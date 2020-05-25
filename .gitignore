@@ -1,0 +1,9 @@
+.DS_Store
+.env
+!.gitignore
+
+.idea/*
+!/.idea/runConfigurations
+
+*.pyc
+*__pycache__*
