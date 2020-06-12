@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
 from collections import defaultdict
