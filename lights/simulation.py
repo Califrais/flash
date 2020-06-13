@@ -5,7 +5,10 @@ from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
+from tick.plot import plot_point_process
+from scipy.stats import gamma, beta
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
@@ -145,8 +148,13 @@ class SimuJointLongitudinalSurvival(Simulation):
     var_error : `float`, default=0.5
         Variance for the error term of the longitudinal process
 
-    hawkes_memory:
-        Must be positive
+    decay : `float`, default=3
+        Decay of exponential kernels for the multivariate Hawkes processes to
+        generate measurement times
+
+    baseline_hawkes_beta_scale : `float`, default=2
+        Scale parameter for the Beta law used to generate constant baselines of
+        measurement times intensities
 
 
 
@@ -185,7 +193,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  cov_corr_time_indep: float = 0.5, low_risk_rate: float = .75,
                  gap: float = .1, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
-                 var_error: float = 0.5,
+                 var_error: float = 0.5, decay: float = 3,
+                 baseline_hawkes_beta_scale: float = 2,
 
                  shape: float = 1.,
                  scale: float = 1.,
@@ -196,15 +205,22 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.n_time_indep_features = n_time_indep_features
         self.time_indep_sparsity = time_indep_sparsity
         self.time_indep_coeff = time_indep_coeff
-        self.time_indep_sparsity = time_indep_sparsity
         self.cov_corr_time_indep = cov_corr_time_indep
         self.low_risk_rate = low_risk_rate
         self.gap = gap
+        self.n_long_features = n_long_features
+        self.cov_corr_long = cov_corr_long
+        self.corr_fixed_effect = corr_fixed_effect
+        self.var_error = var_error
+        self.decay = decay
+        self.baseline_hawkes_beta_scale = baseline_hawkes_beta_scale
+
         self.shape = shape
         self.scale = scale
         self.censoring_factor = censoring_factor
 
         # Attributes that will be instantiated afterwards
+        self.hawkes = None
         self.T = None
         self.G = None
         self.delta = None
@@ -272,48 +288,66 @@ class SimuJointLongitudinalSurvival(Simulation):
         n_time_indep_features = self.n_time_indep_features
         time_indep_sparsity = self.time_indep_sparsity
         time_indep_coeff = self.time_indep_coeff
+        cov_corr_time_indep = self.cov_corr_time_indep
         low_risk_rate = self.low_risk_rate
         gap = self.gap
-        cov_corr_time_indep = self.cov_corr_time_indep
+        n_long_features = self.n_long_features
+        cov_corr_long = self.cov_corr_long
+        corr_fixed_effect = self.corr_fixed_effect
+        var_error = self.var_error
+        decay = self.decay
+        baseline_hawkes_beta_scale = self.baseline_hawkes_beta_scale
 
-        nb_active_features = int(n_time_indep_features * time_indep_sparsity)
-
+        nb_time_indep_active_features = int(
+            n_time_indep_features * time_indep_sparsity)
         xi = np.zeros(n_time_indep_features)
-        xi[0:nb_active_features] = time_indep_coeff
+        xi[0:nb_time_indep_active_features] = time_indep_coeff
 
-        features = features_normal_cov_toeplitz(n_samples,
-                                                n_time_indep_features,
-                                                cov_corr_time_indep)
+        time_indep_features = features_normal_cov_toeplitz(n_samples,
+                                                           n_time_indep_features,
+                                                           cov_corr_time_indep)
 
         # Add class relative information on the design matrix    
         H = np.random.choice(range(n_samples),
                              size=int((1 - low_risk_rate) * n_samples),
                              replace=False)
         H_ = np.delete(range(n_samples), H)
-        features[H, :nb_active_features] += gap
-        features[H_, :nb_active_features] -= gap
-        self.features = features
+        time_indep_features[H, :nb_time_indep_active_features] += gap
+        time_indep_features[H_, :nb_time_indep_active_features] -= gap
+        self.features = time_indep_features
 
         # Simulation of latent variables
-        pi = self.logistic_grad(-features.dot(xi))
+        pi = self.logistic_grad(-time_indep_features.dot(xi))
         u = np.random.rand(n_samples)
         self.G = u <= 1 - pi
 
         ##
-        n_nodes = 3  # dimension of the Hawkes process
-        adjacency = 0.2 * np.ones((n_nodes, n_nodes))
+        baseline = gamma.rvs(a=baseline_hawkes_beta_scale, size=n_long_features)
+        decays = decay * np.ones((n_long_features, n_long_features))
+
+        adjacency = 0.2 * np.ones((n_long_features, n_long_features))
         adjacency[0, 1] = 0
-        decays = 3 * np.ones((n_nodes, n_nodes))
-        baseline = 0.5 * np.ones(n_nodes)
+
         hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
                                       baseline=baseline, verbose=False,
-                                      seed=2398)
+                                      end_time=10, seed=self.seed)
 
-        run_time = 100
-        hawkes.end_time = run_time
-        dt = 0.01
-        hawkes.track_intensity(dt)
+        # TODO: generate T first, then t_i^max, and finally measurment times for long processes with end_time=t_i^max
+
         hawkes.simulate()
+        self.hawkes = hawkes
+
+        if plot_graphs:
+            dt = 0.01
+            hawkes.track_intensity(dt) #TODO: ok de le mettre après simulate?
+            #TODO: pas de plot_graphs > avec self.hawkes ploter ça sur un notebook tuto? à l'exté?
+
+            fig, ax = plt.subplots(n_nodes, 1, figsize=(16, 8), sharex=True,
+                                   sharey=True)
+            plot_point_process(hawkes, n_points=50000, t_min=10, max_jumps=30,
+                               ax=ax)
+            fig.tight_layout()
+
 
 
         ##
