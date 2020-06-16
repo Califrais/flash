@@ -5,10 +5,9 @@ from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
-from tick.plot import plot_point_process
-from scipy.stats import gamma, beta
+from scipy.stats import uniform
+from scipy.sparse import random
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
@@ -138,8 +137,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
     cov_corr_long : `float`, default=0.5
         Correlation to use in the Toeplitz covariance matrix for the random
-        effects simulation, as well as for the adjacency matrix to simulate the
-        measurement times using multivariate Hawkes processes
+        effects simulation
 
     corr_fixed_effect : `float`, default=0.5
         Correlation value to use in the diagonal covariance matrix for the
@@ -152,10 +150,13 @@ class SimuJointLongitudinalSurvival(Simulation):
         Decay of exponential kernels for the multivariate Hawkes processes to
         generate measurement times
 
-    baseline_hawkes_beta_scale : `float`, default=2
-        Scale parameter for the Beta law used to generate constant baselines of
+    baseline_hawkes_uniform_bounds : `list`, default=(.1, .5)
+        Bounds of the uniform distribution used to generate baselines of
         measurement times intensities
 
+    adjacency_hawkes_uniform_bounds : `list`, default=(.05, .1)
+        Bounds of the uniform distribution used to generate sparse adjacency
+        matrix for measurement times intensities
 
 
     scale : `float`, default=1.0
@@ -194,8 +195,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  gap: float = .1, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
                  var_error: float = 0.5, decay: float = 3,
-                 baseline_hawkes_beta_scale: float = 2,
-
+                 baseline_hawkes_uniform_bounds: list = (.1, .5),
+                 adjacency_hawkes_uniform_bounds: list = (.05, .1),
                  shape: float = 1.,
                  scale: float = 1.,
                  censoring_factor: float = 2.):
@@ -213,7 +214,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.corr_fixed_effect = corr_fixed_effect
         self.var_error = var_error
         self.decay = decay
-        self.baseline_hawkes_beta_scale = baseline_hawkes_beta_scale
+        self.baseline_hawkes_uniform_bounds = baseline_hawkes_uniform_bounds
+        self.adjacency_hawkes_uniform_bounds = adjacency_hawkes_uniform_bounds
 
         self.shape = shape
         self.scale = scale
@@ -224,6 +226,27 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.T = None
         self.G = None
         self.delta = None
+
+    @property
+    def time_indep_sparsity(self):
+        return self._time_indep_sparsity
+
+    @time_indep_sparsity.setter
+    def time_indep_sparsity(self, val):
+        if not 0 <= val <= 1:
+            raise ValueError("``time_indep_sparsity`` must be in (0, 1)")
+        self._time_indep_sparsity = val
+
+    @property
+    def low_risk_rate(self):
+        return self._low_risk_rate
+
+    @low_risk_rate.setter
+    def low_risk_rate(self, val):
+        if not 0 <= val <= 1:
+            raise ValueError("``low_risk_rate`` must be in (0, 1)")
+        self._low_risk_rate = val
+
 
     @property
     def shape(self):
@@ -244,16 +267,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         if val <= 0:
             raise ValueError("``scale`` must be strictly positive")
         self._scale = val
-
-    @property
-    def time_indep_sparsity(self):
-        return self._time_indep_sparsity
-
-    @time_indep_sparsity.setter
-    def time_indep_sparsity(self, val):
-        if not 0 <= val <= 1:
-            raise ValueError("``time_indep_sparsity`` must be in (0, 1)")
-        self._time_indep_sparsity = val
 
     @staticmethod
     def logistic_grad(z):
@@ -284,6 +297,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         delta : `np.ndarray`, shape=(n_samples,)
             The simulated censoring indicator
         """
+        verbose = self.verbose
+        seed = self.seed
         n_samples = self.n_samples
         n_time_indep_features = self.n_time_indep_features
         time_indep_sparsity = self.time_indep_sparsity
@@ -296,7 +311,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         corr_fixed_effect = self.corr_fixed_effect
         var_error = self.var_error
         decay = self.decay
-        baseline_hawkes_beta_scale = self.baseline_hawkes_beta_scale
+        baseline_hawkes_uniform_bounds = self.baseline_hawkes_uniform_bounds
+        adjacency_hawkes_uniform_bounds = self.adjacency_hawkes_uniform_bounds
 
         nb_time_indep_active_features = int(
             n_time_indep_features * time_indep_sparsity)
@@ -321,34 +337,27 @@ class SimuJointLongitudinalSurvival(Simulation):
         u = np.random.rand(n_samples)
         self.G = u <= 1 - pi
 
-        ##
-        baseline = gamma.rvs(a=baseline_hawkes_beta_scale, size=n_long_features)
+        a, b = adjacency_hawkes_uniform_bounds
+        rvs = uniform(a, b).rvs
+        adjacency = random(n_long_features, n_long_features, density=0.3,
+                           data_rvs=rvs).todense()
+        np.fill_diagonal(adjacency, rvs(size=n_long_features))
+        a, b = baseline_hawkes_uniform_bounds
+        baseline = uniform(a, b).rvs(size=n_long_features)
         decays = decay * np.ones((n_long_features, n_long_features))
-
-        adjacency = 0.2 * np.ones((n_long_features, n_long_features))
-        adjacency[0, 1] = 0
-
         hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
-                                      baseline=baseline, verbose=False,
-                                      end_time=10, seed=self.seed)
+                                      baseline=baseline, verbose=verbose,
+                                      end_time=100, seed=seed)
 
         # TODO: generate T first, then t_i^max, and finally measurment times for long processes with end_time=t_i^max
 
+        if verbose:
+            # only useful to plot Hawkes multivariate intensities, but
+            # careful: it increases running time!
+            dt = 0.01
+            hawkes.track_intensity(dt)
         hawkes.simulate()
         self.hawkes = hawkes
-
-        if plot_graphs:
-            dt = 0.01
-            hawkes.track_intensity(dt) #TODO: ok de le mettre après simulate?
-            #TODO: pas de plot_graphs > avec self.hawkes ploter ça sur un notebook tuto? à l'exté?
-
-            fig, ax = plt.subplots(n_nodes, 1, figsize=(16, 8), sharex=True,
-                                   sharey=True)
-            plot_point_process(hawkes, n_points=50000, t_min=10, max_jumps=30,
-                               ax=ax)
-            fig.tight_layout()
-
-
 
         ##
 

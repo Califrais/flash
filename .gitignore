@@ -5,5 +5,7 @@
 .idea/*
 !/.idea/runConfigurations
 
+.ipynb_checkpoints
+
 *.pyc
 *__pycache__*
