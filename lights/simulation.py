@@ -319,6 +319,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         decay = self.decay
         baseline_hawkes_uniform_bounds = self.baseline_hawkes_uniform_bounds
         adjacency_hawkes_uniform_bounds = self.adjacency_hawkes_uniform_bounds
+        shape = self.shape
+        scale = self.scale
+        censoring_factor = self.censoring_factor
 
         # Simulation of time-independent coefficient vector
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
@@ -338,7 +341,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.time_indep_features = X
 
         # Simulation of latent variables
-        pi = self.logistic_grad(-X.dot(xi))
+        X_dot_xi = X.dot(xi)
+        pi = self.logistic_grad(-X_dot_xi)
         u = np.random.rand(n_samples)
         G = u <= 1 - pi
         self.latent_class = G
@@ -364,21 +368,48 @@ class SimuJointLongitudinalSurvival(Simulation):
                 2 * nb_active_asso_features] = coeff_val
 
         # Simulation of true times
-        T = np.empty(n_samples)
-        # n_samples_class_1 = np.sum(G)
-        # n_samples_class_0 = n_samples - n_samples_class_1
+        gamma_dim = 4 * n_long_features
+        idx_2 = np.arange(0, gamma_dim, 2)
+        idx_4 = np.arange(0, gamma_dim, 4)
+        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:], [n_long_features - 1]))
+        idx_34.sort()
+        idx_3 = np.arange(0, 2 * n_long_features, 2) + 1
 
-        # T[G == 0] =
-        # T[G == 1] =
+        tmp_0 = np.add.reduceat(gamma_0, idx_2)
+        tmp_1 = np.add.reduceat(gamma_1, idx_2)
+        iota_01 = X_dot_xi[G == 0] + b[G == 0].dot(tmp_0) \
+                  + gamma_0[idx_34].dot(beta_0)
+        iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(gamma_0[idx_4])
+        iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1) \
+                  + gamma_1[idx_34].dot(beta_1)
+        iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
 
-        m = T.mean()
+        T_star = np.empty(n_samples)
+        n_samples_class_1 = np.sum(G)
+        n_samples_class_0 = n_samples - n_samples_class_1
+        u_0 = np.random.uniform(size=n_samples_class_0)
+        u_1 = np.random.uniform(size=n_samples_class_1)
+        scale_plus1 = 1 + scale
+
+        # TODO : sign pb 
+        T_star[G == 0] = np.log(1 - (scale_plus1 * np.log(u_0) /
+                                     iota_02 * scale * shape * np.exp(iota_01))) \
+                         ** (1 / scale_plus1)
+        T_star[G == 1] = np.log(1 - (scale_plus1 * np.log(u_1) /
+                                     iota_12 * scale * shape * np.exp(iota_11))) \
+                         ** (1 / scale_plus1)
+
+        print(T_star)
+
+        m = T_star.mean()
         # Simulation of the censoring
         c = self.censoring_factor
         C = np.random.exponential(scale=c * m, size=n_samples)
-        # Observed time
-        self.times = np.minimum(T, C).astype(int)
+        # Observed censored time
+        T = np.minimum(T_star, C).astype(int)
+        self.times = T
         # Censoring indicator: 1 if it is a time of failure, 0 if censoring
-        delta = (T <= C).astype(np.ushort)
+        delta = (T_star <= C).astype(np.ushort)
         self.censoring = delta
 
         # Simulation of the measurement times using multivariate Hawkes
