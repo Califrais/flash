@@ -127,8 +127,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the
         time-independent features
 
-    low_risk_rate : `float`, default=0.75
-        Proportion of desired low risk samples rate
+    high_risk_rate : `float`, default=0.25
+        Proportion of desired high risk samples rate
 
     gap : `float`, default=0.1
         Gap value to create high/low risk groups in the time-independent
@@ -202,8 +202,8 @@ class SimuJointLongitudinalSurvival(Simulation):
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 200, n_time_indep_features: int = 20,
                  sparsity: float = 0.7, coeff_val: float = 1.,
-                 cov_corr_time_indep: float = 0.5, low_risk_rate: float = .75,
-                 gap: float = .3, n_long_features: int = 5,
+                 cov_corr_time_indep: float = 0.5, high_risk_rate: float = .25,
+                 gap: float = 0.3, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
                  var_error: float = 0.5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
@@ -217,7 +217,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.sparsity = sparsity
         self.coeff_val = coeff_val
         self.cov_corr_time_indep = cov_corr_time_indep
-        self.low_risk_rate = low_risk_rate
+        self.high_risk_rate = high_risk_rate
         self.gap = gap
         self.n_long_features = n_long_features
         self.cov_corr_long = cov_corr_long
@@ -245,14 +245,14 @@ class SimuJointLongitudinalSurvival(Simulation):
         self._sparsity = val
 
     @property
-    def low_risk_rate(self):
-        return self._low_risk_rate
+    def high_risk_rate(self):
+        return self._high_risk_rate
 
-    @low_risk_rate.setter
-    def low_risk_rate(self, val):
+    @high_risk_rate.setter
+    def high_risk_rate(self, val):
         if not 0 <= val <= 1:
-            raise ValueError("``low_risk_rate`` must be in (0, 1)")
-        self._low_risk_rate = val
+            raise ValueError("``high_risk_rate`` must be in (0, 1)")
+        self._high_risk_rate = val
 
     @property
     def scale(self):
@@ -300,7 +300,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         sparsity = self.sparsity
         coeff_val = self.coeff_val
         cov_corr_time_indep = self.cov_corr_time_indep
-        low_risk_rate = self.low_risk_rate
+        high_risk_rate = self.high_risk_rate
         gap = self.gap
         n_long_features = self.n_long_features
         cov_corr_long = self.cov_corr_long
@@ -315,7 +315,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of latent variables
         u = np.random.rand(n_samples)
-        G = (u >= low_risk_rate).astype(int)
+        G = (u <= high_risk_rate).astype(int)
         self.latent_class = G
 
         # Simulation of time-independent coefficient vector
