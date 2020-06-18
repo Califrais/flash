@@ -203,7 +203,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  n_samples: int = 200, n_time_indep_features: int = 20,
                  sparsity: float = 0.7, coeff_val: float = 1.,
                  cov_corr_time_indep: float = 0.5, low_risk_rate: float = .75,
-                 gap: float = 1., n_long_features: int = 5,
+                 gap: float = .3, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
                  var_error: float = 0.5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
@@ -313,6 +313,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         scale = self.scale
         censoring_factor = self.censoring_factor
 
+        # Simulation of latent variables
+        u = np.random.rand(n_samples)
+        G = (u >= low_risk_rate).astype(int)
+        self.latent_class = G
+
         # Simulation of time-independent coefficient vector
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
         xi = np.zeros(n_time_indep_features)
@@ -321,21 +326,12 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
                                          cov_corr_time_indep)
-        # Add class relative information on the design matrix    
-        H = np.random.choice(range(n_samples),
-                             size=int((1 - low_risk_rate) * n_samples),
-                             replace=False)
-        H_ = np.delete(range(n_samples), H)
-        X[H, :nb_active_time_indep_features] += gap
-        X[H_, :nb_active_time_indep_features] -= gap
+        # Add class relative information on the design matrix
+        X[G == 1, :nb_active_time_indep_features] += gap
+        X[G == 0, :nb_active_time_indep_features] -= gap
         self.time_indep_features = X
-
-        # Simulation of latent variables
         X_dot_xi = X.dot(xi)
-        pi = self.logistic_grad(X_dot_xi)
-        u = np.random.rand(n_samples)
-        G = (u <= pi).astype(int)
-        self.latent_class = G
+        # pi = self.logistic_grad(X_dot_xi)
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
