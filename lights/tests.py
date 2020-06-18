@@ -14,19 +14,20 @@ class Test(unittest.TestCase):
         # Simulate data with specific seed
         simu = SimuJointLongitudinalSurvival(n_samples=5,
                                              n_time_indep_features=10,
-                                             n_long_features=2,
-                                             seed=123, verbose=False)
-        features_, times_, censoring_ = simu.simulate()
+                                             n_long_features=5,
+                                             seed=123, verbose=False,
+                                             scale=1, shape=.1)
+        X_, Y_, T_, delta_ = simu.simulate()
 
-        times = np.array([
+        T = np.array([
             1.5022119, 5.93102441, 6.82837051, 0.50940341, 0.14859682,
             30.22922996, 3.54945974, 0.8671229, 1.4228358, 0.11483298
         ])
 
-        censoring = np.array([1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
+        delta = np.array([1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
                              dtype=np.ushort)
 
-        features = np.array([[1.4912667, 0.80881799, 0.26977298], [
+        X = np.array([[1.4912667, 0.80881799, 0.26977298], [
             1.23227551, 0.50697013, 1.9409132
         ], [1.8891494, 1.49834791,
             2.41445794], [0.19431319, 0.80245126, 1.02577552], [
@@ -38,9 +39,9 @@ class Test(unittest.TestCase):
                              ], [0.79464218, 0.65055633, 1.57572506],
                              [0.71524202, 1.66759831, 0.88679047]])
 
-        np.testing.assert_almost_equal(features, features_)
-        np.testing.assert_almost_equal(times, times_)
-        np.testing.assert_almost_equal(censoring, censoring_)
+        np.testing.assert_almost_equal(X, X_)
+        np.testing.assert_almost_equal(T, T_)
+        np.testing.assert_almost_equal(delta, delta_)
 
     @staticmethod
     def get_train_data(seed: int = 1):

@@ -148,7 +148,7 @@ class SimuJointLongitudinalSurvival(Simulation):
     var_error : `float`, default=0.5
         Variance for the error term of the longitudinal process
 
-    decay : `float`, default=3
+    decay : `float`, default=3.0
         Decay of exponential kernels for the multivariate Hawkes processes to
         generate measurement times
 
@@ -160,11 +160,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         Bounds of the uniform distribution used to generate sparse adjacency
         matrix for measurement times intensities
 
-    scale : `float`, default=2.
-        Scaling parameter of the Weibull distribution of the baseline
+    scale : `float`, default=1.0
+        Scaling parameter of the Gompertz distribution of the baseline
 
-    shape : `float`, default=.1
-        Shape parameter of the Weibull distribution of the baseline
+    shape : `float`, default=1.0
+        Shape parameter of the Gompertz distribution of the baseline
 
     censoring_factor : `float`, default=2.0
         Level of censoring. Increasing censoring_factor leads to less censored
@@ -203,13 +203,13 @@ class SimuJointLongitudinalSurvival(Simulation):
                  n_samples: int = 200, n_time_indep_features: int = 20,
                  sparsity: float = 0.7, coeff_val: float = 1.,
                  cov_corr_time_indep: float = 0.5, low_risk_rate: float = .75,
-                 gap: float = .1, n_long_features: int = 5,
+                 gap: float = 1., n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
-                 var_error: float = 0.5, decay: float = 3,
+                 var_error: float = 0.5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
                  adjacency_hawkes_uniform_bounds: list = (.05, .1),
                  shape: float = 1., scale: float = 1.,
-                 censoring_factor: float = 2.):
+                 censoring_factor: float = 2):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
@@ -253,16 +253,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         if not 0 <= val <= 1:
             raise ValueError("``low_risk_rate`` must be in (0, 1)")
         self._low_risk_rate = val
-
-    @property
-    def shape(self):
-        return self._shape
-
-    @shape.setter
-    def shape(self, val):
-        if val <= 0:
-            raise ValueError("``shape`` must be strictly positive")
-        self._shape = val
 
     @property
     def scale(self):
@@ -342,9 +332,9 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of latent variables
         X_dot_xi = X.dot(xi)
-        pi = self.logistic_grad(-X_dot_xi)
+        pi = self.logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
-        G = u <= 1 - pi
+        G = (u <= pi).astype(int)
         self.latent_class = G
 
         # Simulation of the random effects components
@@ -387,26 +377,21 @@ class SimuJointLongitudinalSurvival(Simulation):
         T_star = np.empty(n_samples)
         n_samples_class_1 = np.sum(G)
         n_samples_class_0 = n_samples - n_samples_class_1
-        u_0 = np.random.uniform(size=n_samples_class_0)
-        u_1 = np.random.uniform(size=n_samples_class_1)
-        scale_plus1 = 1 + scale
+        u_0 = np.random.rand(n_samples_class_0)
+        u_1 = np.random.rand(n_samples_class_1)
 
-        # TODO : sign pb 
-        T_star[G == 0] = np.log(1 - (scale_plus1 * np.log(u_0) /
-                                     iota_02 * scale * shape * np.exp(iota_01))) \
-                         ** (1 / scale_plus1)
-        T_star[G == 1] = np.log(1 - (scale_plus1 * np.log(u_1) /
-                                     iota_12 * scale * shape * np.exp(iota_11))) \
-                         ** (1 / scale_plus1)
-
-        print(T_star)
+        tmp = iota_02 + shape
+        T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
+                                scale * np.exp(iota_01)) / tmp
+        tmp = iota_12 + shape
+        T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
+                                scale * np.exp(iota_11)) / tmp
 
         m = T_star.mean()
         # Simulation of the censoring
-        c = self.censoring_factor
-        C = np.random.exponential(scale=c * m, size=n_samples)
+        C = np.random.exponential(scale=censoring_factor * m, size=n_samples)
         # Observed censored time
-        T = np.minimum(T_star, C).astype(int)
+        T = np.minimum(T_star, C)  #.astype(int)
         self.times = T
         # Censoring indicator: 1 if it is a time of failure, 0 if censoring
         delta = (T_star <= C).astype(np.ushort)
