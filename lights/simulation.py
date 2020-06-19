@@ -5,6 +5,7 @@ from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
+from sklearn.preprocessing import MinMaxScaler
 from scipy.stats import uniform
 from scipy.sparse import random
 import numpy as np
@@ -127,10 +128,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the
         time-independent features
 
-    high_risk_rate : `float`, default=0.25
+    high_risk_rate : `float`, default=0.4
         Proportion of desired high risk samples rate
 
-    gap : `float`, default=0.1
+    gap : `float`, default=0.2
         Gap value to create high/low risk groups in the time-independent
         features
 
@@ -202,8 +203,8 @@ class SimuJointLongitudinalSurvival(Simulation):
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 200, n_time_indep_features: int = 20,
                  sparsity: float = 0.7, coeff_val: float = 1.,
-                 cov_corr_time_indep: float = 0.5, high_risk_rate: float = .25,
-                 gap: float = 0.3, n_long_features: int = 5,
+                 cov_corr_time_indep: float = 0.5, high_risk_rate: float = .4,
+                 gap: float = .1, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
                  var_error: float = 0.5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
@@ -329,6 +330,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Add class relative information on the design matrix
         X[G == 1, :nb_active_time_indep_features] += gap
         X[G == 0, :nb_active_time_indep_features] -= gap
+
+        scaler = MinMaxScaler()
+        X = scaler.fit_transform(X)
+
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
         # pi = self.logistic_grad(X_dot_xi)
@@ -350,7 +355,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         gamma_0 = np.zeros(nb_asso_features)
         gamma_1 = gamma_0.copy()
         gamma_0[0:nb_active_asso_features] = coeff_val
-        gamma_1[nb_active_asso_features + 1:
+        gamma_1[nb_active_asso_features:
                 2 * nb_active_asso_features] = coeff_val
 
         # Simulation of true times
@@ -378,10 +383,10 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         tmp = iota_02 + shape
         T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
-                                scale * np.exp(iota_01)) / tmp
+                                (scale * np.exp(iota_01))) / tmp
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
-                                scale * np.exp(iota_11)) / tmp
+                                (scale * np.exp(iota_11))) / tmp
 
         m = T_star.mean()
         # Simulation of the censoring
