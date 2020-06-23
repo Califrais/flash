@@ -388,6 +388,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
                                 (scale * np.exp(iota_11))) / tmp
 
+        print(G)
+        print(T_star[G == 0])
+        print(T_star[G == 1])
+
         m = T_star.mean()
         # Simulation of the censoring
         C = np.random.exponential(scale=censoring_factor * m, size=n_samples)
