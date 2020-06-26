@@ -9,7 +9,8 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.stats import uniform
 from scipy.sparse import random
 import numpy as np
-
+import pandas as pd
+import matplotlib.pyplot as plt
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
                                  rho: float = 0.5):
@@ -322,14 +323,14 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of time-independent coefficient vector
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
         xi = np.zeros(n_time_indep_features)
-        xi[0:nb_active_time_indep_features] = coeff_val
+        xi[0:nb_active_time_indep_features] = -4*coeff_val
 
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
                                          cov_corr_time_indep)
         # Add class relative information on the design matrix
-        X[G == 1, :nb_active_time_indep_features] += gap
-        X[G == 0, :nb_active_time_indep_features] -= gap
+        X[G == 1, :nb_active_time_indep_features] -= gap
+        X[G == 0, :nb_active_time_indep_features] += gap
 
         scaler = MinMaxScaler()
         X = scaler.fit_transform(X)
@@ -340,40 +341,51 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
-        b = features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
+        b = 0.1*features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
 
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
-        beta_0 = - np.random.multivariate_normal(np.ones(q), np.diag(
+        beta_0 = 0.1*np.random.multivariate_normal(np.ones(q), np.diag(
             corr_fixed_effect * np.ones(q)))
-        beta_1 = np.random.multivariate_normal(np.ones(q), np.diag(
+        beta_1 = 0.3*np.random.multivariate_normal(np.ones(q), np.diag(
             corr_fixed_effect * np.ones(q)))
 
         # Simulation of the association parameters
         nb_asso_features = n_long_features * 4  # 4: nb of asso param
-        nb_active_asso_features = int(nb_asso_features * sparsity / 2)  # K=2
-        gamma_0 = np.zeros(nb_asso_features)
-        gamma_1 = gamma_0.copy()
-        gamma_0[0:nb_active_asso_features] = coeff_val
-        gamma_1[nb_active_asso_features:
-                2 * nb_active_asso_features] = coeff_val
+        
+        def sparsity_asso_features(k):
+            gamma = np.zeros(nb_asso_features)
+            low_limit = int((k * sparsity * n_long_features) / 2) + 1
+            high_limit = int(((k + 1) * sparsity * n_long_features) / 2)
+            S_k = np.arange(low_limit, high_limit + 1)
+            for l in range(n_long_features):
+                if (l + 1) < n_long_features * sparsity:
+                    gamma[4 * l: 4 * (l + 1)] += coeff_val
+                if (l + 1) in S_k:
+                    gamma[4 * l: 4 * (l + 1)] += coeff_val
+            return gamma
+
+
+        gamma_0 = sparsity_asso_features(0)
+        gamma_1 = sparsity_asso_features(1)
 
         # Simulation of true times
-        gamma_dim = 4 * n_long_features
-        idx_2 = np.arange(0, gamma_dim, 2)
-        idx_4 = np.arange(0, gamma_dim, 4)
-        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:], [n_long_features - 1]))
+        idx_2 = np.arange(0, nb_asso_features, 2)
+        idx_4 = np.arange(0, nb_asso_features, 4)
+        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:], [4*n_long_features - 1]))
         idx_34.sort()
         idx_3 = np.arange(0, 2 * n_long_features, 2) + 1
 
         tmp_0 = np.add.reduceat(gamma_0, idx_2)
         tmp_1 = np.add.reduceat(gamma_1, idx_2)
+
         iota_01 = X_dot_xi[G == 0] + b[G == 0].dot(tmp_0) \
                   + gamma_0[idx_34].dot(beta_0)
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(gamma_0[idx_4])
         iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1) \
                   + gamma_1[idx_34].dot(beta_1)
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
+
 
         T_star = np.empty(n_samples)
         n_samples_class_1 = np.sum(G)
@@ -384,13 +396,25 @@ class SimuJointLongitudinalSurvival(Simulation):
         tmp = iota_02 + shape
         T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
                                 (scale * np.exp(iota_01))) / tmp
+
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
                                 (scale * np.exp(iota_11))) / tmp
 
+        # visualize the result
         print(G)
         print(T_star[G == 0])
         print(T_star[G == 1])
+        df = pd.DataFrame(data={"time": T_star, "group": G})
+        bins = np.linspace(0, 20, 40)
+        kwargs = dict(bins=bins, alpha=0.7, rwidth=0.9)
+        plt.hist(df.loc[df.group == 1, 'time'], **kwargs, color='r', label='High-risk')
+        plt.hist(df.loc[df.group==0, 'time'], **kwargs, color='b', label='Low-risk')
+        plt.legend()
+        plt.xlabel("Survival time",fontweight="bold")
+        plt.ylabel("Count",fontweight="bold")
+        plt.title("Frequency histogram of survival time",fontweight="bold",size=14)
+        plt.show()
 
         m = T_star.mean()
         # Simulation of the censoring
