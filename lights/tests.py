@@ -14,11 +14,8 @@ class Test(unittest.TestCase):
         # Simulate data with specific seed
         simu = SimuJointLongitudinalSurvival(n_samples=10000,
                                              n_time_indep_features=3,
-                                             n_long_features=5,
-                                             gap=0.5,
-                                             cov_corr_long = .1,
-                                             seed=123, verbose=False,
-                                             scale=.5, shape=.5)
+                                             n_long_features=2,
+                                             seed=123, verbose=False)
         X_, Y_, T_, delta_ = simu.simulate()
 
         T = np.array([
