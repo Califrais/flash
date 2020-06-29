@@ -265,17 +265,6 @@ class SimuJointLongitudinalSurvival(Simulation):
             raise ValueError("``scale`` must be strictly positive")
         self._scale = val
 
-    @staticmethod
-    def logistic_grad(z):
-        """Overflow proof computation of 1 / (1 + exp(-z)))
-        """
-        idx_pos = np.where(z >= 0.)
-        idx_neg = np.where(z < 0.)
-        res = np.empty(z.shape)
-        res[idx_pos] = 1. / (1. + np.exp(-z[idx_pos]))
-        res[idx_neg] = 1 - 1. / (1. + np.exp(z[idx_neg]))
-        return res
-
     @simulation_method
     def simulate(self):
         """Launch simulation of the data
@@ -336,7 +325,6 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
-        # pi = self.logistic_grad(X_dot_xi)
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
