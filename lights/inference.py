@@ -31,10 +31,6 @@ class Learner:
         self.print_every = print_every
         self.history = History()
 
-    def _init_coeffs(self, n_features):
-        self.coeffs = np.empty(n_features)
-        self.n_features = n_features
-
     def _start_solve(self):
         # Reset history
         self.history.clear()
