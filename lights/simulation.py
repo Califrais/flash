@@ -202,7 +202,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 20,
-                 sparsity: float = 0.7, coeff_val_time_indep: float = 12.,
+                 sparsity: float = 0.7, coeff_val_time_indep: float = -12.,
                  coeff_val_time_dep: float = 1., cov_corr_time_indep: float = 0.5,
                  high_risk_rate: float = .4, gap: float = .5, n_long_features: int = 5,
                  cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
@@ -300,12 +300,12 @@ class SimuJointLongitudinalSurvival(Simulation):
         n_samples = self.n_samples
         n_time_indep_features = self.n_time_indep_features
         sparsity = self.sparsity
-        coeff_val_time_indep = self.coeff_val_time_indep/n_time_indep_features
+        coeff_val_time_indep = self.coeff_val_time_indep
         cov_corr_time_indep = self.cov_corr_time_indep
         high_risk_rate = self.high_risk_rate
         gap = self.gap
         n_long_features = self.n_long_features
-        coeff_val_time_dep = self.coeff_val_time_dep/n_long_features
+        coeff_val_time_dep = self.coeff_val_time_dep
         cov_corr_long = self.cov_corr_long
         corr_fixed_effect = self.corr_fixed_effect
         var_error = self.var_error
@@ -330,10 +330,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
                                          cov_corr_time_indep)
         # Add class relative information on the design matrix
-        X[G == 1, :nb_active_time_indep_features] += gap
-        X[G == 0, :nb_active_time_indep_features] -= gap
+        X[G == 1, :nb_active_time_indep_features] -= gap
+        X[G == 0, :nb_active_time_indep_features] += gap
 
-        scaler = MinMaxScaler(feature_range=(-1, 0))
+        scaler = MinMaxScaler()
         X = scaler.fit_transform(X)
 
         self.time_indep_features = X
@@ -342,11 +342,11 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
-        b = 0.2 * features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
+        b = 0.1 * features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
 
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
-        beta_0 = -0.2 * np.random.multivariate_normal(np.ones(q), np.diag(
+        beta_0 = 0.2 * np.random.multivariate_normal(np.ones(q), np.diag(
             corr_fixed_effect * np.ones(q)))
         beta_1 = 0.6 * np.random.multivariate_normal(np.ones(q), np.diag(
             corr_fixed_effect * np.ones(q)))
