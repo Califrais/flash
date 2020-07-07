@@ -143,6 +143,14 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
+    fixed_effect_mean_low_risk : `tuple`, default=(1, .3)
+        Mean vector of the gaussian used to generate the fixed effect parameters
+        for the low risk group
+
+    fixed_effect_mean_high_risk : `tuple`, default=(1, .5)
+        Mean vector of the gaussian used to generate the fixed effect parameters
+        for the high risk group
+
     corr_fixed_effect : `float`, default=0.1
         Correlation value to use in the diagonal covariance matrix for the
         fixed effect simulation
@@ -222,6 +230,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5, decay: float = 3.,
                  n_long_features: int = 10, cov_corr_long: float = .001,
+                 fixed_effect_mean_low_risk: tuple = (1, .3),
+                 fixed_effect_mean_high_risk: tuple = (1, .5),
                  corr_fixed_effect: float = .01, var_error: float = 0.5,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
                  adjacency_hawkes_uniform_bounds: list = (.05, .1),
@@ -239,6 +249,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.gap = gap
         self.n_long_features = n_long_features
         self.cov_corr_long = cov_corr_long
+        self.fixed_effect_mean_low_risk = fixed_effect_mean_low_risk
+        self.fixed_effect_mean_high_risk = fixed_effect_mean_high_risk
         self.corr_fixed_effect = corr_fixed_effect
         self.var_error = var_error
         self.decay = decay
@@ -317,6 +329,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         gap = self.gap
         n_long_features = self.n_long_features
         cov_corr_long = self.cov_corr_long
+        fixed_effect_mean_low_risk = self.fixed_effect_mean_low_risk
+        fixed_effect_mean_high_risk = self.fixed_effect_mean_high_risk
         corr_fixed_effect = self.corr_fixed_effect
         var_error = self.var_error
         decay = self.decay
@@ -354,11 +368,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
 
-        mean = [1, .3] * n_long_features
-        beta_0 = np.random.multivariate_normal(mean, np.diag(
+        mean_0 = fixed_effect_mean_low_risk * n_long_features
+        beta_0 = np.random.multivariate_normal(mean_0, np.diag(
             corr_fixed_effect * np.ones(q)))
-        mean = [1, .5] * n_long_features
-        beta_1 = np.random.multivariate_normal(mean, np.diag(
+        mean_1 = fixed_effect_mean_high_risk * n_long_features
+        beta_1 = np.random.multivariate_normal(mean_1, np.diag(
             corr_fixed_effect * np.ones(q)))
         self.betas = [beta_0, beta_1]
 
