@@ -5,7 +5,6 @@ from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
-from sklearn.preprocessing import MinMaxScaler
 from scipy.stats import uniform
 from scipy.sparse import random
 import numpy as np
@@ -41,7 +40,6 @@ def simulation_method(simulate_method):
     """A decorator for simulation methods.
     It simply calls _start_simulation and _end_simulation methods
     """
-
     def decorated_simulate_method(self):
         self._start_simulation()
         result = simulate_method(self)
@@ -56,7 +54,6 @@ class Simulation:
     """This is an abstract simulation class that inherits form BaseClass
     It does nothing besides printing stuff and verbosing
     """
-
     def __init__(self, seed=None, verbose=True):
         # Set default parameters
         self.seed = seed
@@ -120,9 +117,13 @@ class SimuJointLongitudinalSurvival(Simulation):
         Proportion of both time-independent and association features active
         coefficients vector. Must be in [0, 1].
 
-    coeff_val : `float`, default=1
-        Value of the active coefficients in both the time-independent and
-        association coefficient vectors
+    coeff_val_time_indep : `float`, default=1.
+        Value of the active coefficients in the time-independent coefficient
+        vectors
+
+    coeff_val_asso : `float`, default=.1
+        Value of the coefficients parameter used in the association coefficient
+        vectors
 
     cov_corr_time_indep : `float`, default=0.5
         Correlation to use in the Toeplitz covariance matrix for the
@@ -138,11 +139,11 @@ class SimuJointLongitudinalSurvival(Simulation):
     n_long_features : `int`, default=5
         Number of longitudinal features
 
-    cov_corr_long : `float`, default=0.5
+    cov_corr_long : `float`, default=0.1
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
-    corr_fixed_effect : `float`, default=0.5
+    corr_fixed_effect : `float`, default=0.1
         Correlation value to use in the diagonal covariance matrix for the
         fixed effect simulation
 
@@ -191,6 +192,22 @@ class SimuJointLongitudinalSurvival(Simulation):
     latent_class : `np.ndarray`, shape=(n_samples,)
         Simulated latent classes
 
+    xi : `np.ndarray`, shape=(n_time_indep_features,)
+
+
+    betas : `list`, [beta_0, beta_1]
+        Simulated fixed effect parameters per group
+
+    gammas : `list`, [gamma_0, gamma_1]
+        Simulated association parameters per group
+
+    iotas : `dict`, {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
+        Simulated linear time-varying features per group in the Cox model used
+        to simulate event times
+
+    event_times : `np.ndarray`, shape=(n_samples,)
+            The simulated times of the event of interest
+
     hawkes : `tick.hawkes.simulation.simu_hawkes_exp_kernels`
         Multivariate Hawkes process with exponential kernels used to
         simulate measurement times
@@ -199,24 +216,24 @@ class SimuJointLongitudinalSurvival(Simulation):
     -----
     There is no intercept in this model
     """
-
     def __init__(self, verbose: bool = True, seed: int = None,
-                 n_samples: int = 1000, n_time_indep_features: int = 20,
-                 sparsity: float = 0.7, coeff_val: float = 1.,
-                 cov_corr_time_indep: float = 0.5, high_risk_rate: float = .4,
-                 gap: float = .5, n_long_features: int = 5,
-                 cov_corr_long: float = 0.5, corr_fixed_effect: float = 0.5,
-                 var_error: float = 0.5, decay: float = 3.,
+                 n_samples: int = 1000, n_time_indep_features: int = 10,
+                 sparsity: float = .7, coeff_val_time_indep: float = 1.,
+                 coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
+                 high_risk_rate: float = .4, gap: float = .5, decay: float = 3.,
+                 n_long_features: int = 10, cov_corr_long: float = .001,
+                 corr_fixed_effect: float = .01, var_error: float = 0.5,
                  baseline_hawkes_uniform_bounds: list = (.1, .5),
                  adjacency_hawkes_uniform_bounds: list = (.05, .1),
-                 shape: float = .5, scale: float = .5,
+                 shape: float = .1, scale: float = .001,
                  censoring_factor: float = 2):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
         self.sparsity = sparsity
-        self.coeff_val = coeff_val
+        self.coeff_val_time_indep = coeff_val_time_indep
+        self.coeff_val_asso = coeff_val_asso
         self.cov_corr_time_indep = cov_corr_time_indep
         self.high_risk_rate = high_risk_rate
         self.gap = gap
@@ -233,6 +250,11 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Attributes that will be instantiated afterwards
         self.latent_class = None
+        self.xi = None
+        self.event_times = None
+        self.betas = None
+        self.gammas = None
+        self.iotas = None
         self.hawkes = None
 
     @property
@@ -278,7 +300,7 @@ class SimuJointLongitudinalSurvival(Simulation):
             The simulated longitudinal data
 
         T : `np.ndarray`, shape=(n_samples,)
-            The simulated times of the event of interest
+            The simulated censored times of the event of interest
 
         delta : `np.ndarray`, shape=(n_samples,)
             The simulated censoring indicator
@@ -288,7 +310,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         n_samples = self.n_samples
         n_time_indep_features = self.n_time_indep_features
         sparsity = self.sparsity
-        coeff_val = self.coeff_val
+        coeff_val_time_indep = self.coeff_val_time_indep
+        coeff_val_asso = self.coeff_val_asso
         cov_corr_time_indep = self.cov_corr_time_indep
         high_risk_rate = self.high_risk_rate
         gap = self.gap
@@ -311,49 +334,55 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of time-independent coefficient vector
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
         xi = np.zeros(n_time_indep_features)
-        xi[0:nb_active_time_indep_features] = -4*coeff_val
+        xi[0:nb_active_time_indep_features] = coeff_val_time_indep
+        self.xi = xi
 
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
                                          cov_corr_time_indep)
         # Add class relative information on the design matrix
-        X[G == 1, :nb_active_time_indep_features] -= gap
-        X[G == 0, :nb_active_time_indep_features] += gap
-
-        scaler = MinMaxScaler()
-        X = scaler.fit_transform(X)
+        X[G == 1, :nb_active_time_indep_features] += gap
+        X[G == 0, :nb_active_time_indep_features] -= gap
 
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
-        b = 0.1 * features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
+        b = .1 * features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
 
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
-        beta_0 = -0.1 * np.random.multivariate_normal(np.ones(q), np.diag(
+
+        mean = [1, .3] * n_long_features
+        beta_0 = np.random.multivariate_normal(mean, np.diag(
             corr_fixed_effect * np.ones(q)))
-        beta_1 = 0.3 * np.random.multivariate_normal(np.ones(q), np.diag(
+        mean = [1, .5] * n_long_features
+        beta_1 = np.random.multivariate_normal(mean, np.diag(
             corr_fixed_effect * np.ones(q)))
+        self.betas = [beta_0, beta_1]
 
         # Simulation of the association parameters
-        nb_asso_features = n_long_features * 4  # 4: nb of asso param
+        nb_asso_param = 4
+        nb_asso_features = n_long_features * nb_asso_param
 
         def simu_sparse_asso_features(k):
             gamma = np.zeros(nb_asso_features)
-            low_limit = int((k * sparsity * n_long_features) / 2) + 1
-            high_limit = int(((k + 1) * sparsity * n_long_features) / 2)
+            low_limit = k * int(sparsity * n_long_features / 2) + 1
+            high_limit = (k + 1) * int(sparsity * n_long_features / 2)
             S_k = np.arange(low_limit, high_limit + 1)
             for l in range(n_long_features):
-                if (l + 1) < n_long_features * sparsity:
-                    gamma[4 * l: 4 * (l + 1)] += coeff_val
-                if (l + 1) in S_k:
-                    gamma[4 * l: 4 * (l + 1)] += coeff_val
+                if l + 1 <= 2 * int(sparsity * n_long_features / 2):
+                    gamma[nb_asso_param * l:
+                          nb_asso_param * (l + 1)] += coeff_val_asso
+                if l + 1 in S_k:
+                    gamma[nb_asso_param * l:
+                          nb_asso_param * (l + 1)] += coeff_val_asso
             return gamma
 
         gamma_0 = simu_sparse_asso_features(0)
         gamma_1 = simu_sparse_asso_features(1)
+        self.gammas = [gamma_0, gamma_1]
 
         # Simulation of true times
         idx_2 = np.arange(0, nb_asso_features, 2)
@@ -371,8 +400,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1) \
                   + gamma_1[idx_34].dot(beta_1)
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
+        self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
 
-        T_star = np.empty(n_samples)
+        T_star = np.zeros(n_samples)
         n_samples_class_1 = np.sum(G)
         n_samples_class_0 = n_samples - n_samples_class_1
         u_0 = np.random.rand(n_samples_class_0)
@@ -384,6 +414,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
                                 (scale * np.exp(iota_11))) / tmp
+        self.event_times = T_star
 
         m = T_star.mean()
         # Simulation of the censoring
@@ -415,6 +446,8 @@ class SimuJointLongitudinalSurvival(Simulation):
             # careful: it increases running time!
             dt = 0.01
             hawkes.track_intensity(dt)
+
+        # TODO: add n_sample dimension
         hawkes.simulate()
         self.hawkes = hawkes
 
