@@ -12,9 +12,9 @@ class Test(unittest.TestCase):
         """Test simulation of joint longitudinal and survival data
         """
         # Simulate data with specific seed
-        simu = SimuJointLongitudinalSurvival(n_samples=10000,
-                                             n_time_indep_features=30,
-                                             n_long_features=50,
+        simu = SimuJointLongitudinalSurvival(n_samples=1000,
+                                             n_time_indep_features=10,
+                                             n_long_features=10,
                                              seed=123, verbose=False)
         X_, Y_, T_, delta_ = simu.simulate()
 
