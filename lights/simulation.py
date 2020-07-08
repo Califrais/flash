@@ -367,7 +367,6 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
-
         mean_0 = fixed_effect_mean_low_risk * n_long_features
         beta_0 = np.random.multivariate_normal(mean_0, np.diag(
             corr_fixed_effect * np.ones(q)))

@@ -81,11 +81,11 @@ class ULMM:
     """Fit univariate linear mixed models
     """
 
-    def __init__(self):
-        # TODO Van Tuan
+    def __init__(self, fixed_effect_time_order=5):
+        self.fixed_effect_time_order = fixed_effect_time_order
+
         # Attributes that will be instantiated afterwards
-        self.beta_0 = None
-        self.beta_1 = None
+        self.beta = None
         self.D = None
         self.phi = None
 
@@ -104,6 +104,17 @@ class ULMM:
             Censoring indicator
         """
         # TODO Van Tuan
+        fixed_effect_time_order = self.fixed_effect_time_order
+        n_long_features = Y.shape[1]
+        q = (fixed_effect_time_order + 1) * n_long_features
+        r = 2 * n_long_features  # and all r_l=2
+        beta = np.zeros(q)
+        D = np.ones((r, r))
+        phi = np.ones(n_long_features)
+
+        self.beta = beta
+        self.D = D
+        self.phi = phi
 
 
 class MLMM(Learner):
@@ -136,8 +147,7 @@ class MLMM(Learner):
         self.tol = tol
 
         # Attributes that will be instantiated afterwards
-        self.beta_0 = None
-        self.beta_1 = None
+        self.beta = None
         self.D = None
         self.phi = None
 
@@ -188,8 +198,7 @@ class MLMM(Learner):
         # We initialize parameters by fitting univariate linear mixed models
         ulmm = ULMM()
         ulmm.fit(Y, T, delta)
-        beta_0 = ulmm.beta_0
-        beta_1 = ulmm.beta_1
+        beta = ulmm.beta
         D = ulmm.D
         phi = ulmm.phi
 
@@ -224,8 +233,7 @@ class MLMM(Learner):
         if verbose:
             self.history.print_history()
         self._end_solve()
-        self.beta_0 = beta_0
-        self.beta_1 = beta_1
+        self.beta = beta
         self.D = D
         self.phi = phi
 
@@ -267,11 +275,17 @@ class QNMCEM(Learner):
 
     warm_start : `bool`, default=False
         If true, learning will start from the last reached solution
+
+    fixed_effect_time_order : `int`, default=5
+        Order of the higher time monomial considered for the representations of
+        the time-varying features corresponding to the fixed effect. The
+        dimension of the corresponding design matrix is then equal to
+        fixed_effect_time_order + 1
     """
 
     def __init__(self, fit_intercept=False, l_elastic_net=0.,
                  eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 warm_start=False):
+                 warm_start=False, fixed_effect_time_order=5):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.l_elastic_net = l_elastic_net
         self.eta = eta
@@ -279,20 +293,23 @@ class QNMCEM(Learner):
         self.tol = tol
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
+        self.fixed_effect_time_order = fixed_effect_time_order
 
         # Attributes that will be instantiated afterwards
+        self.n_time_indep_features = None
+        self.n_samples = None
         self.beta_0 = None
         self.beta_1 = None
         self.D = None
         self.phi = None
-        self.xi_ext = None
+        self.xi = None
+        self.gamma_0 = None
+        self.gamma_1 = None
         self.avg_scores = None
         self.scores = None
         self.l_elastic_net_best = None
         self.l_elastic_net_chosen = None
         self.grid_elastic_net = None
-        self.n_time_indep_features = None
-        self.n_samples = None
         self.adaptative_grid_el = None
         self.grid_size = None
 
@@ -319,8 +336,19 @@ class QNMCEM(Learner):
         res[idx_neg] = -z_neg + np.log(1. + np.exp(z_neg))
         return res
 
+    @staticmethod
+    def get_vect_from_ext(v_ext):
+        """Obtain the signed coefficient vector from its extension on positive
+        and negative parts
+        """
+        dim = len(v_ext)
+        if dim % 2 != 0:
+            raise ValueError("``v_ext`` dimension cannot be odd, got %s" % dim)
+        v = v_ext[:dim] - v_ext[dim:]
+        return v
+
     def _get_xi_from_xi_ext(self, xi_ext):
-        """Get the time-independent coefficient vector from its decomposition on
+        """Get the time-independent coefficient vector from its extension on
         positive and negative parts
 
         Parameters
@@ -526,7 +554,7 @@ class QNMCEM(Learner):
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, xi_ext):
         """Probability estimates for being on the high-risk group
 
         Parameters
@@ -534,13 +562,17 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
+        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+            The time-independent coefficient vector decomposed on positive and
+            negative parts
+
         Returns
         -------
         output : `np.ndarray`, shape=(n_samples,)
             Returns the probability of the sample for being on the high-risk
             group
         """
-        xi_0, xi = self._get_xi_from_xi_ext(self.xi_ext)
+        xi_0, xi = self._get_xi_from_xi_ext(xi_ext)
         u = xi_0 + X.dot(xi)
         return QNMCEM.logistic_grad(u)
 
@@ -588,8 +620,12 @@ class QNMCEM(Learner):
         tol = self.tol
         warm_start = self.warm_start
         fit_intercept = self.fit_intercept
+        fixed_effect_time_order = self.fixed_effect_time_order
 
         n_samples, n_time_indep_features = X.shape
+        n_long_features = Y.shape[1]
+        nb_asso_param = 4
+        nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
         self._start_solve()
@@ -598,24 +634,20 @@ class QNMCEM(Learner):
         if fit_intercept:
             n_time_indep_features += 1
         xi_ext = np.zeros(2 * n_time_indep_features)
-        self.xi_ext = xi_ext
+        gamma_0_ext = np.zeros(2 * nb_asso_features)
+        gamma_1_ext = gamma_0_ext.copy()
 
         # We initialize the longitudinal submodels parameters by fitting a
         # multivariate linear mixed model
         mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
                     tol=tol)
         mlmm.fit(Y, T, delta)
-        beta_0 = mlmm.beta_0
-        beta_1 = mlmm.beta_1
+        beta_init = mlmm.beta
+        beta_0_ext = np.concatenate((beta_init, -beta_init))
+        beta_0_ext[beta_0_ext < 0] = 0
+        beta_1_ext = beta_0_ext.copy()
         D = mlmm.D
         phi = mlmm.phi
-
-        self.beta_0, self.beta_1, self.D, self.phi = beta_0, beta_1, D, phi
-        if verbose:
-            print("init: beta_0=%s" % beta_0)
-            print("init: beta_1=%s" % beta_1)
-            print("init: D=%s" % D)
-            print("init: phi=%s" % phi)
 
         func_obj = self._func_obj
         P_func = self._P_func
@@ -626,14 +658,14 @@ class QNMCEM(Learner):
 
         # Bounds vector for the L-BGFS-B algorithms
         bounds_xi = [(0, None)] * n_time_indep_features * 2
+        bounds_beta = [(0, None)] * n_long_features * \
+                      (fixed_effect_time_order + 1) * 2
+        bounds_gamma = [(0, None)] * nb_asso_features * 2
 
         n_iter = 0
         for n_iter in range(max_iter):
-            if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj)
-                if verbose:
-                    self.history.print_history()
-            pi = self.predict_proba(X)
+
+            pi = self.predict_proba(X, xi_ext)
 
             # E-Step
             # TODO Simon
@@ -656,25 +688,29 @@ class QNMCEM(Learner):
                 pgtol=1e-5
             )[0]
 
-            xi = self._get_xi_from_xi_ext(xi_ext)[1]
-            prev_obj = obj
+            if n_iter % print_every == 0:
+                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
+                                    D=D, phi=phi,
+                                    beta_0=self.get_vect_from_ext(beta_0_ext),
+                                    beta_1=self.get_vect_from_ext(beta_1_ext),
+                                    xi=self._get_xi_from_xi_ext(xi_ext)[1],
+                                    gamma_0=self.get_vect_from_ext(gamma_0_ext),
+                                    gamma_1=self.get_vect_from_ext(gamma_1_ext))
+                if verbose:
+                    self.history.print_history()
 
+            prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
 
-        self.history.update(n_iter=n_iter + 1, obj=obj, rel_obj=rel_obj)
-        if verbose:
-            self.history.print_history()
-            print("At the end: beta_0=%s" % beta_0)
-            print("At the end: beta_1=%s" % beta_1)
-            print("At the end: D=%s" % D)
-            print("At the end: phi=%s" % phi)
-
         self._end_solve()
-        self.beta_0 = beta_0
-        self.beta_1 = beta_1
+        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
+        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
         self.D = D
         self.phi = phi
 
