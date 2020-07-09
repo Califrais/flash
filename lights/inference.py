@@ -89,25 +89,19 @@ class ULMM:
         self.D = None
         self.phi = None
 
-    def fit(self, Y, T, delta):
+    def fit(self, Y):
         """Fit univariate linear mixed models
 
         Parameters
         ----------
         Y :
             The longitudinal data
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
         """
         # TODO Van Tuan
         fixed_effect_time_order = self.fixed_effect_time_order
         n_long_features = Y.shape[1]
         q = (fixed_effect_time_order + 1) * n_long_features
-        r = 2 * n_long_features  # and all r_l=2
+        r = 2 * n_long_features  # all r_l=2
         beta = np.zeros(q)
         D = np.ones((r, r))
         phi = np.ones(n_long_features)
@@ -152,19 +146,13 @@ class MLMM(Learner):
         self.phi = None
 
     @staticmethod
-    def log_lik(Y, T, delta):
+    def log_lik(Y):
         """Computes the log-likelihood of the multivariate linear mixed model
 
         Parameters
         ----------
         Y :
             The longitudinal data
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
 
         Returns
         -------
@@ -175,19 +163,13 @@ class MLMM(Learner):
         # TODO: Van-Tuan
         return log_lik
 
-    def fit(self, Y, T, delta):
+    def fit(self, Y):
         """Fit the multivariate linear mixed model
 
         Parameters
         ----------
         Y :
             The longitudinal data
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
         """
         verbose = self.verbose
         max_iter = self.max_iter
@@ -197,12 +179,12 @@ class MLMM(Learner):
 
         # We initialize parameters by fitting univariate linear mixed models
         ulmm = ULMM()
-        ulmm.fit(Y, T, delta)
+        ulmm.fit(Y)
         beta = ulmm.beta
         D = ulmm.D
         phi = ulmm.phi
 
-        log_lik = self.log_lik(Y, T, delta)
+        log_lik = self.log_lik(Y)
         obj = -log_lik
         rel_obj = 1.
         self.history.update(n_iter=0, obj=obj, rel_obj=rel_obj)
@@ -223,7 +205,7 @@ class MLMM(Learner):
             # TODO Van Tuan
 
             prev_obj = obj
-            log_lik = self.log_lik(Y, T, delta)
+            log_lik = self.log_lik(Y)
             obj = -log_lik
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
             if (n_iter > max_iter) or (rel_obj < tol):
@@ -641,7 +623,7 @@ class QNMCEM(Learner):
         # multivariate linear mixed model
         mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
                     tol=tol)
-        mlmm.fit(Y, T, delta)
+        mlmm.fit(Y)
         beta_init = mlmm.beta
         beta_0_ext = np.concatenate((beta_init, -beta_init))
         beta_0_ext[beta_0_ext < 0] = 0
