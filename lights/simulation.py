@@ -439,6 +439,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         delta = (T_star <= C).astype(np.ushort)
         self.censoring = delta
 
+        # Simulation of the time up to which one has longitudinal data
+
+
         # Simulation of the measurement times using multivariate Hawkes
         a, b = adjacency_hawkes_uniform_bounds
         rvs = uniform(a, b).rvs
