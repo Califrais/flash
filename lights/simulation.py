@@ -170,10 +170,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         Bounds of the uniform distribution used to generate sparse adjacency
         matrix for measurement times intensities
 
-    scale : `float`, default=.5
+    scale : `float`, default=.001
         Scaling parameter of the Gompertz distribution of the baseline
 
-    shape : `float`, default=.5
+    shape : `float`, default=.1
         Shape parameter of the Gompertz distribution of the baseline
 
     censoring_factor : `float`, default=2.0
@@ -423,10 +423,10 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         tmp = iota_02 + shape
         T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
-                                (scale * np.exp(iota_01))) / tmp
+                                (scale * shape * np.exp(iota_01))) / tmp
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
-                                (scale * np.exp(iota_11))) / tmp
+                                (scale * shape * np.exp(iota_11))) / tmp
         self.event_times = T_star
 
         m = T_star.mean()

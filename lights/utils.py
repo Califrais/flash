@@ -121,3 +121,39 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
             texts.append(text)
 
     return texts
+
+
+def gompertz_pdf(t, shape: float = .1, scale: float = .001):
+    """
+    Probability density function of a Gompertz random variable.
+
+    Parameters
+    ----------
+    scale : `float`, default=.5
+        Scaling parameter
+
+    shape : `float`, default=.5
+        Shape parameter
+
+    t : `float`
+        Time at which the density function is returned
+    """
+    return scale * shape * np.exp(scale + shape * t - scale * np.exp(shape * t))
+
+
+def gompertz_survival(t, shape: float = .1, scale: float = .001):
+    """
+    Survival function of a Gompertz random variable.
+
+    Parameters
+    ----------
+    scale : `float`, default=.5
+        Scaling parameter
+
+    shape : `float`, default=.5
+        Shape parameter
+
+    t : `float`
+        Time at which the survival function is returned
+    """
+    return np.exp(- scale * (np.exp(shape * t) - 1))
