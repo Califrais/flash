@@ -313,8 +313,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         X : `numpy.ndarray`, shape=(n_samples, n_time_indep_features)
             The simulated time-independent features matrix
 
-        Y :
-            The simulated longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             The simulated censored times of the event of interest

@@ -94,8 +94,9 @@ class ULMM:
 
         Parameters
         ----------
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
         """
         # TODO Van Tuan
         fixed_effect_time_order = self.fixed_effect_time_order
@@ -151,8 +152,9 @@ class MLMM(Learner):
 
         Parameters
         ----------
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         Returns
         -------
@@ -168,8 +170,9 @@ class MLMM(Learner):
 
         Parameters
         ----------
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
         """
         verbose = self.verbose
         max_iter = self.max_iter
@@ -423,8 +426,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             Times of the event of interest
@@ -450,8 +454,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             Times of the event of interest
@@ -566,8 +571,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         Returns
         -------
@@ -587,8 +593,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             Times of the event of interest
@@ -705,8 +712,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             Times of the event of interest
@@ -742,8 +750,9 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y :
-            The longitudinal data
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
             Times of the event of interest
