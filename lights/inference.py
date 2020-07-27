@@ -576,7 +576,7 @@ class QNMCEM(Learner):
             group
         """
         marker = None
-        # TODO Sim
+        # TODO Sim (only if self.fitted = True, else raise error)
         return marker
 
     def fit(self, X, Y, T, delta):

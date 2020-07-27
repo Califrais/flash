@@ -5,9 +5,10 @@ from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
-from scipy.stats import uniform
+from scipy.stats import uniform, beta
 from scipy.sparse import random
 import numpy as np
+import pandas as pd
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
@@ -40,6 +41,7 @@ def simulation_method(simulate_method):
     """A decorator for simulation methods.
     It simply calls _start_simulation and _end_simulation methods
     """
+
     def decorated_simulate_method(self):
         self._start_simulation()
         result = simulate_method(self)
@@ -54,6 +56,7 @@ class Simulation:
     """This is an abstract simulation class that inherits form BaseClass
     It does nothing besides printing stuff and verbosing
     """
+
     def __init__(self, seed=None, verbose=True):
         # Set default parameters
         self.seed = seed
@@ -155,18 +158,18 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation value to use in the diagonal covariance matrix for the
         fixed effect simulation
 
-    var_error : `float`, default=0.5
-        Variance for the error term of the longitudinal process
+    std_error : `float`, default=0.5
+        Standard deviation for the error term of the longitudinal process
 
     decay : `float`, default=3.0
         Decay of exponential kernels for the multivariate Hawkes processes to
         generate measurement times
 
-    baseline_hawkes_uniform_bounds : `list`, default=(.1, .5)
+    baseline_hawkes_uniform_bounds : `list`, default=(.1, 1.)
         Bounds of the uniform distribution used to generate baselines of
         measurement times intensities
 
-    adjacency_hawkes_uniform_bounds : `list`, default=(.05, .1)
+    adjacency_hawkes_uniform_bounds : `list`, default=(.1, .2)
         Bounds of the uniform distribution used to generate sparse adjacency
         matrix for measurement times intensities
 
@@ -200,13 +203,13 @@ class SimuJointLongitudinalSurvival(Simulation):
     latent_class : `np.ndarray`, shape=(n_samples,)
         Simulated latent classes
 
-    xi : `np.ndarray`, shape=(n_time_indep_features,)
+    time_indep_coeffs : `np.ndarray`, shape=(n_time_indep_features,)
+        Simulated time-independent coefficient vector
 
+    fixed_effect_coeffs : `list`, [beta_0, beta_1]
+        Simulated fixed effect coefficient vectors per group
 
-    betas : `list`, [beta_0, beta_1]
-        Simulated fixed effect parameters per group
-
-    gammas : `list`, [gamma_0, gamma_1]
+    asso_coeffs : `list`, [gamma_0, gamma_1]
         Simulated association parameters per group
 
     iotas : `dict`, {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
@@ -216,14 +219,16 @@ class SimuJointLongitudinalSurvival(Simulation):
     event_times : `np.ndarray`, shape=(n_samples,)
             The simulated times of the event of interest
 
-    hawkes : `tick.hawkes.simulation.simu_hawkes_exp_kernels`
-        Multivariate Hawkes process with exponential kernels used to
-        simulate measurement times
+    hawkes : `list` of `tick.hawkes.simulation.simu_hawkes_exp_kernels`
+        Store a single multivariate Hawkes process with exponential kernels
+        used to simulate measurement times for intensities plotting purpose,
+        only if verbose=True
 
     Notes
     -----
     There is no intercept in this model
     """
+
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
                  sparsity: float = .7, coeff_val_time_indep: float = 1.,
@@ -232,9 +237,9 @@ class SimuJointLongitudinalSurvival(Simulation):
                  n_long_features: int = 10, cov_corr_long: float = .001,
                  fixed_effect_mean_low_risk: tuple = (1, .3),
                  fixed_effect_mean_high_risk: tuple = (1, .5),
-                 corr_fixed_effect: float = .01, var_error: float = 0.5,
-                 baseline_hawkes_uniform_bounds: list = (.1, .5),
-                 adjacency_hawkes_uniform_bounds: list = (.05, .1),
+                 corr_fixed_effect: float = .01, std_error: float = 2.,
+                 baseline_hawkes_uniform_bounds: list = (.1, 1.),
+                 adjacency_hawkes_uniform_bounds: list = (.1, .2),
                  shape: float = .1, scale: float = .001,
                  censoring_factor: float = 2):
         Simulation.__init__(self, seed=seed, verbose=verbose)
@@ -252,7 +257,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.fixed_effect_mean_low_risk = fixed_effect_mean_low_risk
         self.fixed_effect_mean_high_risk = fixed_effect_mean_high_risk
         self.corr_fixed_effect = corr_fixed_effect
-        self.var_error = var_error
+        self.std_error = std_error
         self.decay = decay
         self.baseline_hawkes_uniform_bounds = baseline_hawkes_uniform_bounds
         self.adjacency_hawkes_uniform_bounds = adjacency_hawkes_uniform_bounds
@@ -262,12 +267,12 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Attributes that will be instantiated afterwards
         self.latent_class = None
-        self.xi = None
+        self.time_indep_coeffs = None
         self.event_times = None
-        self.betas = None
-        self.gammas = None
+        self.fixed_effect_coeffs = None
+        self.asso_coeffs = None
         self.iotas = None
-        self.hawkes = None
+        self.hawkes = []
 
     @property
     def sparsity(self):
@@ -332,7 +337,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         fixed_effect_mean_low_risk = self.fixed_effect_mean_low_risk
         fixed_effect_mean_high_risk = self.fixed_effect_mean_high_risk
         corr_fixed_effect = self.corr_fixed_effect
-        var_error = self.var_error
+        std_error = self.std_error
         decay = self.decay
         baseline_hawkes_uniform_bounds = self.baseline_hawkes_uniform_bounds
         adjacency_hawkes_uniform_bounds = self.adjacency_hawkes_uniform_bounds
@@ -349,7 +354,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
         xi = np.zeros(n_time_indep_features)
         xi[0:nb_active_time_indep_features] = coeff_val_time_indep
-        self.xi = xi
+        self.time_indep_coeffs = xi
 
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
@@ -373,7 +378,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         mean_1 = fixed_effect_mean_high_risk * n_long_features
         beta_1 = np.random.multivariate_normal(mean_1, np.diag(
             corr_fixed_effect * np.ones(q)))
-        self.betas = [beta_0, beta_1]
+        self.fixed_effect_coeffs = [beta_0, beta_1]
 
         # Simulation of the association parameters
         nb_asso_param = 4
@@ -395,7 +400,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         gamma_0 = simu_sparse_asso_features(0)
         gamma_1 = simu_sparse_asso_features(1)
-        self.gammas = [gamma_0, gamma_1]
+        self.asso_coeffs = [gamma_0, gamma_1]
 
         # Simulation of true times
         idx_2 = np.arange(0, nb_asso_features, 2)
@@ -440,35 +445,51 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.censoring = delta
 
         # Simulation of the time up to which one has longitudinal data
-
-
-        # Simulation of the measurement times using multivariate Hawkes
-        a, b = adjacency_hawkes_uniform_bounds
-        rvs = uniform(a, b).rvs
-        adjacency = random(n_long_features, n_long_features, density=0.3,
-                           data_rvs=rvs).todense()
-        np.fill_diagonal(adjacency, rvs(size=n_long_features))
-        a, b = baseline_hawkes_uniform_bounds
-        baseline = uniform(a, b).rvs(size=n_long_features)
-        decays = decay * np.ones((n_long_features, n_long_features))
-        hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
-                                      baseline=baseline, verbose=verbose,
-                                      end_time=100, seed=seed)
-
-        # TODO: generate T first, then t_i^max, and finally measurment times for long processes with end_time=t_i^max
-
-        if verbose:
-            # only useful to plot Hawkes multivariate intensities, but
-            # careful: it increases running time!
-            dt = 0.01
-            hawkes.track_intensity(dt)
-
-        # TODO: add n_sample dimension
-        hawkes.simulate()
-        self.hawkes = hawkes
+        t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
 
         # Simulation of the longitudinal features
-        Y = None
+        decays = decay * np.ones((n_long_features, n_long_features))
+        Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
+                                  for l in range(n_long_features)])
+
+        # Simulation of the measurement times of the longitudinal processes
+        # using multivariate Hawkes
+        a_, b_ = adjacency_hawkes_uniform_bounds
+        rvs_adjacency = uniform(a_, b_).rvs
+        adjacency = random(n_long_features, n_long_features, density=0.3,
+                           data_rvs=rvs_adjacency, random_state=seed).todense()
+        np.fill_diagonal(adjacency, rvs_adjacency(size=n_long_features))
+
+        a_, b_ = baseline_hawkes_uniform_bounds
+        baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
+
+        for i in range(n_samples):
+            # seed=seed+i: get reproducible but different times
+            hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
+                                          baseline=baseline, verbose=False,
+                                          end_time=t_max[i], seed=seed + i)
+            hawkes.simulate()
+            times_i = hawkes.timestamps
+
+            if verbose:
+                self.hawkes += [hawkes]
+
+            y_i = []
+            for l in range(n_long_features):
+                if G[i] == 0:
+                    beta_l = beta_0[l:l+2]
+                else:
+                    beta_l = beta_1[l:l+2]
+
+                b_l = b[i, l:l+2]
+                n_il = len(times_i[l])
+                U_il = np.c_[np.ones(n_il), times_i[l]]
+                eps_il = np.random.normal(0, std_error, n_il)
+
+                y_i += [pd.Series(U_il.dot(beta_l) + U_il.dot(b_l) + eps_il,
+                                  index=times_i[l])]
+            Y.loc[i] = y_i
+
         self.long_features = Y
 
         return X, Y, T, delta

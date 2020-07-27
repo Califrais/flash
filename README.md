@@ -2,7 +2,7 @@
 _ligths_ is a generalized joint model for high-dimensional multivariate longitudinal data and censored durations
 
 ## Quick description
-_ligths_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of longitudinal features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high- dimensional shared associations.
+_ligths_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of both longitudinal and and time-independent features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high-dimensional shared associations.
 
 To allow flexibility in modeling the dependency between the longitudinal features and the event time, we use appropriate penalties : elastic net for feature selection in the latent class membership, and sparse group lasso in the survival model, as well as for the fixed effect (allowing flexible representations of time).
 

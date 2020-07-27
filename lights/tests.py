@@ -18,7 +18,7 @@ class Test(unittest.TestCase):
                                              seed=123, verbose=False)
         X_, Y_, T_, delta_ = simu.simulate()
 
-        T = np.array([23.4050397, 20.21906185, 15.93688448])
+        T = np.array([31.4839339, 27.198228, 25.9627587])
         delta = np.array([0, 0, 1], dtype=np.ushort)
         X = np.array(
             [[-1.3854538, -1.4562842, -1.7882523, -1.387485, -1.3576753],
