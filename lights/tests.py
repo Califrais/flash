@@ -6,6 +6,8 @@ from lights.simulation import SimuJointLongitudinalSurvival
 import numpy as np
 import pandas as pd
 
+from lights.mlmm import MLMM
+
 
 class Test(unittest.TestCase):
 
@@ -13,11 +15,20 @@ class Test(unittest.TestCase):
         """Test simulation of joint longitudinal and survival data
         """
         # Simulate data with specific seed
-        simu = SimuJointLongitudinalSurvival(n_samples=3,
+        simu = SimuJointLongitudinalSurvival(n_samples=100,
                                              n_time_indep_features=5,
                                              n_long_features=3,
                                              seed=123, verbose=False)
         X_, Y_, T_, delta_ = simu.simulate()
+
+        # use for testing
+        max_iter=20
+        verbose=False
+        print_every=10
+        tol=1e-5
+        mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
+                    tol=tol)
+        mlmm.fit(Y_)
 
         X = np.array(
             [[-1.3854538, -1.4562842, -1.7882523, -1.387485, -1.3576753],

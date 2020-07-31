@@ -10,6 +10,8 @@ from scipy.sparse import random
 import numpy as np
 import pandas as pd
 
+from lights.mlmm import MLMM
+
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
                                  rho: float = 0.5):
@@ -478,11 +480,11 @@ class SimuJointLongitudinalSurvival(Simulation):
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
-                    beta_l = beta_0[l:l+2]
+                    beta_l = beta_0[2*l:2*l+2]
                 else:
-                    beta_l = beta_1[l:l+2]
+                    beta_l = beta_1[2*l:2*l+2]
 
-                b_l = b[i, l:l+2]
+                b_l = b[i, 2*l:2*l+2]
                 n_il = len(times_i[l])
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
