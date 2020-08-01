@@ -220,9 +220,8 @@ class SimuJointLongitudinalSurvival(Simulation):
             The simulated times of the event of interest
 
     hawkes : `list` of `tick.hawkes.simulation.simu_hawkes_exp_kernels`
-        Store a single multivariate Hawkes process with exponential kernels
-        used to simulate measurement times for intensities plotting purpose,
-        only if verbose=True
+        Store the multivariate Hawkes processes with exponential kernels
+        used to simulate measurement times for intensities plotting purpose
 
     Notes
     -----
@@ -470,23 +469,18 @@ class SimuJointLongitudinalSurvival(Simulation):
                                           baseline=baseline, verbose=False,
                                           end_time=t_max[i], seed=seed + i)
             hawkes.simulate()
+            self.hawkes += [hawkes]
             times_i = hawkes.timestamps
-
-            if verbose:
-                self.hawkes += [hawkes]
-
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
                     beta_l = beta_0[l:l+2]
                 else:
                     beta_l = beta_1[l:l+2]
-
                 b_l = b[i, l:l+2]
                 n_il = len(times_i[l])
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
-
                 y_i += [pd.Series(U_il.dot(beta_l) + U_il.dot(b_l) + eps_il,
                                   index=times_i[l])]
             Y.loc[i] = y_i
