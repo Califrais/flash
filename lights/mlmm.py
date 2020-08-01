@@ -6,7 +6,7 @@ import numpy as np
 import statsmodels.formula.api as smf
 from scipy.linalg import block_diag
 import pandas as pd
-import matplotlib.pyplot as plt
+
 
 class MLMM(Learner):
     """EM Algorithm for fitting a multivariate linear mixed model
@@ -30,7 +30,7 @@ class MLMM(Learner):
         a multiple of ``print_every``
     """
 
-    def __init__(self, max_iter=100, verbose=False, print_every=10, tol=1e-5):
+    def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.verbose = verbose

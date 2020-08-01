@@ -3,10 +3,10 @@
 
 import unittest
 from lights.simulation import SimuJointLongitudinalSurvival
+from lights.mlmm import MLMM
+from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
-
-from lights.mlmm import MLMM
 
 
 class Test(unittest.TestCase):
@@ -15,20 +15,10 @@ class Test(unittest.TestCase):
         """Test simulation of joint longitudinal and survival data
         """
         # Simulate data with specific seed
-        simu = SimuJointLongitudinalSurvival(n_samples=100,
+        simu = SimuJointLongitudinalSurvival(n_samples=3,
                                              n_time_indep_features=5,
-                                             n_long_features=3,
-                                             seed=123, verbose=False)
+                                             n_long_features=3, seed=123)
         X_, Y_, T_, delta_ = simu.simulate()
-
-        # use for testing
-        max_iter=20
-        verbose=False
-        print_every=10
-        tol=1e-5
-        mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
-                    tol=tol)
-        mlmm.fit(Y_)
 
         X = np.array(
             [[-1.3854538, -1.4562842, -1.7882523, -1.387485, -1.3576753],
@@ -62,10 +52,43 @@ class Test(unittest.TestCase):
     def get_train_data(seed: int = 1):
         """Get train data for specific tests
         """
-        np.random.seed(seed)
-        simu = SimuJointLongitudinalSurvival()
-        features, times, censoring = simu.simulate()
-        return features, times, censoring
+        simu = SimuJointLongitudinalSurvival(seed=seed)
+        X, Y, T, delta = simu.simulate()
+        return X, Y, T, delta
+
+    def test_MLMM(self):
+        """Test MLMM estimation
+        """
+        simu = SimuJointLongitudinalSurvival(seed=123, high_risk_rate=0)
+        # simulation with no latent subgroups
+        Y = simu.simulate()[1]
+        beta_ = simu.fixed_effect_coeffs[0]
+        D_ = simu.long_cov
+        phi_l = simu.std_error
+        n_long_features = simu.n_long_features
+        phi_ = np.repeat(phi_l, n_long_features)
+
+        # TODO Van Tuan : here we simulate with high_risk_rate=0 so with no
+        #  latent subgroups. We expect MLMM to recover approximately the true
+        #  beta_, D_, phi_ . Use assert_almost_equal with a decimal not to
+        #  big to allow estimation error ;)
+
+        # mlmm = MLMM()
+        # mlmm.fit(Y)
+        # beta, D, phi = mlmm.beta, mlmm.D, mlmm.phi
+
+        # decimal = 2
+        # np.testing.assert_almost_equal(beta, beta_, decimal=decimal)
+        # np.testing.assert_almost_equal(D, D_, decimal=decimal)
+        # np.testing.assert_almost_equal(phi, phi_, decimal=decimal)
+
+    def test_QNMCEM(self):
+        """Test QNMCEM Algorithm
+        """
+        simu = SimuJointLongitudinalSurvival(seed=123)
+        X, Y, T, delta = simu.simulate()
+        D = simu.long_cov
+        # TODO Sim : check parameters estimation
 
 
 if __name__ == "main":

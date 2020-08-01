@@ -10,11 +10,9 @@ from scipy.sparse import random
 import numpy as np
 import pandas as pd
 
-from lights.mlmm import MLMM
-
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
-                                 rho: float = 0.5):
+                                 rho: float = 0.5, cst: float = 1.):
     """Features obtained as samples of a centered Gaussian vector
     with a toeplitz covariance matrix
 
@@ -29,14 +27,21 @@ def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
     rho : `float`, default=0.5
         Correlation coefficient of the toeplitz correlation matrix
 
+    cst : `float`, default=1.
+        Multiplicative constant
+
     Returns
     -------
-    output : `np.ndarray`, shape=(n_samples, n_features)
+    features : `np.ndarray`, shape=(n_samples, n_features)
         The simulated features matrix
+
+    cov : `np.ndarray`, shape=(n_features, n_features)
+        The simulated variance-covariance matrix
     """
     cov = toeplitz(rho ** np.arange(0, n_features))
-    return np.random.multivariate_normal(
+    features = cst * np.random.multivariate_normal(
         np.zeros(n_features), cov, size=n_samples)
+    return features, cov
 
 
 def simulation_method(simulate_method):
@@ -208,6 +213,11 @@ class SimuJointLongitudinalSurvival(Simulation):
     time_indep_coeffs : `np.ndarray`, shape=(n_time_indep_features,)
         Simulated time-independent coefficient vector
 
+    long_cov : `np.ndarray`, shape=(2 * n_long_features, 2 * n_long_features)
+        Variance-covariance matrix that accounts for dependence between the
+        different longitudinal outcome. Here r = 2 * n_long_features since
+        one choose linear time-varying features, so all r_l=2
+
     fixed_effect_coeffs : `list`, [beta_0, beta_1]
         Simulated fixed effect coefficient vectors per group
 
@@ -270,6 +280,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Attributes that will be instantiated afterwards
         self.latent_class = None
         self.time_indep_coeffs = None
+        self.long_cov = None
         self.event_times = None
         self.fixed_effect_coeffs = None
         self.asso_coeffs = None
@@ -361,7 +372,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
-                                         cov_corr_time_indep)
+                                         cov_corr_time_indep)[0]
         # Add class relative information on the design matrix
         X[G == 1, :nb_active_time_indep_features] += gap
         X[G == 0, :nb_active_time_indep_features] -= gap
@@ -371,7 +382,8 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of the random effects components
         r = 2 * n_long_features  # linear time-varying features, so all r_l=2
-        b = .1 * features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
+        b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
+        self.long_cov = D
 
         # Simulation of the fixed effect parameters
         q = 2 * n_long_features  # linear time-varying features, so all q_l=2
@@ -480,11 +492,11 @@ class SimuJointLongitudinalSurvival(Simulation):
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
-                    beta_l = beta_0[2*l:2*l+2]
+                    beta_l = beta_0[2 * l:2 * l + 2]
                 else:
-                    beta_l = beta_1[2*l:2*l+2]
+                    beta_l = beta_1[2 * l:2 * l + 2]
 
-                b_l = b[i, 2*l:2*l+2]
+                b_l = b[i, 2 * l:2 * l + 2]
                 n_il = len(times_i[l])
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
