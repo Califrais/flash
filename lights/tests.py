@@ -59,7 +59,9 @@ class Test(unittest.TestCase):
     def test_MLMM(self):
         """Test MLMM estimation
         """
-        simu = SimuJointLongitudinalSurvival(seed=123, high_risk_rate=0)
+        simu = SimuJointLongitudinalSurvival(n_samples=100,
+                                             n_time_indep_features=5,
+                                             n_long_features=3, seed=123, high_risk_rate=0)
         # simulation with no latent subgroups
         Y = simu.simulate()[1]
         beta_ = simu.fixed_effect_coeffs[0]
@@ -73,14 +75,15 @@ class Test(unittest.TestCase):
         #  beta_, D_, phi_ . Use assert_almost_equal with a decimal not to
         #  big to allow estimation error ;)
 
-        # mlmm = MLMM()
-        # mlmm.fit(Y)
-        # beta, D, phi = mlmm.beta, mlmm.D, mlmm.phi
+        fixed_effect_time_order = 1
+        mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order)
+        mlmm.fit(Y)
+        beta, D, phi = np.concatenate(mlmm.beta), mlmm.D, np.concatenate(mlmm.phi)
 
-        # decimal = 2
-        # np.testing.assert_almost_equal(beta, beta_, decimal=decimal)
-        # np.testing.assert_almost_equal(D, D_, decimal=decimal)
-        # np.testing.assert_almost_equal(phi, phi_, decimal=decimal)
+        decimal = 2
+        np.testing.assert_almost_equal(beta, beta_, decimal=decimal)
+        np.testing.assert_almost_equal(D, D_, decimal=decimal)
+        np.testing.assert_almost_equal(phi, phi_, decimal=decimal)
 
     def test_QNMCEM(self):
         """Test QNMCEM Algorithm
