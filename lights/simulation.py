@@ -38,8 +38,8 @@ def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
     cov : `np.ndarray`, shape=(n_features, n_features)
         The simulated variance-covariance matrix
     """
-    cov = toeplitz(rho ** np.arange(0, n_features))
-    features = cst * np.random.multivariate_normal(
+    cov = (cst**2)*toeplitz(rho ** np.arange(0, n_features))
+    features = np.random.multivariate_normal(
         np.zeros(n_features), cov, size=n_samples)
     return features, cov
 
@@ -361,7 +361,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of latent variables
         u = np.random.rand(n_samples)
-        G = (u <= high_risk_rate).astype(int)
+        G = (u < high_risk_rate).astype(int)
         self.latent_class = G
 
         # Simulation of time-independent coefficient vector

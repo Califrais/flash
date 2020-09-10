@@ -4,6 +4,8 @@
 from datetime import datetime
 from lights.history import History
 from time import time
+from scipy.linalg import block_diag
+import numpy as np
 
 
 class Learner:
@@ -71,3 +73,106 @@ class Learner:
             return self.history.values
         else:
             return val
+
+    @staticmethod
+    def extract_features(Y, fixed_effect_time_order):
+        """Extract the longitudinal data of subject i-th outcome l-th
+            into features of the multivariate linear mixed model
+
+        Parameters
+            ----------
+            Y : `pandas.DataFrame`
+                The simulated longitudinal data
+            fixed_effect_time_order : `int`
+                Order of fixed effect features
+
+            Returns
+            -------
+            U : `np.array`
+                The fixed-effect features of the simulated longitudinal data
+            V : `np.array`
+                The random-effect features of the simulated longitudinal data
+            y : `np.array`
+                The outcome of the simulated longitudinal data
+            N : `list`
+                The number samples of the simulated longitudinal data
+
+            U_L : `list` of `np.array`
+                The fixed-effect features of the simulated longitudinal data arranged by l-th order
+            V_L : `list` of `np.array`
+                The random-effect features of the simulated longitudinal data arranged by l-th order
+            y_L : `list` of `np.array`
+                The outcome of the simulated longitudinal data arranged by l-th order
+            N_L : `list` of `list`
+                The number samples of the simulated longitudinal data arranged by l-th order 
+
+        """
+
+        def extract_specified_features(Y_il):
+            """Extract the longitudinal data of subject i-th outcome l-th
+            into features of the multivariate linear mixed model
+
+            Parameters
+            ----------
+            Y_il : `pandas.Series`
+                The simulated longitudinal data of l-th outcome of i-th subject
+
+            Returns
+            -------
+            U_il : `np.array`
+                The fixed-effect features for of l-th outcome of i-th subject
+            Y_il : `np.array`
+                The l-th outcome of i-th subject
+            n_il : `list`
+                The number samples of l-th outcome of i-th subject
+            """
+            times_il = Y_il.index.values
+            y_il = Y_il.values
+            N_il = len(times_il)
+            U_il = np.ones(N_il)
+            for t in range(fixed_effect_time_order):
+                U_il = np.c_[U_il, times_il**(t+1)]
+            return U_il, y_il, N_il
+
+        n, L = Y.shape
+        U, V, y, N = [], [], [], []
+        U_L, V_L, y_L, N_L = [], [], [], []
+        for i in range(n):
+            Y_i = Y.iloc[i]
+            L = len(Y_i)
+            for l in range(L):
+                U_il, y_il, N_il = extract_specified_features(Y_i[l])
+                V_il = U_il
+
+                if l == 0:
+                    U_i = U_il
+                    V_i = V_il
+                    y_i = y_il
+                    N_i = [N_il]
+
+                else:
+                    U_i = block_diag(U_i, U_il)
+                    V_i = block_diag(V_i, V_il)
+                    y_i = np.concatenate((y_i, y_il))
+                    N_i.append(N_il)
+
+                if i == 0:
+                    U_L.append(U_il)
+                    V_L.append(V_il)
+                    y_L.append(y_il)
+                    N_L.append([N_il])
+                else:
+                    U_L[l] = np.concatenate((U_L[l], U_il))
+                    V_L[l] = block_diag(V_L[l], V_il)
+                    y_L[l] = np.concatenate((y_L[l], y_il))
+                    N_L[l].append(N_il)
+
+            if i == 0:
+                V = V_i
+            else:
+                V = block_diag(V, V_i)
+            U.append(U_i)
+            y.append(y_i)
+            N.append(N_i)
+
+        return (U, V, y, N), (U_L, V_L, y_L, N_L)
