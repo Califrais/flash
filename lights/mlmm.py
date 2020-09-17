@@ -69,7 +69,8 @@ class MLMM(Learner):
         n, L = Y.shape
         r = Eb[0].shape[0]
 
-        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y, self.fixed_effect_time_order)
+        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
+                                                                   self.fixed_effect_time_order)
         Eb_c = np.concatenate(Eb).reshape(-1, 1)
         M = np.dot(np.concatenate(U), self.beta) + np.dot(V, Eb_c)
         diag = []
@@ -130,8 +131,7 @@ class MLMM(Learner):
         (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
                                                                    fixed_effect_time_order)
 
-        # TODO n, L = n_samples, n_long_features
-        n, L = Y.shape
+        n_samples, n_long_features = Y.shape
         n_iter = 0
         for n_iter in range(max_iter):
             if n_iter % print_every == 0:
@@ -141,13 +141,22 @@ class MLMM(Learner):
                     self.history.print_history()
 
             # E-Step
-            mu_tilde, Omega, mu_tilde_L, Omega_L = [], [], np.empty(), []
-            for i in range(n):
-                U_i, y_i, N_i, V_i = U[i], y[i], N[i], V[i]
+            mu_tilde, Omega, mu_tilde_L, Omega_L = [], []\
+                , [np.array([])] * n_long_features\
+                , [np.zeros((n_samples * r_l, n_samples * r_l))] * n_long_features
+            mu= np.array([])
+            pointer = 0
+            for i in range(n_samples):
+                N_i = N[i]
+                U_i = U[pointer : pointer + sum(N_i),:]
+                y_i= y[pointer : pointer + sum(N_i)]
+                V_i = V[pointer : pointer + sum(N_i),
+                      i*n_long_features*r_l : (i+1)*n_long_features*r_l]
+                pointer += sum(N_i)
 
                 # compute Sigma_i
                 Phi_i = []
-                for l in range(L):
+                for l in range(n_long_features):
                     n_il = N_i[l]
                     Phi_i += [1 / phi[l, 0]] * n_il
                 Sigma_i = np.diag(Phi_i)
@@ -162,49 +171,38 @@ class MLMM(Learner):
                 mu_i = Omega_i.dot(V_i.transpose()).dot(Sigma_i).dot(
                     y_i - U_i.dot(beta))
                 mu_tilde.append(mu_i)
+                mu = np.append(mu, mu_i)
 
-                for l in range(L):
+                for l in range(n_long_features):
                     mu_tilde_L[l] = np.append(
                         mu_tilde_L[l],
                         mu_tilde[i][r_l * l: r_l * (l + 1), 0]
                     )
 
-                    if i == 0:
-                        Omega_L.append(Omega_i[r_l * l: r_l * (l + 1),
-                                       r_l * l: r_l * (l + 1)])
-                    else:
-                        Omega_L[l] = block_diag(
-                            Omega_L[l],
-                            Omega_i[r_l * l: r_l * (l + 1),
-                            r_l * l: r_l * (l + 1)]
-                        )
+                    Omega_L[l][i * r_l : (i + 1) * r_l, i * r_l : (i + 1) * r_l]\
+                        = Omega_i[r_l * l : r_l * (l + 1), r_l * l : r_l * (l + 1)]
+
+            mu = mu.reshape(-1, 1)
+            mu_tilde = np.array(mu_tilde).reshape(n_samples, -1).transpose()
 
             # M-Step
             # Update beta
-            U_beta = np.concatenate(U)
-            V_beta = V
-            y_beta = np.concatenate(y).reshape(-1, 1)
-            mu_beta = np.concatenate(Eb).reshape(-1, 1)
-
-            op1 = np.dot(U_beta.transpose(), U_beta)
-            op2 = np.dot(U_beta.transpose(), (y_beta - np.dot(V_beta, mu_beta)))
-            beta = np.linalg.inv(op1).dot(op2)
+            beta = np.dot(np.linalg.inv(np.dot(U.transpose(), U)),
+                np.dot(U.transpose(), (y - np.dot(V, mu))))
 
             # Update D
-            mu_D = np.array(Eb).reshape(n, -1).transpose()
-            D = (1 / n) * (np.array(Omega).sum(axis=0) + np.dot(mu_D,
-                                                                mu_D.transpose()))
+            D = (1 / n_samples) * (np.array(Omega).sum(axis=0)
+                                   + np.dot(mu_tilde, mu_tilde.transpose()))
 
             # Update phi
-            mu_L = Eb_L
-            for l in range(L):
-                N_l = np.array(N_L[l]).sum()
-                y_l = y_L[l].reshape(-1, 1)
+            for l in range(n_long_features):
+                N_l = sum(N_L[l])
+                y_l = y_L[l]
                 U_l = U_L[l]
                 V_l = V_L[l]
-                beta_l = beta[2 * l: 2 * (l + 1)]
                 Omega_l = Omega_L[l]
-                mu_l = mu_L[l].reshape(-1, 1)
+                beta_l = beta[2 * l: 2 * (l + 1)]
+                mu_l = mu_tilde_L[l].reshape(-1, 1)
 
                 residFixed = y_l - U_l.dot(beta_l)
                 phi[l] = (1 / N_l) * (np.dot(residFixed.transpose(),
@@ -216,8 +214,9 @@ class MLMM(Learner):
             self.beta = beta
             self.D = D
             self.phi = phi
-            log_lik = self.log_lik(Y, Eb)
-            print("Likelihood", log_lik)
+            # TODO: Update likelihood function
+            # log_lik = self.log_lik(Y, mu_tilde)
+            # print("Likelihood", log_lik)
             obj = -log_lik
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
             if (n_iter > max_iter) or (rel_obj < tol):

@@ -167,12 +167,12 @@ class Learner:
                 if i == 0:
                     U_L.append(U_il)
                     V_L.append(V_il)
-                    y_L.append(y_il)
+                    y_L.append(y_il.reshape(-1, 1))
                     N_L.append([N_il])
                 else:
                     U_L[l] = np.concatenate((U_L[l], U_il))
                     V_L[l] = block_diag(V_L[l], V_il)
-                    y_L[l] = np.concatenate((y_L[l], y_il))
+                    y_L[l] = np.concatenate((y_L[l], y_il.reshape(-1, 1)))
                     N_L[l].append(N_il)
 
             if i == 0:
@@ -180,7 +180,11 @@ class Learner:
             else:
                 V = block_diag(V, V_i)
             U.append(U_i)
-            y.append(y_i)
+            y.append(y_i.reshape(-1, 1))
             N.append(N_i)
+
+        U = np.concatenate(U)
+        y = np.concatenate(y)
+        print(y.shape)
 
         return (U, V, y, N), (U_L, V_L, y_L, N_L)
