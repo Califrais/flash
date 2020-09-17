@@ -13,11 +13,6 @@ class MLMM(Learner):
 
     Parameters
     ----------
-    tol : `float`, default=1e-5
-        The tolerance of the solver (iterations stop when the stopping
-        criterion is below it). By default the solver does ``max_iter``
-        iterations
-
     max_iter : `int`, default=100
         Maximum number of iterations of the solver
 
@@ -28,9 +23,21 @@ class MLMM(Learner):
     print_every : `int`, default=10
         Print history information when ``n_iter`` (iteration number) is
         a multiple of ``print_every``
+
+    tol : `float`, default=1e-5
+        The tolerance of the solver (iterations stop when the stopping
+        criterion is below it). By default the solver does ``max_iter``
+        iterations
+
+    fixed_effect_time_order : `int`, default=5
+        Order of the higher time monomial considered for the representations of
+        the time-varying features corresponding to the fixed effect. The
+        dimension of the corresponding design matrix is then equal to
+        fixed_effect_time_order + 1
     """
 
-    def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5, fixed_effect_time_order=5):
+    def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5,
+                 fixed_effect_time_order=5):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.verbose = verbose
@@ -75,11 +82,15 @@ class MLMM(Learner):
 
         y_c = np.concatenate(y).reshape(-1, 1)
         Eb_c = np.concatenate(Eb).reshape(-1, 1)
-        log_lik = np.linalg.multi_dot([y_c.transpose(), S, M]) - 0.5 * np.linalg.multi_dot(
-            [M.transpose(), S, M]) - 0.5 * np.linalg.multi_dot([y_c.transpose(), S, y_c]) \
-                  - 0.5 * np.array(N).sum() * np.log(2 * np.pi) + 0.5 * log_det_S - 0.5 * n * r * np.log(
+        log_lik = np.linalg.multi_dot(
+            [y_c.transpose(), S, M]) - 0.5 * np.linalg.multi_dot(
+            [M.transpose(), S, M]) - 0.5 * np.linalg.multi_dot(
+            [y_c.transpose(), S, y_c]) \
+                  - 0.5 * np.array(N).sum() * np.log(
+            2 * np.pi) + 0.5 * log_det_S - 0.5 * n * r * np.log(
             2 * np.pi) - 0.5 * n * np.log(np.linalg.det(self.D)) \
-                  - 0.5 * Eb_c.transpose().dot(np.kron(np.eye(n), np.linalg.inv(self.D))).dot(Eb_c)
+                  - 0.5 * Eb_c.transpose().dot(
+            np.kron(np.eye(n), np.linalg.inv(self.D))).dot(Eb_c)
 
         return log_lik
 
@@ -97,9 +108,8 @@ class MLMM(Learner):
         print_every = self.print_every
         tol = self.tol
         fixed_effect_time_order = self.fixed_effect_time_order
-        random_effect_time_order = fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
-        r_l = random_effect_time_order + 1
+        r_l = 2  # linear time-varying features, so all r_l=2
         self._start_solve()
 
         # We initialize parameters by fitting univariate linear mixed models
@@ -116,8 +126,11 @@ class MLMM(Learner):
         if verbose:
             self.history.print_history()
 
-        # feature extraction
-        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y, fixed_effect_time_order)
+        # features extraction
+        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
+                                                                   fixed_effect_time_order)
+
+        # TODO n, L = n_samples, n_long_features
         n, L = Y.shape
         n_iter = 0
         for n_iter in range(max_iter):
@@ -128,35 +141,43 @@ class MLMM(Learner):
                     self.history.print_history()
 
             # E-Step
-            Eb, A = [], []
-            Eb_L, A_L = [], []
+            mu_tilde, Omega, mu_tilde_L, Omega_L = [], [], np.empty(), []
             for i in range(n):
-                U_i, y_i, N_i = U[i], y[i].reshape(-1, 1), N[i]
-                V_i = U_i
-                diag = []
+                U_i, y_i, N_i, V_i = U[i], y[i], N[i], V[i]
+
+                # compute Sigma_i
+                Phi_i = []
                 for l in range(L):
-                    N_il = N_i[l]
-                    diag += [1 / phi[l, 0]] * N_il
+                    n_il = N_i[l]
+                    Phi_i += [1 / phi[l, 0]] * n_il
+                Sigma_i = np.diag(Phi_i)
 
-                Si = np.diag(diag)
+                # compute Omega_i
+                D_inv = np.linalg.inv(D)
+                Omega_i = np.linalg.inv(
+                    V_i.transpose().dot(Sigma_i).dot(V_i) + D_inv)
+                Omega.append(Omega_i)
 
-                # MVN covariance matrix for [bi | yi]
-                Dinv = np.linalg.inv(D)
-                Ai = np.linalg.inv(V_i.transpose().dot(Si).dot(V_i) + Dinv)
-
-                # MVN mean vector for [bi | yi]
-                Eb.append(Ai.dot(V_i.transpose()).dot(Si).dot(y_i - U_i.dot(beta)))
-
-                A.append(Ai)
+                # compute mu_i
+                mu_i = Omega_i.dot(V_i.transpose()).dot(Sigma_i).dot(
+                    y_i - U_i.dot(beta))
+                mu_tilde.append(mu_i)
 
                 for l in range(L):
+                    mu_tilde_L[l] = np.append(
+                        mu_tilde_L[l],
+                        mu_tilde[i][r_l * l: r_l * (l + 1), 0]
+                    )
+
                     if i == 0:
-                        Eb_L.append(Eb[i][r_l * l: r_l * (l + 1), 0])
-                        A_L.append(Ai[r_l * l : r_l * (l + 1), r_l * l : r_l * (l + 1)])
+                        Omega_L.append(Omega_i[r_l * l: r_l * (l + 1),
+                                       r_l * l: r_l * (l + 1)])
                     else:
-                        Eb_L[l] = np.concatenate((Eb_L[l].transpose(), Eb[i][r_l * l : r_l * (l + 1), 0].transpose())).transpose()
-                        A_L[l] = block_diag(A_L[l], Ai[r_l * l : r_l * (l + 1), r_l * l : r_l * (l + 1)])
-
+                        Omega_L[l] = block_diag(
+                            Omega_L[l],
+                            Omega_i[r_l * l: r_l * (l + 1),
+                            r_l * l: r_l * (l + 1)]
+                        )
 
             # M-Step
             # Update beta
@@ -171,7 +192,8 @@ class MLMM(Learner):
 
             # Update D
             mu_D = np.array(Eb).reshape(n, -1).transpose()
-            D = (1/n)*(np.array(A).sum(axis=0) + np.dot(mu_D, mu_D.transpose()))
+            D = (1 / n) * (np.array(Omega).sum(axis=0) + np.dot(mu_D,
+                                                                mu_D.transpose()))
 
             # Update phi
             mu_L = Eb_L
@@ -181,12 +203,14 @@ class MLMM(Learner):
                 U_l = U_L[l]
                 V_l = V_L[l]
                 beta_l = beta[2 * l: 2 * (l + 1)]
-                A_l = A_L[l]
+                Omega_l = Omega_L[l]
                 mu_l = mu_L[l].reshape(-1, 1)
 
                 residFixed = y_l - U_l.dot(beta_l)
-                phi[l] = (1/N_l)*(np.dot(residFixed.transpose(), (residFixed - 2 * V_l.dot(mu_l)))\
-                         + np.trace(V_l.transpose().dot(V_l).dot(A_l + np.dot(mu_l, mu_l.transpose()))))
+                phi[l] = (1 / N_l) * (np.dot(residFixed.transpose(),
+                                             (residFixed - 2 * V_l.dot(mu_l))) \
+                                      + np.trace(V_l.transpose().dot(V_l).dot(
+                            Omega_l + np.dot(mu_l, mu_l.transpose()))))
 
             prev_obj = obj
             self.beta = beta
@@ -244,18 +268,21 @@ class ULMM:
             for i in range(n):
                 times_il = Y.iloc[i][l].index.values
                 U = times_il
-                for t in range(fixed_effect_time_order-1):
+                for t in range(fixed_effect_time_order - 1):
                     U = np.c_[U, times_il ** (t + 2)]
                 V = U
                 Y_il = Y.iloc[i][l].values
                 n_il = len(times_il)
-                data = data.append(pd.DataFrame(data = {'U': U, 'V': V, 'Y': Y_il, 'S': [s]*n_il}))
+                data = data.append(pd.DataFrame(
+                    data={'U': U, 'V': V, 'Y': Y_il, 'S': [s] * n_il}))
                 s += 1
             md = smf.mixedlm("Y ~ U", data, groups=data["S"], re_formula="~V")
             mdf = md.fit()
             beta[q_l * l] = mdf.params["Intercept"]
-            beta[q_l * l + 1 : q_l * (l + 1)] = mdf.params["U"]
-            D[r_l * l : r_l * (l + 1), r_l * l : r_l * (l + 1)] = np.array([[mdf.params["Group Var"], mdf.params["Group x V Cov"]], [mdf.params["Group x V Cov"], mdf.params["V Var"]]])
+            beta[q_l * l + 1: q_l * (l + 1)] = mdf.params["U"]
+            D[r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)] = np.array(
+                [[mdf.params["Group Var"], mdf.params["Group x V Cov"]],
+                 [mdf.params["Group x V Cov"], mdf.params["V Var"]]])
             phi[l] = mdf.resid.values.var()
 
         self.beta = beta

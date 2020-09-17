@@ -76,35 +76,40 @@ class Learner:
 
     @staticmethod
     def extract_features(Y, fixed_effect_time_order):
-        """Extract the longitudinal data of subject i-th outcome l-th
-            into features of the multivariate linear mixed model
+        """Extract the design features from longitudinal data
 
         Parameters
-            ----------
-            Y : `pandas.DataFrame`
-                The simulated longitudinal data
-            fixed_effect_time_order : `int`
-                Order of fixed effect features
+        ----------
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The longitudinal data. Each element of the dataframe is a
+            pandas.Series
+        fixed_effect_time_order : `int`
+            Order of fixed effect features
 
-            Returns
-            -------
-            U : `np.array`
-                The fixed-effect features of the simulated longitudinal data
-            V : `np.array`
-                The random-effect features of the simulated longitudinal data
-            y : `np.array`
-                The outcome of the simulated longitudinal data
-            N : `list`
-                The number samples of the simulated longitudinal data
+        Returns
+        -------
+        U : `np.array`, shape=(N_total, q)
+            Matrix that concatenates the fixed-effect design features of the
+            longitudinal data of all subjects, with N_total the total number
+            of longitudinal measurements for all subjects (N_total = sum(N))
+        V : `np.array`, shape=(N_total, n_samples x r)
+            Bloc-diagonal matrix with the random-effect design features of
+            the longitudinal data of all subjects
+        y : `np.array`, shape=(N_total,)
+            Vector that concatenates all longitudinal outcomes for all
+            subjects
+        N : `list`, shape=(n_samples,)
+            List with the number of the longitudinal measurements for each
+            subject
 
-            U_L : `list` of `np.array`
-                The fixed-effect features of the simulated longitudinal data arranged by l-th order
-            V_L : `list` of `np.array`
-                The random-effect features of the simulated longitudinal data arranged by l-th order
-            y_L : `list` of `np.array`
-                The outcome of the simulated longitudinal data arranged by l-th order
-            N_L : `list` of `list`
-                The number samples of the simulated longitudinal data arranged by l-th order 
+        U_L : `list` of `np.array`
+            The fixed-effect features of the simulated longitudinal data arranged by l-th order
+        V_L : `list` of `np.array`
+            The random-effect features of the simulated longitudinal data arranged by l-th order
+        y_L : `list` of `np.array`
+            The outcome of the simulated longitudinal data arranged by l-th order
+        N_L : `list` of `list`
+            The number samples of the simulated longitudinal data arranged by l-th order
 
         """
 
@@ -131,7 +136,7 @@ class Learner:
             N_il = len(times_il)
             U_il = np.ones(N_il)
             for t in range(fixed_effect_time_order):
-                U_il = np.c_[U_il, times_il**(t+1)]
+                U_il = np.c_[U_il, times_il ** (t + 1)]
             return U_il, y_il, N_il
 
         n, L = Y.shape
@@ -154,6 +159,9 @@ class Learner:
                     U_i = block_diag(U_i, U_il)
                     V_i = block_diag(V_i, V_il)
                     y_i = np.concatenate((y_i, y_il))
+
+                    #TODO add the required .reshape(-1, 1)
+
                     N_i.append(N_il)
 
                 if i == 0:
