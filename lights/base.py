@@ -8,6 +8,32 @@ from scipy.linalg import block_diag
 import numpy as np
 
 
+def customized_block_diag(l_arr):
+    """
+    Create a block diagonal matrix from provided list of arrays.
+
+    Parameters
+    ----------
+    l_arr : list of arrays, up to 2-D
+        Input arrays.
+    Returns
+    -------
+    out : ndarray
+        Array with input arrays on the diagonal.
+    """
+    shapes = np.array([a.shape for a in l_arr])
+    out_dtype = np.find_common_type([arr.dtype for arr in l_arr], [])
+    out = np.zeros(np.sum(shapes, axis=0), dtype=out_dtype)
+
+    r, c = 0, 0
+    for i, (rr, cc) in enumerate(shapes):
+        out[r:r + rr, c:c + cc] = l_arr[i]
+        r += rr
+        c += cc
+
+    return out
+
+
 class Learner:
     """The base class for a Solver.
     Not intended for end-users, but for development only.
@@ -140,29 +166,21 @@ class Learner:
             return U_il, y_il, N_il
 
         n, L = Y.shape
+        r_l = 2
         U, V, y, N = [], [], [], []
         U_L, V_L, y_L, N_L = [], [], [], []
         for i in range(n):
             Y_i = Y.iloc[i]
             L = len(Y_i)
+            U_i, V_i, y_i, N_i = [], [], [], []
             for l in range(L):
                 U_il, y_il, N_il = extract_specified_features(Y_i[l])
-                V_il = U_il
+                V_il = U_il[:, :r_l]
 
-                if l == 0:
-                    U_i = U_il
-                    V_i = V_il
-                    y_i = y_il
-                    N_i = [N_il]
-
-                else:
-                    U_i = block_diag(U_i, U_il)
-                    V_i = block_diag(V_i, V_il)
-                    y_i = np.concatenate((y_i, y_il))
-
-                    #TODO add the required .reshape(-1, 1)
-
-                    N_i.append(N_il)
+                U_i.append(U_il)
+                V_i.append(V_il)
+                y_i.append(y_il)
+                N_i.append(N_il)
 
                 if i == 0:
                     U_L.append(U_il)
@@ -175,16 +193,9 @@ class Learner:
                     y_L[l] = np.concatenate((y_L[l], y_il.reshape(-1, 1)))
                     N_L[l].append(N_il)
 
-            if i == 0:
-                V = V_i
-            else:
-                V = block_diag(V, V_i)
-            U.append(U_i)
-            y.append(y_i.reshape(-1, 1))
+            U.append(customized_block_diag(U_i))
+            V.append(customized_block_diag(V_i))
+            y.append(np.array(y_i).reshape(-1, 1))
             N.append(N_i)
-
-        U = np.concatenate(U)
-        y = np.concatenate(y)
-        print(y.shape)
 
         return (U, V, y, N), (U_L, V_L, y_L, N_L)

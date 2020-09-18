@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner
+from lights.base import Learner, customized_block_diag
 import numpy as np
 import statsmodels.formula.api as smf
-from scipy.linalg import block_diag
+# from scipy.linalg import block_diag
 import pandas as pd
 
 
@@ -128,7 +128,7 @@ class MLMM(Learner):
             self.history.print_history()
 
         # features extraction
-        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
                                                                    fixed_effect_time_order)
 
         n_samples, n_long_features = Y.shape
@@ -141,18 +141,12 @@ class MLMM(Learner):
                     self.history.print_history()
 
             # E-Step
-            mu_tilde, Omega, mu_tilde_L, Omega_L = [], []\
+            mu, Omega, mu_tilde_L, Omega_L = [], []\
                 , [np.array([])] * n_long_features\
                 , [np.zeros((n_samples * r_l, n_samples * r_l))] * n_long_features
-            mu= np.array([])
-            pointer = 0
+
             for i in range(n_samples):
-                N_i = N[i]
-                U_i = U[pointer : pointer + sum(N_i),:]
-                y_i= y[pointer : pointer + sum(N_i)]
-                V_i = V[pointer : pointer + sum(N_i),
-                      i*n_long_features*r_l : (i+1)*n_long_features*r_l]
-                pointer += sum(N_i)
+                U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
 
                 # compute Sigma_i
                 Phi_i = []
@@ -168,31 +162,35 @@ class MLMM(Learner):
                 Omega.append(Omega_i)
 
                 # compute mu_i
+                print(U_i.shape())
+                print(y_i.shape())
                 mu_i = Omega_i.dot(V_i.transpose()).dot(Sigma_i).dot(
                     y_i - U_i.dot(beta))
-                mu_tilde.append(mu_i)
-                mu = np.append(mu, mu_i)
+                mu.append(mu_i)
 
                 for l in range(n_long_features):
                     mu_tilde_L[l] = np.append(
                         mu_tilde_L[l],
-                        mu_tilde[i][r_l * l: r_l * (l + 1), 0]
+                        mu[i][r_l * l: r_l * (l + 1), 0]
                     )
 
                     Omega_L[l][i * r_l : (i + 1) * r_l, i * r_l : (i + 1) * r_l]\
                         = Omega_i[r_l * l : r_l * (l + 1), r_l * l : r_l * (l + 1)]
 
-            mu = mu.reshape(-1, 1)
-            mu_tilde = np.array(mu_tilde).reshape(n_samples, -1).transpose()
+            mu = np.array(mu).reshape(n_samples, -1).transpose()
+            mu_flat = mu.transpose().flatten().reshape(-1, 1)
 
             # M-Step
             # Update beta
+            U = np.concatenate(U_list)
+            V = customized_block_diag(V_list)
+            y = np.concatenate(y_list)
             beta = np.dot(np.linalg.inv(np.dot(U.transpose(), U)),
-                np.dot(U.transpose(), (y - np.dot(V, mu))))
+                np.dot(U.transpose(), (y - np.dot(V, mu_flat))))
 
             # Update D
             D = (1 / n_samples) * (np.array(Omega).sum(axis=0)
-                                   + np.dot(mu_tilde, mu_tilde.transpose()))
+                                   + np.dot(mu, mu.transpose()))
 
             # Update phi
             for l in range(n_long_features):
