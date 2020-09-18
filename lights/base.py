@@ -8,7 +8,7 @@ from scipy.linalg import block_diag
 import numpy as np
 
 
-def customized_block_diag(l_arr):
+def block_diag(l_arr):
     """
     Create a block diagonal matrix from provided list of arrays.
 
@@ -139,42 +139,40 @@ class Learner:
 
         """
 
-        def extract_specified_features(Y_il):
-            """Extract the longitudinal data of subject i-th outcome l-th
-            into features of the multivariate linear mixed model
+        def from_ts_to_design_features(Y_il):
+            """Extracts the design features from a given longitudinal trajectory
 
             Parameters
             ----------
             Y_il : `pandas.Series`
-                The simulated longitudinal data of l-th outcome of i-th subject
+                A longitudinal trajectory
 
             Returns
             -------
             U_il : `np.array`
-                The fixed-effect features for of l-th outcome of i-th subject
+                The corresponding fixed-effect design features
             Y_il : `np.array`
-                The l-th outcome of i-th subject
+                The corresponding outcomes
             n_il : `list`
-                The number samples of l-th outcome of i-th subject
+                The corresponding number of measurements
             """
             times_il = Y_il.index.values
             y_il = Y_il.values
-            N_il = len(times_il)
-            U_il = np.ones(N_il)
+            n_il = len(times_il)
+            U_il = np.ones(n_il)
             for t in range(fixed_effect_time_order):
                 U_il = np.c_[U_il, times_il ** (t + 1)]
-            return U_il, y_il, N_il
+            return U_il, y_il, n_il
 
-        n, L = Y.shape
-        r_l = 2
+        n_samples, n_long_features = Y.shape
+        r_l = 2  # linear time-varying features, so all r_l=2
         U, V, y, N = [], [], [], []
         U_L, V_L, y_L, N_L = [], [], [], []
-        for i in range(n):
+        for i in range(n_samples):
             Y_i = Y.iloc[i]
-            L = len(Y_i)
             U_i, V_i, y_i, N_i = [], [], [], []
-            for l in range(L):
-                U_il, y_il, N_il = extract_specified_features(Y_i[l])
+            for l in range(n_long_features):
+                U_il, y_il, N_il = from_ts_to_design_features(Y_i[l])
                 V_il = U_il[:, :r_l]
 
                 U_i.append(U_il)
@@ -193,8 +191,8 @@ class Learner:
                     y_L[l] = np.concatenate((y_L[l], y_il.reshape(-1, 1)))
                     N_L[l].append(N_il)
 
-            U.append(customized_block_diag(U_i))
-            V.append(customized_block_diag(V_i))
+            U.append(block_diag(U_i))
+            V.append(block_diag(V_i))
             y.append(np.array(y_i).reshape(-1, 1))
             N.append(N_i)
 
