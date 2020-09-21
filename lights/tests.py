@@ -7,6 +7,7 @@ from lights.mlmm import MLMM
 from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
+from lights.base import Learner
 
 
 class Test(unittest.TestCase):
@@ -77,7 +78,9 @@ class Test(unittest.TestCase):
 
         fixed_effect_time_order = 1
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order)
-        mlmm.fit(Y)
+        # TODO: extracted features to test MLMM case (similar when calling from inference.py)
+        extracted_features = Learner.extract_features(Y, fixed_effect_time_order)
+        mlmm.fit(extracted_features)
         beta, D, phi = np.concatenate(mlmm.beta), mlmm.D, np.concatenate(mlmm.phi)
 
         decimal = 2

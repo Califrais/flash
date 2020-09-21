@@ -49,7 +49,7 @@ class MLMM(Learner):
         self.D = None
         self.phi = None
 
-    def log_lik(self, Y, Eb):
+    def log_lik(self, extracted_features):
         """Computes the log-likelihood of the multivariate linear mixed model
 
         Parameters
@@ -63,40 +63,32 @@ class MLMM(Learner):
         output : `float`
             The value of the log-likelihood
         """
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples = len(U_list)
+        n_long_features = len(U_L)
         log_lik = 0
 
-        # TODO recode it :)
+        for i in range(n_samples):
+            U_i = U_list[i]
+            V_i = V_list[i]
+            n_i = sum(N[i])
+            y_i = y_list[i]
+            diag  = []
+            for l in range(n_long_features):
+                diag += [1 / self.phi[l, 0]] * N[i][l]
+            Sigma_i = np.diag(diag)
 
-        n, L = Y.shape
-        r = Eb[0].shape[0]
+            op1 = -0.5*n_i*np.log(2*np.pi)
+            op2 = -0.5*np.log(np.linalg.det(np.linalg.multi_dot([V_i, self.D, V_i.T])+ Sigma_i))
+            op3 = -0.5*np.linalg.multi_dot([(y_i - np.dot(U_i, self.beta)).T,
+                np.linalg.inv(np.linalg.multi_dot([V_i, self.D, V_i.T]) + Sigma_i),
+                                           (y_i - np.dot(U_i, self.beta))])
 
-        (U, V, y, N), (U_L, V_L, y_L, N_L) = self.extract_features(Y,
-                                                                   self.fixed_effect_time_order)
-        Eb_c = np.concatenate(Eb).reshape(-1, 1)
-        M = np.dot(np.concatenate(U), self.beta) + np.dot(V, Eb_c)
-        diag = []
-        for i in range(n):
-            for l in range(L):
-                N_il = N[i][l]
-                diag += [1 / self.phi[l, 0]] * N_il
-        S = np.diag(diag)
-        log_det_S = np.log(diag).sum()
-
-        y_c = np.concatenate(y).reshape(-1, 1)
-        Eb_c = np.concatenate(Eb).reshape(-1, 1)
-        log_lik = np.linalg.multi_dot(
-            [y_c.transpose(), S, M]) - 0.5 * np.linalg.multi_dot(
-            [M.transpose(), S, M]) - 0.5 * np.linalg.multi_dot(
-            [y_c.transpose(), S, y_c]) \
-                  - 0.5 * np.array(N).sum() * np.log(
-            2 * np.pi) + 0.5 * log_det_S - 0.5 * n * r * np.log(
-            2 * np.pi) - 0.5 * n * np.log(np.linalg.det(self.D)) \
-                  - 0.5 * Eb_c.transpose().dot(
-            np.kron(np.eye(n), np.linalg.inv(self.D))).dot(Eb_c)
+            log_lik += op1 + op2 + op3
 
         return log_lik
 
-    def fit(self, Y):
+    def fit(self, extracted_features):
         """Fit the multivariate linear mixed model
 
         Parameters
@@ -110,16 +102,18 @@ class MLMM(Learner):
         print_every = self.print_every
         tol = self.tol
         fixed_effect_time_order = self.fixed_effect_time_order
-        n_samples, n_long_features = Y.shape
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples = len(U_list)
+        n_long_features = len(U_L)
         r_l = 2  # linear time-varying features, so all r_l=2
 
         self._start_solve()
         # We initialize parameters by fitting univariate linear mixed models
         ulmm = ULMM(fixed_effect_time_order)
-        ulmm.fit(Y)
-        beta = ulmm.beta.reshape(-1, 1)  # TODO : .reshape(-1, 1) in ULMM
+        ulmm.fit(extracted_features)
+        beta = ulmm.beta
         D = ulmm.D
-        phi = ulmm.phi.reshape(-1, 1)
+        phi = ulmm.phi
 
         log_lik = 1.
         obj = -log_lik
@@ -127,10 +121,6 @@ class MLMM(Learner):
         self.history.update(n_iter=0, obj=obj, rel_obj=rel_obj)
         if verbose:
             self.history.print_history()
-
-        # features extraction
-        extracted_features = self.extract_features(Y, fixed_effect_time_order)
-        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
 
         n_iter = 0
         for n_iter in range(max_iter):
@@ -142,6 +132,7 @@ class MLMM(Learner):
 
             # E-Step
             mu, Omega = [], []
+            mu = np.zeros((n_long_features * r_l, n_samples))
             mu_tilde_L = [np.array([])] * n_long_features
             Omega_L = [np.zeros((n_samples * r_l, n_samples * r_l))] * n_long_features
 
@@ -164,25 +155,18 @@ class MLMM(Learner):
                 # compute mu_i
                 mu_i = Omega_i.dot(V_i.transpose()).dot(Sigma_i).dot(
                     y_i - U_i.dot(beta))
-                mu.append(mu_i)
-                # TODO : directly fill the mu matrix
+                mu[:, i] = mu_i.flatten()
 
                 for l in range(n_long_features):
                     mu_tilde_L[l] = np.append(
                         mu_tilde_L[l],
-                        mu[i][r_l * l: r_l * (l + 1), 0]
+                        mu[r_l * l: r_l * (l + 1), i]
                     )
                     Omega_L[l][i * r_l: (i + 1) * r_l, i * r_l: (i + 1) * r_l] \
                         = Omega_i[r_l * l: r_l * (l + 1),
                           r_l * l: r_l * (l + 1)]
 
-            # TODO : now useless
-            # mu = np.array(mu).reshape(n_samples, -1).transpose()
-
-
-            # mu_flat = mu.transpose().flatten().reshape(-1, 1)
-            mu_flat = mu.T.flatten()
-            # TODO replace all .transpose() by .T
+            mu_flat = mu.T.flatten().reshape(-1, 1)
 
             # M-Step
             U = np.concatenate(U_list)
@@ -190,15 +174,10 @@ class MLMM(Learner):
             y = np.concatenate(y_list)
 
             # Update beta
-            # TODO : try it :
-            # beta = np.dot(np.linalg.inv(np.dot(U.transpose(), U)),
-            #     np.dot(U.transpose(), (y - np.dot(V, mu_flat))))
             U_T = U.transpose()
             beta = np.linalg.inv(U_T.dot(U)).dot(U_T.dot(y - V.dot(mu_flat)))
 
             # Update D
-            # D = (1 / n_samples) * (np.array(Omega).sum(axis=0)
-            #                        + np.dot(mu, mu.transpose()))
             D = (np.array(Omega).sum(axis=0) + mu.dot(mu.T)) / n_samples
 
             # Update phi
@@ -220,9 +199,8 @@ class MLMM(Learner):
             self.D = D
             self.phi = phi
 
-            # TODO: Update likelihood function
-            # log_lik = self.log_lik(Y, mu_tilde)
-            # print("Likelihood", log_lik)
+            log_lik = self.log_lik(extracted_features)
+            print("Likelihood", log_lik)
 
             obj = -log_lik
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
@@ -235,7 +213,7 @@ class MLMM(Learner):
         self._end_solve()
 
 
-class ULMM:
+class ULMM(Learner):
     """Fit univariate linear mixed models
     """
     def __init__(self, fixed_effect_time_order=5):
@@ -246,7 +224,7 @@ class ULMM:
         self.D = None
         self.phi = None
 
-    def fit(self, Y):
+    def fit(self, extracted_features):
         """Fit univariate linear mixed models
 
         Parameters
@@ -258,40 +236,43 @@ class ULMM:
         fixed_effect_time_order = self.fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
-        n_samples, n_long_features = Y.shape
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples = len(U_list)
+        n_long_features = len(U_L)
         q = q_l * n_long_features
         r = r_l * n_long_features
 
         beta = np.zeros(q)
         D = np.zeros((r, r))
         phi = np.ones(n_long_features)
+
         for l in range(n_long_features):
-            data = pd.DataFrame(columns=['U', 'V', 'Y', 'S'])
-            s = 0
+            U = U_L[l][:, 1:]
+            V = U_L[l][:, 1:r_l]
+            Y = y_L[l]
+            S = np.array([])
             for i in range(n_samples):
+                S = np.append(S, i*np.ones(N_L[l][i]))
 
-                # TODO : already done in extract_features !
-                # times_il = Y.iloc[i][l].index.values
-                # U = times_il
-                # for t in range(fixed_effect_time_order - 1):
-                #     U = np.c_[U, times_il ** (t + 2)]
-                # V = U
-                # Y_il = Y.iloc[i][l].values
-                # n_il = len(times_il)
+            fixed_effect_columns = []
+            other_columns = ['V', 'Y', 'S']
+            for j in range(fixed_effect_time_order):
+                fixed_effect_columns.append('U' + str(j + 1))
+            data = pd.DataFrame(data = np.hstack((U,V,Y,S.reshape(-1, 1))),
+                                columns=fixed_effect_columns + other_columns)
 
-                data = data.append(pd.DataFrame(
-                    data={'U': U, 'V': V, 'Y': Y_il, 'S': [s] * n_il}))
-                s += 1
-            md = smf.mixedlm("Y ~ U", data, groups=data["S"], re_formula="~V")
+            md = smf.mixedlm("Y ~ " + ' + '.join(fixed_effect_columns), data,
+                             groups=data["S"], re_formula="~V")
             mdf = md.fit()
             beta[q_l * l] = mdf.params["Intercept"]
-            beta[q_l * l + 1: q_l * (l + 1)] = mdf.params["U"]
+            beta[q_l * l + 1: q_l * (l + 1)] = [mdf.params[features]
+                                            for features in fixed_effect_columns]
 
             D[r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)] = np.array(
                 [[mdf.params["Group Var"], mdf.params["Group x V Cov"]],
                  [mdf.params["Group x V Cov"], mdf.params["V Var"]]])
             phi[l] = mdf.resid.values.var()
 
-        self.beta = beta
+        self.beta = beta.reshape(-1, 1)
         self.D = D
-        self.phi = phi
+        self.phi = phi.reshape(-1, 1)

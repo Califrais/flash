@@ -414,9 +414,11 @@ class QNMCEM(Learner):
 
         # We initialize the longitudinal submodels parameters by fitting a
         # multivariate linear mixed model
+        # features extraction
+        extracted_features = self.extract_features(Y, fixed_effect_time_order)
         mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
                     tol=tol)
-        mlmm.fit(Y)
+        mlmm.fit(extracted_features)
         beta_init = mlmm.beta
         beta_0_ext = np.concatenate((beta_init, -beta_init))
         beta_0_ext[beta_0_ext < 0] = 0

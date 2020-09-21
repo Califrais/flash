@@ -4,7 +4,6 @@
 from datetime import datetime
 from lights.history import History
 from time import time
-from scipy.linalg import block_diag
 import numpy as np
 
 
@@ -21,6 +20,7 @@ def block_diag(l_arr):
     out : ndarray
         Array with input arrays on the diagonal.
     """
+
     shapes = np.array([a.shape for a in l_arr])
     out_dtype = np.find_common_type([arr.dtype for arr in l_arr], [])
     out = np.zeros(np.sum(shapes, axis=0), dtype=out_dtype)
@@ -167,33 +167,36 @@ class Learner:
         n_samples, n_long_features = Y.shape
         r_l = 2  # linear time-varying features, so all r_l=2
         U, V, y, N = [], [], [], []
-        U_L, V_L, y_L, N_L = [], [], [], []
+        U_L, V_L, y_L, N_L = [[] for i in range(n_long_features)], \
+                             [[] for i in range(n_long_features)], \
+                             [[] for i in range(n_long_features)], \
+                             [[] for i in range(n_long_features)]
+
         for i in range(n_samples):
             Y_i = Y.iloc[i]
-            U_i, V_i, y_i, N_i = [], [], [], []
+            U_i, V_i, y_i, N_i = [], [], np.array([]), []
             for l in range(n_long_features):
                 U_il, y_il, N_il = from_ts_to_design_features(Y_i[l])
                 V_il = U_il[:, :r_l]
 
                 U_i.append(U_il)
                 V_i.append(V_il)
-                y_i.append(y_il)
+                y_i = np.append(y_i, y_il)
                 N_i.append(N_il)
 
-                if i == 0:
-                    U_L.append(U_il)
-                    V_L.append(V_il)
-                    y_L.append(y_il.reshape(-1, 1))
-                    N_L.append([N_il])
-                else:
-                    U_L[l] = np.concatenate((U_L[l], U_il))
-                    V_L[l] = block_diag(V_L[l], V_il)
-                    y_L[l] = np.concatenate((y_L[l], y_il.reshape(-1, 1)))
-                    N_L[l].append(N_il)
+                U_L[l].append(U_il)
+                V_L[l].append(V_il)
+                y_L[l].append(y_il.reshape(-1, 1))
+                N_L[l].append(N_il)
 
             U.append(block_diag(U_i))
             V.append(block_diag(V_i))
-            y.append(np.array(y_i).reshape(-1, 1))
+            y.append(y_i.reshape(-1, 1))
             N.append(N_i)
+
+        for l in range(n_long_features):
+            U_L[l] = np.concatenate(tuple(U_L[l]))
+            V_L[l] = block_diag(V_L[l])
+            y_L[l] = np.concatenate(tuple(y_L[l]))
 
         return (U, V, y, N), (U_L, V_L, y_L, N_L)
