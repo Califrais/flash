@@ -122,7 +122,7 @@ class Learner:
         """
         r_l = 2  # linear time-varying features, so all r_l=2
         times_il = Y_il.index.values
-        y_il = Y_il.values
+        y_il = Y_il.values.reshape(-1, 1)
         n_il = len(times_il)
         U_il = np.ones(n_il)
         for t in range(1, fixed_effect_time_order + 1):
@@ -190,7 +190,7 @@ class Learner:
 
                 U_L[l].append(U_il)
                 V_L[l].append(V_il)
-                y_L[l].append(y_il.reshape(-1, 1))
+                y_L[l].append(y_il)
                 N_L[l].append(N_il)
 
             U.append(block_diag(U_i))
