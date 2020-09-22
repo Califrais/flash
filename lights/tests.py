@@ -4,6 +4,7 @@
 import unittest
 from lights.simulation import SimuJointLongitudinalSurvival
 from lights.mlmm import MLMM
+from lights.ulmm import ULMM
 from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
@@ -57,6 +58,31 @@ class Test(unittest.TestCase):
         X, Y, T, delta = simu.simulate()
         return X, Y, T, delta
 
+    def test_ULMM(self):
+        """Test ULMM estimation
+        """
+        simu = SimuJointLongitudinalSurvival(n_samples=100,
+                                             n_time_indep_features=5,
+                                             n_long_features=3, seed=123, high_risk_rate=0)
+        # simulation with no latent subgroups
+        Y = simu.simulate()[1]
+        beta_ = simu.fixed_effect_coeffs[0]
+        D_ = simu.long_cov
+        phi_l = simu.std_error**2
+        n_long_features = simu.n_long_features
+        phi_ = np.repeat(phi_l, n_long_features)
+
+        fixed_effect_time_order = 1
+        ulmm = ULMM(fixed_effect_time_order=fixed_effect_time_order)
+        extracted_features = Learner.extract_features(Y, fixed_effect_time_order)
+        ulmm.fit(extracted_features)
+        beta, D, phi = np.concatenate(ulmm.beta), ulmm.D, np.concatenate(ulmm.phi)
+
+        decimal = 1
+        np.testing.assert_almost_equal(beta, beta_, decimal=decimal)
+        np.testing.assert_almost_equal(D, D_, decimal=decimal)
+        np.testing.assert_almost_equal(phi, phi_, decimal=decimal)
+
     def test_MLMM(self):
         """Test MLMM estimation
         """
@@ -67,7 +93,7 @@ class Test(unittest.TestCase):
         Y = simu.simulate()[1]
         beta_ = simu.fixed_effect_coeffs[0]
         D_ = simu.long_cov
-        phi_l = simu.std_error
+        phi_l = simu.std_error**2
         n_long_features = simu.n_long_features
         phi_ = np.repeat(phi_l, n_long_features)
 

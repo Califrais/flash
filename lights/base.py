@@ -115,6 +115,8 @@ class Learner:
         -------
         U_il : `np.array`
             The corresponding fixed-effect design features
+        V_il : `np.array`
+            The corresponding random-effect design features
         Y_il : `np.array`
             The corresponding outcomes
         n_il : `list`
