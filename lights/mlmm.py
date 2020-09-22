@@ -3,6 +3,7 @@
 
 from lights.base import Learner, block_diag
 import numpy as np
+from numpy.linalg import multi_dot
 import statsmodels.formula.api as smf
 import pandas as pd
 
@@ -55,7 +56,7 @@ class MLMM(Learner):
         Parameters
         ----------
         extracted_features : `tuple, tuple`,
-            The extracted features from simulated longitudinal data.
+            The extracted features from longitudinal data.
             Each tuple is a combination of fixed-effect design features,
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
@@ -66,27 +67,27 @@ class MLMM(Learner):
             The value of the log-likelihood
         """
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
-        n_samples = len(U_list)
-        n_long_features = len(U_L)
-        log_lik = 0
+        n_samples, n_long_features = len(U_list), len(U_L)
+        D, beta, phi = self.D, self.beta, self.phi
 
+        log_lik = 0
         for i in range(n_samples):
             U_i = U_list[i]
             V_i = V_list[i]
             n_i = sum(N[i])
             y_i = y_list[i]
-            diag  = []
+            diag = []
             for l in range(n_long_features):
-                diag += [1 / self.phi[l, 0]] * N[i][l]
+                diag += [1 / phi[l, 0]] * N[i][l]
             Sigma_i = np.diag(diag)
+            tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
+            tmp_2 = y_i - U_i.dot(beta)
 
-            op1 = -0.5*n_i*np.log(2*np.pi)
-            op2 = -0.5*np.log(np.linalg.det(np.linalg.multi_dot([V_i, self.D, V_i.T])+ Sigma_i))
-            op3 = -0.5*np.linalg.multi_dot([(y_i - np.dot(U_i, self.beta)).T,
-                np.linalg.inv(np.linalg.multi_dot([V_i, self.D, V_i.T]) + Sigma_i),
-                                           (y_i - np.dot(U_i, self.beta))])
+            op1 = n_i * np.log(2 * np.pi)
+            op2 = np.log(np.linalg.det(tmp_1))
+            op3 = multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2])
 
-            log_lik += op1 + op2 + op3
+            log_lik -= .5 * (op1 + op2 + op3)
 
         return log_lik
 
@@ -96,7 +97,7 @@ class MLMM(Learner):
         Parameters
         ----------
         extracted_features : `tuple, tuple`,
-            The extracted features from simulated longitudinal data.
+            The extracted features from longitudinal data.
             Each tuple is a combination of fixed-effect design features,
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
@@ -106,9 +107,9 @@ class MLMM(Learner):
         print_every = self.print_every
         tol = self.tol
         fixed_effect_time_order = self.fixed_effect_time_order
+
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
-        n_samples = len(U_list)
-        n_long_features = len(U_L)
+        n_samples, n_long_features = len(U_list), len(U_L)
         r_l = 2  # linear time-varying features, so all r_l=2
 
         self._start_solve()
@@ -135,10 +136,11 @@ class MLMM(Learner):
                     self.history.print_history()
 
             # E-Step
-            mu, Omega = [], []
+            Omega = []
             mu = np.zeros((n_long_features * r_l, n_samples))
             mu_tilde_L = [np.array([])] * n_long_features
-            Omega_L = [np.zeros((n_samples * r_l, n_samples * r_l))] * n_long_features
+            Omega_L = [np.zeros(
+                (n_samples * r_l, n_samples * r_l))] * n_long_features
 
             for i in range(n_samples):
                 U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
@@ -203,10 +205,7 @@ class MLMM(Learner):
             self.D = D
             self.phi = phi
 
-            log_lik = self.log_lik(extracted_features)
-            print("Likelihood", log_lik)
-
-            obj = -log_lik
+            obj = -self.log_lik(extracted_features)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
@@ -217,9 +216,10 @@ class MLMM(Learner):
         self._end_solve()
 
 
-class ULMM(Learner):
+class ULMM:
     """Fit univariate linear mixed models
     """
+
     def __init__(self, fixed_effect_time_order=5):
         self.fixed_effect_time_order = fixed_effect_time_order
 
@@ -234,7 +234,7 @@ class ULMM(Learner):
         Parameters
         ----------
         extracted_features : `tuple, tuple`,
-            The extracted features from simulated longitudinal data.
+            The extracted features from longitudinal data.
             Each tuple is a combination of fixed-effect design features,
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
@@ -243,8 +243,7 @@ class ULMM(Learner):
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
-        n_samples = len(U_list)
-        n_long_features = len(U_L)
+        n_samples, n_long_features = len(U_list), len(U_L)
         q = q_l * n_long_features
         r = r_l * n_long_features
 
@@ -258,13 +257,13 @@ class ULMM(Learner):
             Y = y_L[l]
             S = np.array([])
             for i in range(n_samples):
-                S = np.append(S, i*np.ones(N_L[l][i]))
+                S = np.append(S, i * np.ones(N_L[l][i]))
 
             fixed_effect_columns = []
             other_columns = ['V', 'Y', 'S']
             for j in range(fixed_effect_time_order):
                 fixed_effect_columns.append('U' + str(j + 1))
-            data = pd.DataFrame(data = np.hstack((U,V,Y,S.reshape(-1, 1))),
+            data = pd.DataFrame(data=np.hstack((U, V, Y, S.reshape(-1, 1))),
                                 columns=fixed_effect_columns + other_columns)
 
             md = smf.mixedlm("Y ~ " + ' + '.join(fixed_effect_columns), data,
@@ -272,7 +271,8 @@ class ULMM(Learner):
             mdf = md.fit()
             beta[q_l * l] = mdf.params["Intercept"]
             beta[q_l * l + 1: q_l * (l + 1)] = [mdf.params[features]
-                                            for features in fixed_effect_columns]
+                                                for features in
+                                                fixed_effect_columns]
 
             D[r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)] = np.array(
                 [[mdf.params["Group Var"], mdf.params["Group x V Cov"]],
