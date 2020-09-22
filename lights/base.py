@@ -101,6 +101,34 @@ class Learner:
             return val
 
     @staticmethod
+    def from_ts_to_design_features(Y_il, fixed_effect_time_order):
+        """Extracts the design features from a given longitudinal trajectory
+
+        Parameters
+        ----------
+        Y_il : `pandas.Series`
+            A longitudinal trajectory
+        fixed_effect_time_order : `int`
+            Order of fixed effect features
+
+        Returns
+        -------
+        U_il : `np.array`
+            The corresponding fixed-effect design features
+        Y_il : `np.array`
+            The corresponding outcomes
+        n_il : `list`
+            The corresponding number of measurements
+        """
+        times_il = Y_il.index.values
+        y_il = Y_il.values
+        n_il = len(times_il)
+        U_il = np.ones(n_il)
+        for t in range(fixed_effect_time_order):
+            U_il = np.c_[U_il, times_il ** (t + 1)]
+        return U_il, y_il, n_il
+
+    @staticmethod
     def extract_features(Y, fixed_effect_time_order):
         """Extract the design features from longitudinal data
 
@@ -139,31 +167,6 @@ class Learner:
 
         """
 
-        def from_ts_to_design_features(Y_il):
-            """Extracts the design features from a given longitudinal trajectory
-
-            Parameters
-            ----------
-            Y_il : `pandas.Series`
-                A longitudinal trajectory
-
-            Returns
-            -------
-            U_il : `np.array`
-                The corresponding fixed-effect design features
-            Y_il : `np.array`
-                The corresponding outcomes
-            n_il : `list`
-                The corresponding number of measurements
-            """
-            times_il = Y_il.index.values
-            y_il = Y_il.values
-            n_il = len(times_il)
-            U_il = np.ones(n_il)
-            for t in range(fixed_effect_time_order):
-                U_il = np.c_[U_il, times_il ** (t + 1)]
-            return U_il, y_il, n_il
-
         n_samples, n_long_features = Y.shape
         r_l = 2  # linear time-varying features, so all r_l=2
         U, V, y, N = [], [], [], []
@@ -176,7 +179,7 @@ class Learner:
             Y_i = Y.iloc[i]
             U_i, V_i, y_i, N_i = [], [], np.array([]), []
             for l in range(n_long_features):
-                U_il, y_il, N_il = from_ts_to_design_features(Y_i[l])
+                U_il, y_il, N_il = Learner.from_ts_to_design_features(Y_i[l], fixed_effect_time_order)
                 V_il = U_il[:, :r_l]
 
                 U_i.append(U_il)
