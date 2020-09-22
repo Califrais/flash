@@ -120,13 +120,18 @@ class Learner:
         n_il : `list`
             The corresponding number of measurements
         """
+
+        r_l = 2  # linear time-varying features, so all r_l=2
         times_il = Y_il.index.values
         y_il = Y_il.values
         n_il = len(times_il)
         U_il = np.ones(n_il)
+        V_il = np.ones(n_il)
         for t in range(fixed_effect_time_order):
             U_il = np.c_[U_il, times_il ** (t + 1)]
-        return U_il, y_il, n_il
+        for t in range(r_l - 1):
+            V_il = np.c_[V_il, times_il ** (t + 1)]
+        return U_il, V_il, y_il, n_il
 
     @staticmethod
     def extract_features(Y, fixed_effect_time_order):
@@ -179,8 +184,8 @@ class Learner:
             Y_i = Y.iloc[i]
             U_i, V_i, y_i, N_i = [], [], np.array([]), []
             for l in range(n_long_features):
-                U_il, y_il, N_il = Learner.from_ts_to_design_features(Y_i[l], fixed_effect_time_order)
-                V_il = U_il[:, :r_l]
+                U_il, V_il, y_il, N_il = Learner.from_ts_to_design_features(Y_i[l], fixed_effect_time_order)
+                # V_il = U_il[:, :r_l]
 
                 U_i.append(U_il)
                 V_i.append(V_il)

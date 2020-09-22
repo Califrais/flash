@@ -54,9 +54,11 @@ class MLMM(Learner):
 
         Parameters
         ----------
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
-            a pandas.Series
+        extracted_features : `tuple, tuple`,
+            The extracted features from simulated longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
 
         Returns
         -------
@@ -93,9 +95,11 @@ class MLMM(Learner):
 
         Parameters
         ----------
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
-            a pandas.Series
+        extracted_features : `tuple, tuple`,
+            The extracted features from simulated longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
         """
         verbose = self.verbose
         max_iter = self.max_iter
@@ -229,9 +233,11 @@ class ULMM(Learner):
 
         Parameters
         ----------
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The longitudinal data. Each element of the dataframe is
-            a pandas.Series
+        extracted_features : `tuple, tuple`,
+            The extracted features from simulated longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
         """
         fixed_effect_time_order = self.fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
