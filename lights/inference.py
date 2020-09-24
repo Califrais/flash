@@ -371,6 +371,10 @@ class QNMCEM(Learner):
         # TODO Sim (only if self.fitted = True, else raise error)
         return marker
 
+    def f(self, t, delta, y, b):
+        # TODO : return tuple for version G=0 and G=1 ; and fill a docstring
+        return 1
+
     def f_data_g_latent(self, Y, T, delta, S):
 
         K = 2  # nb of groups (remove later)
@@ -381,22 +385,16 @@ class QNMCEM(Learner):
             for k in range(K):
                 f_k = []
                 for b in S:
-                    # TODO: write function to compute f(t, delta, y | G, b, theta)
-                    # f(t, delta, y | b, G, theta)
-                    f_k.append(1.0)
+                    f_k.append(self.f(T, delta, Y, b))
                 f_i.append(f_k)
             f.append(f_i)
-
         return f
-    def construct_samples(self, D, N):
+
+    def construct_samples(self, N):
         """ construct a set of samples used for approximation
 
         Parameters
         ----------
-
-        D : `np.array`, shape=(r, r)
-            The global variance-covariance matrix
-
         N : `int`
             Number of constructed samples
 
@@ -404,16 +402,16 @@ class QNMCEM(Learner):
         -------
         S : `list`, size=2*N
             Set of constructed samples
-
         """
+        D = self.D
         S = []
         C = np.linalg.cholesky(D)
-        (r, r) = D.shape
+        r = D.shape[0]
+        # TODO : avoid the for loop
         for n in range(N):
             Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r))
             b = C.dot(Omega).reshape(-1, 1)
             S += [b, -b]
-
         return S
 
     def fit(self, X, Y, T, delta):
@@ -496,7 +494,7 @@ class QNMCEM(Learner):
             # TODO Simon
             pi_est = 0
             N = 5
-            S = self.construct_samples(D, N)
+            S = self.construct_samples(N)
 
             # M-Step
             # TODO Simon
@@ -505,6 +503,7 @@ class QNMCEM(Learner):
             f = self.f_data_g_latent(Y, T, delta, S)
             # TODO; write function compute pi_xi
             pi_xi = np.ones(K)
+
             E_bbT = []
             for i in range(n_samples):
                 Lambda_bibiT = []
