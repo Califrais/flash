@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner
+from lights.base import Learner, extract_features
 from lights.mlmm import MLMM
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
@@ -371,6 +371,51 @@ class QNMCEM(Learner):
         # TODO Sim (only if self.fitted = True, else raise error)
         return marker
 
+    def f_data_g_latent(self, Y, T, delta, S):
+
+        K = 2  # nb of groups (remove later)
+        n_samples = Y.shape[0]
+        f = []
+        for i in range(n_samples):
+            f_i = []
+            for k in range(K):
+                f_k = []
+                for b in S:
+                    # TODO: write function to compute f(t, delta, y | G, b, theta)
+                    # f(t, delta, y | b, G, theta)
+                    f_k.append(1.0)
+                f_i.append(f_k)
+            f.append(f_i)
+
+        return f
+    def construct_samples(self, D, N):
+        """ construct a set of samples used for approximation
+
+        Parameters
+        ----------
+
+        D : `np.array`, shape=(r, r)
+            The global variance-covariance matrix
+
+        N : `int`
+            Number of constructed samples
+
+        Returns
+        -------
+        S : `list`, size=2*N
+            Set of constructed samples
+
+        """
+        S = []
+        C = np.linalg.cholesky(D)
+        (r, r) = D.shape
+        for n in range(N):
+            Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r))
+            b = C.dot(Omega).reshape(-1, 1)
+            S += [b, -b]
+
+        return S
+
     def fit(self, X, Y, T, delta):
         """Fit the lights model
 
@@ -399,6 +444,9 @@ class QNMCEM(Learner):
 
         n_samples, n_time_indep_features = X.shape
         n_long_features = Y.shape[1]
+        r_l = 2  # linear time-varying features, so all r_l=2
+        K = 2  # nb of groups (remove later)
+        r = n_long_features * r_l
         nb_asso_param = 4
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         self.n_samples = n_samples
@@ -415,9 +463,9 @@ class QNMCEM(Learner):
         # We initialize the longitudinal submodels parameters by fitting a
         # multivariate linear mixed model
         # features extraction
-        extracted_features = self.extract_features(Y, fixed_effect_time_order)
+        extracted_features = extract_features(Y, fixed_effect_time_order)
         mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
-                    tol=tol)
+                    tol=tol, fixed_effect_time_order=fixed_effect_time_order)
         mlmm.fit(extracted_features)
         beta_init = mlmm.beta
         beta_0_ext = np.concatenate((beta_init, -beta_init))
@@ -447,9 +495,28 @@ class QNMCEM(Learner):
             # E-Step
             # TODO Simon
             pi_est = 0
+            N = 5
+            S = self.construct_samples(D, N)
 
             # M-Step
             # TODO Simon
+
+            # Update D
+            f = self.f_data_g_latent(Y, T, delta, S)
+            # TODO; write function compute pi_xi
+            pi_xi = np.ones(K)
+            E_bbT = []
+            for i in range(n_samples):
+                Lambda_bibiT = []
+                num, dem = 0, 0
+                for k in range(K):
+                    for j in range(len(S)):
+                        b = S[j]
+                        Lambda_bibiT.append(b.dot(b.T)*f[i][k][j])
+                    num += pi_xi[k] * (np.array(Lambda_bibiT).sum(axis=0)) / (2 * N)
+                    dem += pi_xi[k] * (np.array(f[i][k]).sum()) / (2 * N)
+                E_bbT.append(num/dem)
+            D = (np.array(E_bbT).sum(axis=0))/n_samples
 
             if warm_start:
                 x0 = xi_ext

@@ -8,7 +8,7 @@ from lights.ulmm import ULMM
 from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
-from lights.base import Learner
+from lights.base import Learner, extract_features
 
 
 class Test(unittest.TestCase):
@@ -74,7 +74,7 @@ class Test(unittest.TestCase):
 
         fixed_effect_time_order = 1
         ulmm = ULMM(fixed_effect_time_order=fixed_effect_time_order)
-        extracted_features = Learner.extract_features(Y, fixed_effect_time_order)
+        extracted_features = extract_features(Y, fixed_effect_time_order)
         ulmm.fit(extracted_features)
         beta, D, phi = np.concatenate(ulmm.beta), ulmm.D, np.concatenate(ulmm.phi)
 
@@ -105,7 +105,7 @@ class Test(unittest.TestCase):
         fixed_effect_time_order = 1
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order)
         # TODO: extracted features to test MLMM case (similar when calling from inference.py)
-        extracted_features = Learner.extract_features(Y, fixed_effect_time_order)
+        extracted_features = extract_features(Y, fixed_effect_time_order)
         mlmm.fit(extracted_features)
         beta, D, phi = np.concatenate(mlmm.beta), mlmm.D, np.concatenate(mlmm.phi)
 
@@ -117,9 +117,14 @@ class Test(unittest.TestCase):
     def test_QNMCEM(self):
         """Test QNMCEM Algorithm
         """
-        simu = SimuJointLongitudinalSurvival(seed=123)
+        # simu = SimuJointLongitudinalSurvival(seed=123)
+        simu = SimuJointLongitudinalSurvival(n_samples=100,
+                                             n_time_indep_features=5,
+                                             n_long_features=3, seed=123)
         X, Y, T, delta = simu.simulate()
         D = simu.long_cov
+        qnmcem = QNMCEM(max_iter=3, fixed_effect_time_order=1)
+        qnmcem.fit(X, Y, T, delta)
         # TODO Sim : check parameters estimation
 
 
