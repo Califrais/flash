@@ -4,8 +4,18 @@
 import numpy as np
 import statsmodels.formula.api as smf
 import pandas as pd
+
+
 class ULMM:
-    """Fit univariate linear mixed models
+    """Algorithm for fitting a univariate linear mixed model
+
+    Parameters
+    ----------
+    fixed_effect_time_order : `int`, default=5
+        Order of the higher time monomial considered for the representations of
+        the time-varying features corresponding to the fixed effect. The
+        dimension of the corresponding design matrix is then equal to
+        fixed_effect_time_order + 1
     """
 
     def __init__(self, fixed_effect_time_order=5):

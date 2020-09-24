@@ -5,8 +5,6 @@ from lights.base import Learner, block_diag
 from lights.ulmm import ULMM
 import numpy as np
 from numpy.linalg import multi_dot
-import statsmodels.formula.api as smf
-import pandas as pd
 
 
 class MLMM(Learner):
