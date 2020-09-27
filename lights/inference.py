@@ -371,23 +371,55 @@ class QNMCEM(Learner):
         # TODO Sim (only if self.fitted = True, else raise error)
         return marker
 
-    def f(self, t, delta, y, b):
-        # TODO : return tuple for version G=0 and G=1 ; and fill a docstring
-        return 1
+    def f(self, y_i, t_i, delta_i, S):
+        """ Computes f(y_i, t_i, delta_i| S, G, theta)
+
+        Parameters
+        ----------
+        y_i :
+
+        t_i :
+
+        delta_i:
+
+        S:
+
+        Returns
+        -------
+        output : `list`
+
+        """
+        # TODO : return list for version G=0 and G=1 ; and fill a docstring
+        N = S.shape[0]
+        return [[0]*N, [1]*N]
 
     def f_data_g_latent(self, Y, T, delta, S):
+        """ Computes f(Y, T, delta| S, G, theta)
 
-        K = 2  # nb of groups (remove later)
+        Parameters
+        ----------
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
+
+        T : `np.ndarray`, shape=(n_samples,)
+            The simulated censored times of the event of interest
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            The simulated censoring indicator
+
+        S: `np.ndarray`, , shape=(2*N, r)
+            Set of constructed samples
+
+        Returns
+        -------
+        f : `list`
+            The value of the f(Y, T, delta| S, G, theta)
+        """
         n_samples = Y.shape[0]
         f = []
         for i in range(n_samples):
-            f_i = []
-            for k in range(K):
-                f_k = []
-                for b in S:
-                    f_k.append(self.f(T, delta, Y, b))
-                f_i.append(f_k)
-            f.append(f_i)
+            f.append(self.f(Y[i], T[i], delta[i], S))
         return f
 
     def construct_samples(self, N):
@@ -400,19 +432,45 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        S : `list`, size=2*N
+        S : `np.ndarray`, , shape=(2*N, r)
             Set of constructed samples
         """
         D = self.D
-        S = []
         C = np.linalg.cholesky(D)
         r = D.shape[0]
-        # TODO : avoid the for loop
-        for n in range(N):
-            Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r))
-            b = C.dot(Omega).reshape(-1, 1)
-            S += [b, -b]
+
+        Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
+        b = Omega.dot(C.T)
+        S = np.vstack((b, -b))
+
         return S
+
+    def _Eg(self, g, f):
+        """compute expectations for different functions g
+
+        Parameters
+        ----------
+        g : `list`
+            The value of g function for all samples
+
+        f: `list`
+            The value of the f(Y, T, delta| S, G, theta)
+
+        Returns
+        -------
+        Eg : `np.ndarray`, , shape=(n_samples, )
+            The expectation for g
+
+        """
+        n_samples = f.size()
+        Eg = np.zeros(n_samples)
+        for i in range(n_samples):
+            Eg[i] = ((1 - self.pi_xi) * (g * self.f[i][0]).sum(axis=0)
+                    + self.pi_xi * (g * self.f[i][1]).sum(axis=0)) / \
+                    ((1 - self.pi_xi) * (np.array(f[i][0]).sum()) +
+                     self.pi_xi * (np.array(f[i][1]).sum()))
+
+        return Eg
 
     def fit(self, X, Y, T, delta):
         """Fit the lights model
@@ -504,18 +562,11 @@ class QNMCEM(Learner):
             # TODO; write function compute pi_xi
             pi_xi = np.ones(K)
 
-            E_bbT = []
-            for i in range(n_samples):
-                Lambda_bibiT = []
-                num, dem = 0, 0
-                for k in range(K):
-                    for j in range(len(S)):
-                        b = S[j]
-                        Lambda_bibiT.append(b.dot(b.T)*f[i][k][j])
-                    num += pi_xi[k] * (np.array(Lambda_bibiT).sum(axis=0)) / (2 * N)
-                    dem += pi_xi[k] * (np.array(f[i][k]).sum()) / (2 * N)
-                E_bbT.append(num/dem)
-            D = (np.array(E_bbT).sum(axis=0))/n_samples
+            g0 = []
+            for s in S:
+                g0.append(s.dot(s.T))
+            E_g0 = self._Eg(g0, f)
+            D = (np.array(E_g0).sum(axis=0)) / n_samples
 
             if warm_start:
                 x0 = xi_ext
