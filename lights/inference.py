@@ -52,10 +52,14 @@ class QNMCEM(Learner):
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
+
+    initialize : `bool`, default=True
+        If `True`, we initialize the parameters using MLMM model, otherwise we
+        use arbitrarily chosen fixed initialization
     """
     def __init__(self, fit_intercept=False, l_elastic_net=0.,
                  eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 warm_start=False, fixed_effect_time_order=5):
+                 warm_start=False, fixed_effect_time_order=5, initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.l_elastic_net = l_elastic_net
         self.eta = eta
@@ -64,6 +68,7 @@ class QNMCEM(Learner):
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.initialize = initialize
 
         # Attributes that will be instantiated afterwards
         self.n_time_indep_features = None
@@ -227,7 +232,7 @@ class QNMCEM(Learner):
             The log-likelihood computed on the given data
         """
         prb = 1
-        # TODO Simon
+        # TODO
         return np.mean(np.log(prb))
 
     def _func_obj(self, X, Y, T, delta, xi_ext):
@@ -389,7 +394,7 @@ class QNMCEM(Learner):
             group
         """
         marker = None
-        # TODO Sim (only if self.fitted = True, else raise error)
+        # TODO (only if self.fitted = True, else raise error)
         return marker
 
     def f_data_g_latent(self, Y, T, delta, S):
@@ -514,40 +519,56 @@ class QNMCEM(Learner):
         fixed_effect_time_order = self.fixed_effect_time_order
 
         n_samples, n_time_indep_features = X.shape
-        n_long_features = Y.shape[1]
-        r_l = 2  # linear time-varying features, so all r_l=2
-        K = 2  # nb of groups (remove later)
-        r = n_long_features * r_l
-        nb_asso_param = 4
-        nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
+        n_long_features = Y.shape[1]
+        q_l = fixed_effect_time_order + 1
+        r_l = 2  # linear time-varying features, so all r_l=2
+        nb_asso_param = 4
+        if fit_intercept:
+            n_time_indep_features += 1
+        nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
+
         self._start_solve()
 
         # features extraction
         extracted_features = extract_features(Y, fixed_effect_time_order)
 
         # initialization
-        if fit_intercept:
-            n_time_indep_features += 1
         xi_ext = np.zeros(2 * n_time_indep_features)
-        # TODO : try to initialize gamma_0 with a standard Cox model from tick
+        # TODO at the end : try to initialize gamma_0 with a standard Cox model
+        #  from tick
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
         # initialize longitudinal submodels
-        mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
-                    tol=tol, fixed_effect_time_order=fixed_effect_time_order)
-        mlmm.fit(extracted_features)
-        beta_init = mlmm.beta
-        beta_0_ext = np.concatenate((beta_init, -beta_init))
+        if self.initialize:
+            mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
+                        tol=tol, fixed_effect_time_order=fixed_effect_time_order)
+            mlmm.fit(extracted_features)
+            beta = mlmm.beta
+            D = mlmm.D
+            phi = mlmm.phi
+        else:
+            # fixed initialization
+            q = q_l * n_long_features
+            r = r_l * n_long_features
+            beta = np.zeros((q, 1))
+            D = np.diag(np.ones(r))
+            phi = np.ones((n_long_features, 1))
+
+        beta_0_ext = np.concatenate((beta, -beta))
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
-        D = mlmm.D
-        phi = mlmm.phi
 
+        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
+        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
         self.D = D
         self.phi = phi
+
         func_obj = self._func_obj
         P_func = self._P_func
         grad_P = self._grad_P

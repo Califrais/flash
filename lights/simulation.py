@@ -393,7 +393,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         mean_1 = fixed_effect_mean_high_risk * n_long_features
         beta_1 = np.random.multivariate_normal(mean_1, np.diag(
             corr_fixed_effect * np.ones(q)))
-        self.fixed_effect_coeffs = [beta_0, beta_1]
+        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
+                                    beta_1.reshape(-1, 1)]
 
         # Simulation of the association parameters
         nb_asso_param = 4

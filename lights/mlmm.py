@@ -33,15 +33,20 @@ class MLMM(Learner):
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
+
+    initialize : `bool`, default=True
+        If `True`, we initialize the parameters using ULMM model, otherwise we
+        use arbitrarily chosen fixed initialization
     """
     def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 fixed_effect_time_order=5):
+                 fixed_effect_time_order=5, initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.verbose = verbose
         self.print_every = print_every
         self.tol = tol
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.initialize = initialize
 
         # Attributes that will be instantiated afterwards
         self.beta = None
@@ -111,13 +116,21 @@ class MLMM(Learner):
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
 
-        # We initialize parameters by fitting univariate linear mixed models
-        ulmm = ULMM(verbose=verbose,
-                    fixed_effect_time_order=fixed_effect_time_order)
-        ulmm.fit(extracted_features)
-        beta = ulmm.beta
-        D = ulmm.D
-        phi = ulmm.phi
+        if self.initialize:
+            # initialize parameters by fitting univariate linear mixed models
+            ulmm = ULMM(verbose=verbose,
+                        fixed_effect_time_order=fixed_effect_time_order)
+            ulmm.fit(extracted_features)
+            beta = ulmm.beta
+            D = ulmm.D
+            phi = ulmm.phi
+        else:
+            # fixed initialization
+            q = q_l * n_long_features
+            r = r_l * n_long_features
+            beta = np.zeros((q, 1))
+            D = np.diag(np.ones(r))
+            phi = np.ones((n_long_features, 1))
 
         self.beta = beta
         self.D = D

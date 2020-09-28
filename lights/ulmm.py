@@ -53,12 +53,13 @@ class ULMM(Learner):
         r_l = 2  # linear time-varying features, so all r_l=2
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
+
+        # fixed initialization
         q = q_l * n_long_features
         r = r_l * n_long_features
-
-        beta = np.zeros(q)
-        D = np.zeros((r, r))
-        phi = np.ones(n_long_features)
+        beta = np.zeros((q, 1))
+        D = np.diag(np.ones(r))
+        phi = np.ones((n_long_features, 1))
 
         for l in range(n_long_features):
             U = U_L[l][:, 1:]
