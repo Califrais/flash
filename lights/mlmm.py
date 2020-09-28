@@ -108,6 +108,7 @@ class MLMM(Learner):
 
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
+        q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
 
         # We initialize parameters by fitting univariate linear mixed models
@@ -183,8 +184,7 @@ class MLMM(Learner):
                 U_l = U_L[l]
                 V_l = V_L[l]
                 Omega_l = Omega_L[l]
-                # TODO Van Tuan : beta_l needs to include fixed_effect_time_order
-                beta_l = beta[2 * l: 2 * (l + 1)]
+                beta_l = beta[q_l * l: q_l * (l + 1)]
                 mu_l = mu_tilde_L[l].reshape(-1, 1)
                 tmp = y_l - U_l.dot(beta_l)
                 phi[l] = (tmp.T.dot(tmp - 2 * V_l.dot(mu_l)) + np.trace(
