@@ -326,8 +326,9 @@ class QNMCEM(Learner):
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def predict_proba(self, X, xi_ext):
-        """Probability estimates for being on the high-risk group
+    def get_proba(self, X, xi_ext):
+        """Probability estimates for being on the high-risk group given
+        time-independent features
 
         Parameters
         ----------
@@ -342,11 +343,32 @@ class QNMCEM(Learner):
         -------
         output : `np.ndarray`, shape=(n_samples,)
             Returns the probability of the sample for being on the high-risk
-            group
+            group given time-independent features
         """
         xi_0, xi = self._get_xi_from_xi_ext(xi_ext)
         u = xi_0 + X.dot(xi)
         return QNMCEM.logistic_grad(u)
+
+    def get_post_proba(self, pi_xi, Lambda_1):
+        """Posterior probability estimates for being on the high-risk group
+        given all observed data
+
+        Parameters
+        ----------
+        pi_xi : `np.ndarray`, shape=(n_samples,)
+            Comes from get_proba function
+
+        Lambda_1 : `np.ndarray`, shape=(n_samples, 2)
+            blabla
+
+        Returns
+        -------
+        output : `np.ndarray`, shape=(n_samples,)
+            Returns the posterior probability of the sample for being on the
+            high-risk group given all observed data
+        """
+        # TODO
+        return 1
 
     def predict_marker(self, X, Y):
         """Marker rule of the lights model for being on the high-risk group
@@ -370,28 +392,6 @@ class QNMCEM(Learner):
         # TODO Sim (only if self.fitted = True, else raise error)
         return marker
 
-    def f(self, y_i, t_i, delta_i, S):
-        """Computes f(y_i, t_i, delta_i| S, G, theta)
-
-        Parameters
-        ----------
-        y_i :
-
-        t_i :
-
-        delta_i:
-
-        S:
-
-        Returns
-        -------
-        output : `list`
-
-        """
-        # TODO : return list for version G=0 and G=1 ; and fill a docstring
-        N = S.shape[0]
-        return [[0]*N, [1]*N]
-
     def f_data_g_latent(self, Y, T, delta, S):
         """Computes f(Y, T, delta| S, G, theta)
 
@@ -412,17 +412,15 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        f : `list`
+        f : `np.ndarray`, shape=(n_samples, 2)
             The value of the f(Y, T, delta| S, G, theta)
         """
-        n_samples = Y.shape[0]
-        f = []
-        for i in range(n_samples):
-            f.append(self.f(Y[i], T[i], delta[i], S))
-        return f
+        # TODO : return list for version G=0 and G=1 ; and fill a docstring
+        N = S.shape[0]
+        return [[0] * N, [1] * N]
 
-    def construct_samples(self, N):
-        """Constructs a set of samples used for Monte Carlo approximation
+    def construct_MC_samples(self, N):
+        """Constructs the set of samples used for Monte Carlo approximation
 
         Parameters
         ----------
@@ -442,15 +440,36 @@ class QNMCEM(Learner):
         S = np.vstack((b, -b))
         return S
 
-    def _Eg(self, g, f):
-        """Computes expectations for different functions g
+    def _Lambda_g(self, g, f):
+        """blabla
 
         Parameters
         ----------
-        g : `list`
+        g : `np.array`, shape=(n_samples, 2)
             The value of g function for all samples
 
-        f: `list`
+        f: `np.array`, shape=(n_samples, 2)
+            The value of the f(Y, T, delta| S, G, theta)
+
+        Returns
+        -------
+        Lambda_g : `list`, shape=(n_samples, )
+            The expectation for g
+        """
+        Lambda_g = 0
+        return Lambda_g
+
+    def _Eg(self, pi_xi, Lambda_1, Lambda_g):
+        """Computes approximated expectations of different functions g taking
+        random effects as input, conditional on the observed data and the
+        current estimate of the parameters
+
+        Parameters
+        ----------
+        g : `np.array`, shape=(n_samples, 2)
+            The value of g function for all samples
+
+        f: `np.array`, shape=(n_samples, 2)
             The value of the f(Y, T, delta| S, G, theta)
 
         Returns
@@ -461,7 +480,7 @@ class QNMCEM(Learner):
         n_samples = f.size()
         Eg = np.zeros(n_samples)
         for i in range(n_samples):
-            Eg[i] = ((1 - self.pi_xi) * (g * self.f[i][0]).sum(axis=0)
+            Eg[i] = ((1 - pi_xi) * (g * self.f[i][0]).sum(axis=0)
                     + self.pi_xi * (g * self.f[i][1]).sum(axis=0)) / \
                     ((1 - self.pi_xi) * (np.array(f[i][0]).sum()) +
                      self.pi_xi * (np.array(f[i][1]).sum()))
@@ -512,6 +531,7 @@ class QNMCEM(Learner):
         if fit_intercept:
             n_time_indep_features += 1
         xi_ext = np.zeros(2 * n_time_indep_features)
+        # TODO : try to initialize gamma_0 with a standard Cox model from tick
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
@@ -542,10 +562,13 @@ class QNMCEM(Learner):
 
         for n_iter in range(max_iter):
 
+            pi_xi = self.get_proba(X, xi_ext)
+
             # E-Step
-            pi_est = self.predict_proba(X, xi_ext)
+            Lambda_1 = 0
+            pi_est = self.get_post_proba(pi_xi, Lambda_1)
             N = 5
-            S = self.construct_samples(N)
+            S = self.construct_MC_samples(N)
 
             # M-Step
 
@@ -555,8 +578,9 @@ class QNMCEM(Learner):
             g0 = []
             for s in S:
                 g0.append(s.dot(s.T))
+            # TODO : g0(S)
             E_g0 = self._Eg(g0, f)
-            D = (np.array(E_g0).sum(axis=0)) / n_samples
+            D = np.array(E_g0).sum(axis=0) / n_samples
 
             if warm_start:
                 x0 = xi_ext

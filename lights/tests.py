@@ -98,7 +98,7 @@ class Test(unittest.TestCase):
         n_long_features = simu.n_long_features
         phi_ = np.repeat(phi_l, n_long_features)
 
-        fixed_effect_time_order = 1
+        fixed_effect_time_order = 1  # q_l=2 in the simulations
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order)
         extracted_features = extract_features(Y, fixed_effect_time_order)
         mlmm.fit(extracted_features)
