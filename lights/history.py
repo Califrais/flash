@@ -27,7 +27,7 @@ class History:
     """
 
     def __init__(self, minimum_col_width=8,
-                 print_order=["n_iter", "obj", "step", "rel_obj"]):
+                 print_order=["n_iter", "obj", "rel_obj"]):
         self.minimum_col_width = minimum_col_width
         self.print_order = print_order
 
@@ -45,10 +45,6 @@ class History:
         # Default print style of history values. Default is %.2e
         print_style = defaultdict(lambda: "%g")
         print_style["n_iter"] = "%d"
-        print_style["n_epoch"] = "%d"
-        print_style["n_inner_prod"] = "%d"
-        print_style["spars"] = "%d"
-        print_style["rank"] = "%d"
         self.print_style = print_style
 
         # Attributes that will be instantiated afterwards

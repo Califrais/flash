@@ -34,7 +34,6 @@ class MLMM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
     """
-
     def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  fixed_effect_time_order=5):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
@@ -84,7 +83,7 @@ class MLMM(Learner):
 
             op1 = n_i * np.log(2 * np.pi)
             op2 = np.log(np.linalg.det(tmp_1))
-            op3 = multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2])
+            op3 = multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2])[0][0]
 
             log_lik -= .5 * (op1 + op2 + op3)
 
@@ -111,28 +110,21 @@ class MLMM(Learner):
         n_samples, n_long_features = len(U_list), len(U_L)
         r_l = 2  # linear time-varying features, so all r_l=2
 
-        self._start_solve()
         # We initialize parameters by fitting univariate linear mixed models
-        ulmm = ULMM(fixed_effect_time_order)
+        ulmm = ULMM(verbose=verbose,
+                    fixed_effect_time_order=fixed_effect_time_order)
         ulmm.fit(extracted_features)
         beta = ulmm.beta
         D = ulmm.D
         phi = ulmm.phi
 
-        log_lik = 1.
-        obj = -log_lik
-        rel_obj = 1.
-        self.history.update(n_iter=0, obj=obj, rel_obj=rel_obj)
-        if verbose:
-            self.history.print_history()
+        self.beta = beta
+        self.D = D
+        self.phi = phi
+        obj = -self.log_lik(extracted_features)
+        self._start_solve()
 
-        n_iter = 0
         for n_iter in range(max_iter):
-            if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, obj=obj,
-                                    rel_obj=rel_obj)
-                if verbose:
-                    self.history.print_history()
 
             # E-Step
             Omega = []
@@ -168,8 +160,7 @@ class MLMM(Learner):
                         mu[r_l * l: r_l * (l + 1), i]
                     )
                     Omega_L[l][i * r_l: (i + 1) * r_l, i * r_l: (i + 1) * r_l] \
-                        = Omega_i[r_l * l: r_l * (l + 1),
-                          r_l * l: r_l * (l + 1)]
+                        = Omega_i[r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)]
 
             mu_flat = mu.T.flatten().reshape(-1, 1)
 
@@ -192,24 +183,27 @@ class MLMM(Learner):
                 U_l = U_L[l]
                 V_l = V_L[l]
                 Omega_l = Omega_L[l]
+                # TODO Van Tuan : beta_l needs to include fixed_effect_time_order
                 beta_l = beta[2 * l: 2 * (l + 1)]
                 mu_l = mu_tilde_L[l].reshape(-1, 1)
-
                 tmp = y_l - U_l.dot(beta_l)
                 phi[l] = (tmp.T.dot(tmp - 2 * V_l.dot(mu_l)) + np.trace(
                     V_l.T.dot(V_l).dot(Omega_l + mu_l.dot(mu_l.T)))) / N_l
 
-            prev_obj = obj
             self.beta = beta
             self.D = D
             self.phi = phi
 
+            prev_obj = obj
             obj = -self.log_lik(extracted_features)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+
+            if n_iter % print_every == 0:
+                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
+                                    beta=beta, D=D, phi=phi)
+                if verbose:
+                    self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
 
-        self.history.update(n_iter=n_iter + 1, obj=obj, rel_obj=rel_obj)
-        if verbose:
-            self.history.print_history()
         self._end_solve()

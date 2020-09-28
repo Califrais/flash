@@ -53,7 +53,6 @@ class QNMCEM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
     """
-
     def __init__(self, fit_intercept=False, l_elastic_net=0.,
                  eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=False, fixed_effect_time_order=5):
@@ -372,7 +371,7 @@ class QNMCEM(Learner):
         return marker
 
     def f(self, y_i, t_i, delta_i, S):
-        """ Computes f(y_i, t_i, delta_i| S, G, theta)
+        """Computes f(y_i, t_i, delta_i| S, G, theta)
 
         Parameters
         ----------
@@ -394,7 +393,7 @@ class QNMCEM(Learner):
         return [[0]*N, [1]*N]
 
     def f_data_g_latent(self, Y, T, delta, S):
-        """ Computes f(Y, T, delta| S, G, theta)
+        """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
         ----------
@@ -423,7 +422,7 @@ class QNMCEM(Learner):
         return f
 
     def construct_samples(self, N):
-        """ construct a set of samples used for approximation
+        """Constructs a set of samples used for Monte Carlo approximation
 
         Parameters
         ----------
@@ -438,15 +437,13 @@ class QNMCEM(Learner):
         D = self.D
         C = np.linalg.cholesky(D)
         r = D.shape[0]
-
         Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
         b = Omega.dot(C.T)
         S = np.vstack((b, -b))
-
         return S
 
     def _Eg(self, g, f):
-        """compute expectations for different functions g
+        """Computes expectations for different functions g
 
         Parameters
         ----------
@@ -460,7 +457,6 @@ class QNMCEM(Learner):
         -------
         Eg : `np.ndarray`, , shape=(n_samples, )
             The expectation for g
-
         """
         n_samples = f.size()
         Eg = np.zeros(n_samples)
@@ -509,17 +505,17 @@ class QNMCEM(Learner):
         self.n_time_indep_features = n_time_indep_features
         self._start_solve()
 
-        # Initialization
+        # features extraction
+        extracted_features = extract_features(Y, fixed_effect_time_order)
+
+        # initialization
         if fit_intercept:
             n_time_indep_features += 1
         xi_ext = np.zeros(2 * n_time_indep_features)
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
-        # We initialize the longitudinal submodels parameters by fitting a
-        # multivariate linear mixed model
-        # features extraction
-        extracted_features = extract_features(Y, fixed_effect_time_order)
+        # initialize longitudinal submodels
         mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
                     tol=tol, fixed_effect_time_order=fixed_effect_time_order)
         mlmm.fit(extracted_features)
@@ -530,37 +526,31 @@ class QNMCEM(Learner):
         D = mlmm.D
         phi = mlmm.phi
 
+        self.D = D
+        self.phi = phi
         func_obj = self._func_obj
         P_func = self._P_func
         grad_P = self._grad_P
 
         obj = func_obj(X, Y, T, delta, xi_ext)
-        rel_obj = 1.
 
-        # Bounds vector for the L-BGFS-B algorithms
+        # bounds vector for the L-BGFS-B algorithms
         bounds_xi = [(0, None)] * n_time_indep_features * 2
         bounds_beta = [(0, None)] * n_long_features * \
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
 
-        n_iter = 0
         for n_iter in range(max_iter):
 
-            pi = self.predict_proba(X, xi_ext)
-
             # E-Step
-            # TODO Simon
-            pi_est = 0
+            pi_est = self.predict_proba(X, xi_ext)
             N = 5
             S = self.construct_samples(N)
 
             # M-Step
-            # TODO Simon
 
             # Update D
             f = self.f_data_g_latent(Y, T, delta, S)
-            # TODO; write function compute pi_xi
-            pi_xi = np.ones(K)
 
             g0 = []
             for s in S:
@@ -582,31 +572,29 @@ class QNMCEM(Learner):
                 pgtol=1e-5
             )[0]
 
-            if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    D=D, phi=phi,
-                                    beta_0=self.get_vect_from_ext(beta_0_ext),
-                                    beta_1=self.get_vect_from_ext(beta_1_ext),
-                                    xi=self._get_xi_from_xi_ext(xi_ext)[1],
-                                    gamma_0=self.get_vect_from_ext(gamma_0_ext),
-                                    gamma_1=self.get_vect_from_ext(gamma_1_ext))
-                if verbose:
-                    self.history.print_history()
+            self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+            self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+            self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
+            self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+            self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
+            self.D = D
+            self.phi = phi
 
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+
+            if n_iter % print_every == 0:
+                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
+                                    D=D, phi=phi, beta_0=self.beta_0,
+                                    beta_1=self.beta_1, xi=self.xi,
+                                    gamma_0=self.gamma_0, gamma_1=self.gamma_1)
+                if verbose:
+                    self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
 
         self._end_solve()
-        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
-        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-        self.D = D
-        self.phi = phi
 
     def score(self, X, Y, T, delta, metric):
         """Computes the score with the trained parameters on the given data,

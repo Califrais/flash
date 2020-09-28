@@ -2,13 +2,13 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import unittest
+from lights.base import extract_features
 from lights.simulation import SimuJointLongitudinalSurvival
 from lights.mlmm import MLMM
 from lights.ulmm import ULMM
 from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
-from lights.base import Learner, extract_features
 
 
 class Test(unittest.TestCase):
@@ -86,9 +86,10 @@ class Test(unittest.TestCase):
     def test_MLMM(self):
         """Test MLMM estimation
         """
-        simu = SimuJointLongitudinalSurvival(n_samples=100,
+        simu = SimuJointLongitudinalSurvival(n_samples=200,
                                              n_time_indep_features=5,
-                                             n_long_features=3, seed=123, high_risk_rate=0)
+                                             n_long_features=3, seed=123,
+                                             high_risk_rate=0)
         # simulation with no latent subgroups
         Y = simu.simulate()[1]
         beta_ = simu.fixed_effect_coeffs[0]
@@ -97,19 +98,13 @@ class Test(unittest.TestCase):
         n_long_features = simu.n_long_features
         phi_ = np.repeat(phi_l, n_long_features)
 
-        # TODO Van Tuan : here we simulate with high_risk_rate=0 so with no
-        #  latent subgroups. We expect MLMM to recover approximately the true
-        #  beta_, D_, phi_ . Use assert_almost_equal with a decimal not to
-        #  big to allow estimation error ;)
-
         fixed_effect_time_order = 1
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order)
-        # TODO: extracted features to test MLMM case (similar when calling from inference.py)
         extracted_features = extract_features(Y, fixed_effect_time_order)
         mlmm.fit(extracted_features)
         beta, D, phi = np.concatenate(mlmm.beta), mlmm.D, np.concatenate(mlmm.phi)
 
-        decimal = 2
+        decimal = 0
         np.testing.assert_almost_equal(beta, beta_, decimal=decimal)
         np.testing.assert_almost_equal(D, D_, decimal=decimal)
         np.testing.assert_almost_equal(phi, phi_, decimal=decimal)

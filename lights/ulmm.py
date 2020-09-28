@@ -1,25 +1,35 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
+from lights.base import Learner
 import numpy as np
 import statsmodels.formula.api as smf
 import pandas as pd
 
 
-class ULMM:
-    """Algorithm for fitting a univariate linear mixed model
+class ULMM(Learner):
+    """Algorithm for fitting an univariate linear mixed model
 
     Parameters
     ----------
+    verbose : `bool`, default=True
+        If `True`, we verbose things, otherwise the solver does not
+        print anything (but records information in history anyway)
+
+    print_every : `int`, default=10
+        Print history information when ``n_iter`` (iteration number) is
+        a multiple of ``print_every``
+
     fixed_effect_time_order : `int`, default=5
         Order of the higher time monomial considered for the representations of
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
     """
-
-    def __init__(self, fixed_effect_time_order=5):
+    def __init__(self, verbose=True, print_every=10, fixed_effect_time_order=5):
+        Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.verbose = verbose
 
         # Attributes that will be instantiated afterwards
         self.beta = None
@@ -37,6 +47,7 @@ class ULMM:
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
         """
+        self._start_solve()
         fixed_effect_time_order = self.fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
@@ -80,3 +91,5 @@ class ULMM:
         self.beta = beta.reshape(-1, 1)
         self.D = D
         self.phi = phi.reshape(-1, 1)
+
+        self._end_solve()
