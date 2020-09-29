@@ -166,7 +166,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         fixed effect simulation
 
     std_error : `float`, default=0.5
-        Standard deviation for the error term of the longitudinal process
+        Standard deviation for the error term of the longitudinal processes
 
     decay : `float`, default=3.0
         Decay of exponential kernels for the multivariate Hawkes processes to
@@ -213,9 +213,9 @@ class SimuJointLongitudinalSurvival(Simulation):
     time_indep_coeffs : `np.ndarray`, shape=(n_time_indep_features,)
         Simulated time-independent coefficient vector
 
-    long_cov : `np.ndarray`, shape=(2 * n_long_features, 2 * n_long_features)
+    long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
         Variance-covariance matrix that accounts for dependence between the
-        different longitudinal outcome. Here r = 2 * n_long_features since
+        different longitudinal outcome. Here r = 2*n_long_features since
         one choose linear time-varying features, so all r_l=2
 
     fixed_effect_coeffs : `list`, [beta_0, beta_1]

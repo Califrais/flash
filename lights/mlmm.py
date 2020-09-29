@@ -49,8 +49,8 @@ class MLMM(Learner):
         self.initialize = initialize
 
         # Attributes that will be instantiated afterwards
-        self.beta = None
-        self.D = None
+        self.fixed_effect_coeffs = None
+        self.long_cov = None
         self.phi = None
 
     def log_lik(self, extracted_features):
@@ -71,7 +71,7 @@ class MLMM(Learner):
         """
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
-        D, beta, phi = self.D, self.beta, self.phi
+        D, beta, phi = self.long_cov, self.fixed_effect_coeffs, self.phi
 
         log_lik = 0
         for i in range(n_samples):
@@ -94,6 +94,27 @@ class MLMM(Learner):
 
         return log_lik
 
+    def update_theta(self, fixed_effect_coeffs, long_cov, phi):
+        """Update class attributes corresponding to MLMM model parameters
+
+        Parameters
+        ----------
+        fixed_effect_coeffs : `np.ndarray`,
+            shape=((fixed_effect_time_order+1)*n_long_features,)
+            Fixed effect coefficient vectors
+
+        long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
+        Variance-covariance matrix that accounts for dependence between the
+        different longitudinal outcome. Here r = 2*n_long_features since
+        one choose linear time-varying features, so all r_l=2
+
+        phi : `np.ndarray`, shape=(n_long_features,)
+            Variance vector for the error term of the longitudinal processes
+        """
+        self.fixed_effect_coeffs = fixed_effect_coeffs
+        self.long_cov = long_cov
+        self.phi = phi
+
     def fit(self, extracted_features):
         """Fit the multivariate linear mixed model
 
@@ -105,6 +126,7 @@ class MLMM(Learner):
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
         """
+        self._start_solve()
         verbose = self.verbose
         max_iter = self.max_iter
         print_every = self.print_every
@@ -121,8 +143,8 @@ class MLMM(Learner):
             ulmm = ULMM(verbose=verbose,
                         fixed_effect_time_order=fixed_effect_time_order)
             ulmm.fit(extracted_features)
-            beta = ulmm.beta
-            D = ulmm.D
+            beta = ulmm.fixed_effect_coeffs
+            D = ulmm.long_cov
             phi = ulmm.phi
         else:
             # fixed initialization
@@ -132,11 +154,8 @@ class MLMM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((n_long_features, 1))
 
-        self.beta = beta
-        self.D = D
-        self.phi = phi
+        self.update_theta(beta, D, phi)
         obj = -self.log_lik(extracted_features)
-        self._start_solve()
 
         for n_iter in range(max_iter):
 
@@ -203,17 +222,15 @@ class MLMM(Learner):
                 phi[l] = (tmp.T.dot(tmp - 2 * V_l.dot(mu_l)) + np.trace(
                     V_l.T.dot(V_l).dot(Omega_l + mu_l.dot(mu_l.T)))) / N_l
 
-            self.beta = beta
-            self.D = D
-            self.phi = phi
-
+            self.update_theta(beta, D, phi)
             prev_obj = obj
             obj = -self.log_lik(extracted_features)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    beta=beta, D=D, phi=phi)
+                                    fixed_effect_coeffs=beta, long_cov=D,
+                                    phi=phi)
                 if verbose:
                     self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):

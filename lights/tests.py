@@ -80,7 +80,8 @@ class Test(unittest.TestCase):
         fixed_effect_time_order = 1  # q_l=2 in the simulations
         extracted_features = extract_features(Y, fixed_effect_time_order)
         initializer.fit(extracted_features)
-        beta, D, phi = initializer.beta, initializer.D, initializer.phi
+        beta = initializer.fixed_effect_coeffs
+        D, phi = initializer.long_cov, initializer.phi
 
         decimal = 0
         np.testing.assert_almost_equal(beta, beta_, decimal=decimal)

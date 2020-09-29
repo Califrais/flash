@@ -75,7 +75,7 @@ class QNMCEM(Learner):
         self.n_samples = None
         self.beta_0 = None
         self.beta_1 = None
-        self.D = None
+        self.long_cov = None
         self.phi = None
         self.xi = None
         self.gamma_0 = None
@@ -441,7 +441,7 @@ class QNMCEM(Learner):
         S : `np.ndarray`, , shape=(2*N, r)
             Set of constructed samples
         """
-        D = self.D
+        D = self.long_cov
         C = np.linalg.cholesky(D)
         r = D.shape[0]
         Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
@@ -473,7 +473,7 @@ class QNMCEM(Learner):
         Returns
         -------
         Lambda_g : `list`, shape=(n_samples, )
-            The expectation for g
+            blabla
         """
         Lambda_g = 0
         return Lambda_g
@@ -496,15 +496,56 @@ class QNMCEM(Learner):
         Eg : `np.ndarray`, , shape=(n_samples, )
             The expectation for g
         """
-        n_samples = pi_xi.size()
+        n_samples = self.n_samples
         Eg = np.zeros(n_samples)
         for i in range(n_samples):
-            Eg[i] = ((1 - pi_xi) * Lambda_g[i][0]
-                    + self.pi_xi * Lambda_g[i][1]) / \
-                    ((1 - self.pi_xi) * Lambda_1[i][0] +
-                     self.pi_xi * Lambda_1[i][1])
-
+            Eg[i] = ((1 - pi_xi) * Lambda_g[i][0] + pi_xi * Lambda_g[i][1]) / \
+                    ((1 - pi_xi) * Lambda_1[i][0] + pi_xi * Lambda_1[i][1])
         return Eg
+
+    def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                     gamma_1_ext, long_cov, phi):
+        """Update class attributes corresponding to lights model parameters
+
+        Parameters
+        ----------
+        beta_0_ext : `np.ndarray`,
+            shape=((fixed_effect_time_order+1)*n_long_features,)
+            Fixed effect coefficient vectors for low-risk group decomposed on
+            positive and negative parts
+
+        beta_1_ext : `np.ndarray`,
+            shape=((fixed_effect_time_order+1)*n_long_features,)
+            Fixed effect coefficient vectors for high-risk group decomposed on
+            positive and negative parts
+
+        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+            Time-independent coefficient vector decomposed on positive and
+            negative parts
+
+        gamma_0_ext : `np.ndarray`, shape=(n_samples,)
+            Association coefficient vectors for low-risk group decomposed on
+            positive and negative parts
+
+        gamma_1_ext : `np.ndarray`, shape=(n_samples,)
+            Association coefficient vectors for high-risk group decomposed on
+            positive and negative parts
+
+        long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
+        Variance-covariance matrix that accounts for dependence between the
+        different longitudinal outcome. Here r = 2*n_long_features since
+        one choose linear time-varying features, so all r_l=2
+
+        phi : `np.ndarray`, shape=(n_long_features,)
+            Variance vector for the error term of the longitudinal processes
+        """
+        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
+        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
+        self.long_cov = long_cov
+        self.phi = phi
 
     def fit(self, X, Y, T, delta):
         """Fit the lights model
@@ -524,6 +565,7 @@ class QNMCEM(Learner):
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
         """
+        self._start_solve()
         verbose = self.verbose
         max_iter = self.max_iter
         print_every = self.print_every
@@ -543,8 +585,6 @@ class QNMCEM(Learner):
             n_time_indep_features += 1
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
 
-        self._start_solve()
-
         # features extraction
         extracted_features = extract_features(Y, fixed_effect_time_order)
 
@@ -561,7 +601,7 @@ class QNMCEM(Learner):
                         tol=tol, fixed_effect_time_order=fixed_effect_time_order)
             mlmm.fit(extracted_features)
             beta = mlmm.beta
-            D = mlmm.D
+            D = mlmm.long_cov
             phi = mlmm.phi
         else:
             # fixed initialization
@@ -575,14 +615,8 @@ class QNMCEM(Learner):
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
 
-        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
-        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-        self.D = D
-        self.phi = phi
-
+        self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                          gamma_1_ext, D, phi)
         func_obj = self._func_obj
         P_func = self._P_func
         grad_P = self._grad_P
@@ -628,21 +662,15 @@ class QNMCEM(Learner):
                 pgtol=1e-5
             )[0]
 
-            self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-            self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-            self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
-            self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-            self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-            self.D = D
-            self.phi = phi
-
+            self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                              gamma_1_ext, D, phi)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    D=D, phi=phi, beta_0=self.beta_0,
+                                    long_cov=D, phi=phi, beta_0=self.beta_0,
                                     beta_1=self.beta_1, xi=self.xi,
                                     gamma_0=self.gamma_0, gamma_1=self.gamma_1)
                 if verbose:

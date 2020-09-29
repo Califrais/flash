@@ -32,8 +32,8 @@ class ULMM(Learner):
         self.verbose = verbose
 
         # Attributes that will be instantiated afterwards
-        self.beta = None
-        self.D = None
+        self.fixed_effect_coeffs = None
+        self.long_cov = None
         self.phi = None
 
     def fit(self, extracted_features):
@@ -89,8 +89,7 @@ class ULMM(Learner):
                  [mdf.params["Group x V Cov"], mdf.params["V Var"]]])
             phi[l] = mdf.resid.values.var()
 
-        self.beta = beta.reshape(-1, 1)
-        self.D = D
+        self.fixed_effect_coeffs = beta.reshape(-1, 1)
+        self.long_cov = D
         self.phi = phi.reshape(-1, 1)
-
         self._end_solve()
