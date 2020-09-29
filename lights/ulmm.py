@@ -78,7 +78,7 @@ class ULMM(Learner):
 
             md = smf.mixedlm("Y ~ " + ' + '.join(fixed_effect_columns), data,
                              groups=data["S"], re_formula="~V")
-            mdf = md.fit()
+            mdf = md.fit(method='lbfgs')
             beta[q_l * l] = mdf.params["Intercept"]
             beta[q_l * l + 1: q_l * (l + 1)] = [mdf.params[features]
                                                 for features in

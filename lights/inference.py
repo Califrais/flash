@@ -422,6 +422,10 @@ class QNMCEM(Learner):
         """
         # TODO : return list for version G=0 and G=1 ; and fill a docstring
         N = S.shape[0]
+        n_samples = Y.shape[0]
+        f = []
+        for i in range(n_samples):
+            f.append(self.f(Y[i], T[i], delta[i], S))
         return [[0] * N, [1] * N]
 
     def construct_MC_samples(self, N):
@@ -444,6 +448,16 @@ class QNMCEM(Learner):
         b = Omega.dot(C.T)
         S = np.vstack((b, -b))
         return S
+
+    def _g0(self, S):
+        """Computes g0
+
+        """
+        g0 = []
+        for s in S:
+            g0.append(s.dot(s.T))
+
+        return g0
 
     def _Lambda_g(self, g, f):
         """blabla
@@ -482,13 +496,13 @@ class QNMCEM(Learner):
         Eg : `np.ndarray`, , shape=(n_samples, )
             The expectation for g
         """
-        n_samples = f.size()
+        n_samples = pi_xi.size()
         Eg = np.zeros(n_samples)
         for i in range(n_samples):
-            Eg[i] = ((1 - pi_xi) * (g * self.f[i][0]).sum(axis=0)
-                    + self.pi_xi * (g * self.f[i][1]).sum(axis=0)) / \
-                    ((1 - self.pi_xi) * (np.array(f[i][0]).sum()) +
-                     self.pi_xi * (np.array(f[i][1]).sum()))
+            Eg[i] = ((1 - pi_xi) * Lambda_g[i][0]
+                    + self.pi_xi * Lambda_g[i][1]) / \
+                    ((1 - self.pi_xi) * Lambda_1[i][0] +
+                     self.pi_xi * Lambda_1[i][1])
 
         return Eg
 
@@ -596,10 +610,7 @@ class QNMCEM(Learner):
             # Update D
             f = self.f_data_g_latent(Y, T, delta, S)
 
-            g0 = []
-            for s in S:
-                g0.append(s.dot(s.T))
-            # TODO : g0(S)
+            g0 = self._g0(S)
             E_g0 = self._Eg(g0, f)
             D = np.array(E_g0).sum(axis=0) / n_samples
 
