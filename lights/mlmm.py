@@ -229,7 +229,7 @@ class MLMM(Learner):
 
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    fixed_effect_coeffs=beta, long_cov=D,
+                                    fixed_effect_coeffs=beta.ravel(), long_cov=D,
                                     phi=phi)
                 if verbose:
                     self.history.print_history()
