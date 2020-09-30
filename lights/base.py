@@ -55,13 +55,13 @@ class Learner:
 
         Parameters
         ----------
-        key : str [optional, default=None]
+        key : `str`, default=None
             if None all history is returned as a dict
             if str then history of the required key is given
 
         Returns
         -------
-        output : dict or list
+        output : `dict` or `list`
             if key is None or key is not in history then output is
                 dict containing history of all keys
             if key is not None and key is in history, then output is a list
@@ -72,6 +72,16 @@ class Learner:
             return self.history.values
         else:
             return val
+
+    def get_history_keys(self):
+        """Return names of the elements stored in history
+
+        Returns
+        -------
+        output : `list`
+            list containing names of history keys
+        """
+        return self.history.values.keys()
 
 
 def block_diag(l_arr):
