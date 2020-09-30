@@ -57,6 +57,7 @@ class QNMCEM(Learner):
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization
     """
+
     def __init__(self, fit_intercept=False, l_elastic_net=0.,
                  eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=False, fixed_effect_time_order=5, initialize=True):
@@ -417,16 +418,15 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        f : `np.ndarray`, shape=(n_samples, 2)
+        f : `np.ndarray`, shape=(n_samples, 2, N_MC)
             The value of the f(Y, T, delta| S, G, theta)
         """
         # TODO : return list for version G=0 and G=1 ; and fill a docstring
-        N = S.shape[0]
+        N_MC = S.shape[0]
         n_samples = Y.shape[0]
-        f = []
-        for i in range(n_samples):
-            f.append(self.f(Y[i], T[i], delta[i], S))
-        return [[0] * N, [1] * N]
+        f = np.zeros(shape=(n_samples, 2,  N_MC))
+
+        return f
 
     def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -464,15 +464,15 @@ class QNMCEM(Learner):
 
         Parameters
         ----------
-        g : `np.array`, shape=(n_samples, 2)
+        g : `np.ndarray`, shape=(n_samples, 2, shape(g_i))
             The value of g function for all samples
 
-        f: `np.array`, shape=(n_samples, 2)
+        f: `np.ndarray`, shape=(n_samples, 2, N_MC)
             The value of the f(Y, T, delta| S, G, theta)
 
         Returns
         -------
-        Lambda_g : `list`, shape=(n_samples, )
+        Lambda_g : `np.array`, shape=(n_samples, )
             blabla
         """
         Lambda_g = 0
@@ -485,22 +485,23 @@ class QNMCEM(Learner):
 
         Parameters
         ----------
-        g : `np.array`, shape=(n_samples, 2)
+        pi_xi : `np.array`, shape=(n_samples,)
             The value of g function for all samples
 
-        f: `np.array`, shape=(n_samples, 2)
-            The value of the f(Y, T, delta| S, G, theta)
+        Lambda_1: `np.ndarray`, shape=(n_samples, 2)
+
+
+        Lambda_g: `np.ndarray`, shape=(n_samples, 2, shape(g))
+
 
         Returns
         -------
-        Eg : `np.ndarray`, , shape=(n_samples, )
+        Eg : `np.ndarray`, shape=(n_samples, shape(g))
             The expectation for g
         """
-        n_samples = self.n_samples
-        Eg = np.zeros(n_samples)
-        for i in range(n_samples):
-            Eg[i] = ((1 - pi_xi) * Lambda_g[i][0] + pi_xi * Lambda_g[i][1]) / \
-                    ((1 - pi_xi) * Lambda_1[i][0] + pi_xi * Lambda_1[i][1])
+        Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi).T \
+             / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi).sum()
+
         return Eg
 
     def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
@@ -597,8 +598,9 @@ class QNMCEM(Learner):
 
         # initialize longitudinal submodels
         if self.initialize:
-            mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
-                        tol=tol, fixed_effect_time_order=fixed_effect_time_order)
+            mlmm = MLMM(max_iter=max_iter, verbose=verbose,
+                        print_every=print_every, tol=tol,
+                        fixed_effect_time_order=fixed_effect_time_order)
             mlmm.fit(extracted_features)
             beta = mlmm.beta
             D = mlmm.long_cov
@@ -636,16 +638,18 @@ class QNMCEM(Learner):
             # E-Step
             Lambda_1 = 0
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
-            N = 5
+            N_MC = 5
             S = self.construct_MC_samples(N)
 
             # M-Step
 
             # Update D
             f = self.f_data_g_latent(Y, T, delta, S)
+            Lambda_1 = self._Lambda_g(np.ones(N_MC), f)
 
             g0 = self._g0(S)
-            E_g0 = self._Eg(g0, f)
+            Lambda_g0 = self._Lambda_g(g0, f)
+            E_g0 = self._Eg(g0, Lambda_1, Lambda_g0)
             D = np.array(E_g0).sum(axis=0) / n_samples
 
             if warm_start:
