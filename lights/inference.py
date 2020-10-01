@@ -418,13 +418,13 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        f : `np.ndarray`, shape=(n_samples, 2, N_MC)
+        f : `np.ndarray`, shape=(n_samples, 2, N)
             The value of the f(Y, T, delta| S, G, theta)
         """
         # TODO : return list for version G=0 and G=1 ; and fill a docstring
-        N_MC = S.shape[0]
+        N = S.shape[0]
         n_samples = Y.shape[0]
-        f = np.zeros(shape=(n_samples, 2,  N_MC))
+        f = np.zeros(shape=(n_samples, 2,  N))
 
         return f
 
@@ -460,20 +460,26 @@ class QNMCEM(Learner):
         return g0
 
     def _Lambda_g(self, g, f):
-        """blabla
+        """Approximated integral (see (15) in the lights paper)
 
         Parameters
         ----------
-        g : `np.ndarray`, shape=(n_samples, 2, shape(g_i))
-            The value of g function for all samples
+        g : `np.ndarray`, shape=(n_samples, 2, N)
+            Values of g function for all subjects, all groups and all Monte
+            Carlo samples. Each element could be real or matrices depending on
+            Im(\tilde{g}_i)
 
-        f: `np.ndarray`, shape=(n_samples, 2, N_MC)
-            The value of the f(Y, T, delta| S, G, theta)
+        f: `np.ndarray`, shape=(n_samples, 2, N)
+            Values of the density of the observed data given the latent ones and
+            the current estimate of the parameters, computed for all subjects,
+            all groups and all Monte Carlo samples
 
         Returns
         -------
-        Lambda_g : `np.array`, shape=(n_samples, )
-            blabla
+        Lambda_g : `np.array`, shape=(n_samples, 2)
+            The approximated integral computed for all subjects, all groups and
+            all Monte Carlo samples. Each element could be real or matrices
+            depending on Im(\tilde{g}_i)
         """
         Lambda_g = 0
         return Lambda_g
@@ -481,7 +487,7 @@ class QNMCEM(Learner):
     def _Eg(self, pi_xi, Lambda_1, Lambda_g):
         """Computes approximated expectations of different functions g taking
         random effects as input, conditional on the observed data and the
-        current estimate of the parameters
+        current estimate of the parameters. See (14) in the lights paper
 
         Parameters
         ----------
@@ -489,19 +495,19 @@ class QNMCEM(Learner):
             The value of g function for all samples
 
         Lambda_1: `np.ndarray`, shape=(n_samples, 2)
+            Approximated integral (see (15) in the lights paper) with
+            \tilde(g)=1
 
-
-        Lambda_g: `np.ndarray`, shape=(n_samples, 2, shape(g))
-
+        Lambda_g: `np.ndarray`, shape=(n_samples, 2)
+             Approximated integral (see (15) in the lights paper)
 
         Returns
         -------
-        Eg : `np.ndarray`, shape=(n_samples, shape(g))
-            The expectation for g
+        Eg : `np.ndarray`, shape=(n_samples,)
+            The approximated expectations for g
         """
-        Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi).T \
-             / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi).sum()
-
+        Eg = ((Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi)
+              / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)).T
         return Eg
 
     def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
@@ -585,6 +591,7 @@ class QNMCEM(Learner):
         if fit_intercept:
             n_time_indep_features += 1
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
+        N = 5  # number of initial Monte Carlo sample for S
 
         # features extraction
         extracted_features = extract_features(Y, fixed_effect_time_order)
@@ -638,19 +645,22 @@ class QNMCEM(Learner):
             # E-Step
             Lambda_1 = 0
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
-            N_MC = 5
+
             S = self.construct_MC_samples(N)
+
+            # if False: # to be defined
+            #     N *= 10
+            #     fctr *= .1
 
             # M-Step
 
             # Update D
             f = self.f_data_g_latent(Y, T, delta, S)
-            Lambda_1 = self._Lambda_g(np.ones(N_MC), f)
-
+            Lambda_1 = self._Lambda_g(np.ones(N), f)
             g0 = self._g0(S)
             Lambda_g0 = self._Lambda_g(g0, f)
-            E_g0 = self._Eg(g0, Lambda_1, Lambda_g0)
-            D = np.array(E_g0).sum(axis=0) / n_samples
+            E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
+            D = E_g0.sum(axis=0) / n_samples
 
             if warm_start:
                 x0 = xi_ext
