@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner
+from lights.base import Learner, extract_features
 from lights.mlmm import MLMM
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
@@ -52,11 +52,15 @@ class QNMCEM(Learner):
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
+
+    initialize : `bool`, default=True
+        If `True`, we initialize the parameters using MLMM model, otherwise we
+        use arbitrarily chosen fixed initialization
     """
 
     def __init__(self, fit_intercept=False, l_elastic_net=0.,
                  eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 warm_start=False, fixed_effect_time_order=5):
+                 warm_start=False, fixed_effect_time_order=5, initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.l_elastic_net = l_elastic_net
         self.eta = eta
@@ -65,13 +69,14 @@ class QNMCEM(Learner):
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.initialize = initialize
 
         # Attributes that will be instantiated afterwards
         self.n_time_indep_features = None
         self.n_samples = None
         self.beta_0 = None
         self.beta_1 = None
-        self.D = None
+        self.long_cov = None
         self.phi = None
         self.xi = None
         self.gamma_0 = None
@@ -228,7 +233,7 @@ class QNMCEM(Learner):
             The log-likelihood computed on the given data
         """
         prb = 1
-        # TODO Simon
+        # TODO
         return np.mean(np.log(prb))
 
     def _func_obj(self, X, Y, T, delta, xi_ext):
@@ -327,8 +332,9 @@ class QNMCEM(Learner):
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def predict_proba(self, X, xi_ext):
-        """Probability estimates for being on the high-risk group
+    def get_proba(self, X, xi_ext):
+        """Probability estimates for being on the high-risk group given
+        time-independent features
 
         Parameters
         ----------
@@ -343,11 +349,32 @@ class QNMCEM(Learner):
         -------
         output : `np.ndarray`, shape=(n_samples,)
             Returns the probability of the sample for being on the high-risk
-            group
+            group given time-independent features
         """
         xi_0, xi = self._get_xi_from_xi_ext(xi_ext)
         u = xi_0 + X.dot(xi)
         return QNMCEM.logistic_grad(u)
+
+    def get_post_proba(self, pi_xi, Lambda_1):
+        """Posterior probability estimates for being on the high-risk group
+        given all observed data
+
+        Parameters
+        ----------
+        pi_xi : `np.ndarray`, shape=(n_samples,)
+            Comes from get_proba function
+
+        Lambda_1 : `np.ndarray`, shape=(n_samples, 2)
+            blabla
+
+        Returns
+        -------
+        output : `np.ndarray`, shape=(n_samples,)
+            Returns the posterior probability of the sample for being on the
+            high-risk group given all observed data
+        """
+        # TODO
+        return 1
 
     def predict_marker(self, X, Y):
         """Marker rule of the lights model for being on the high-risk group
@@ -368,8 +395,164 @@ class QNMCEM(Learner):
             group
         """
         marker = None
-        # TODO Sim (only if self.fitted = True, else raise error)
+        # TODO (only if self.fitted = True, else raise error)
         return marker
+
+    def f_data_g_latent(self, Y, T, delta, S):
+        """Computes f(Y, T, delta| S, G, theta)
+
+        Parameters
+        ----------
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
+
+        T : `np.ndarray`, shape=(n_samples,)
+            The simulated censored times of the event of interest
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            The simulated censoring indicator
+
+        S: `np.ndarray`, , shape=(2*N, r)
+            Set of constructed samples
+
+        Returns
+        -------
+        f : `np.ndarray`, shape=(n_samples, 2, N)
+            The value of the f(Y, T, delta| S, G, theta)
+        """
+        # TODO : return list for version G=0 and G=1 ; and fill a docstring
+        N = S.shape[0]
+        n_samples = Y.shape[0]
+        f = np.zeros(shape=(n_samples, 2,  N))
+
+        return f
+
+    def construct_MC_samples(self, N):
+        """Constructs the set of samples used for Monte Carlo approximation
+
+        Parameters
+        ----------
+        N : `int`
+            Number of constructed samples
+
+        Returns
+        -------
+        S : `np.ndarray`, , shape=(2*N, r)
+            Set of constructed samples
+        """
+        D = self.long_cov
+        C = np.linalg.cholesky(D)
+        r = D.shape[0]
+        Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
+        b = Omega.dot(C.T)
+        S = np.vstack((b, -b))
+        return S
+
+    def _g0(self, S):
+        """Computes g0
+
+        """
+        g0 = []
+        for s in S:
+            g0.append(s.dot(s.T))
+
+        return g0
+
+    def _Lambda_g(self, g, f):
+        """Approximated integral (see (15) in the lights paper)
+
+        Parameters
+        ----------
+        g : `np.ndarray`, shape=(n_samples, 2, N)
+            Values of g function for all subjects, all groups and all Monte
+            Carlo samples. Each element could be real or matrices depending on
+            Im(\tilde{g}_i)
+
+        f: `np.ndarray`, shape=(n_samples, 2, N)
+            Values of the density of the observed data given the latent ones and
+            the current estimate of the parameters, computed for all subjects,
+            all groups and all Monte Carlo samples
+
+        Returns
+        -------
+        Lambda_g : `np.array`, shape=(n_samples, 2)
+            The approximated integral computed for all subjects, all groups and
+            all Monte Carlo samples. Each element could be real or matrices
+            depending on Im(\tilde{g}_i)
+        """
+        Lambda_g = 0
+        return Lambda_g
+
+    def _Eg(self, pi_xi, Lambda_1, Lambda_g):
+        """Computes approximated expectations of different functions g taking
+        random effects as input, conditional on the observed data and the
+        current estimate of the parameters. See (14) in the lights paper
+
+        Parameters
+        ----------
+        pi_xi : `np.array`, shape=(n_samples,)
+            The value of g function for all samples
+
+        Lambda_1: `np.ndarray`, shape=(n_samples, 2)
+            Approximated integral (see (15) in the lights paper) with
+            \tilde(g)=1
+
+        Lambda_g: `np.ndarray`, shape=(n_samples, 2)
+             Approximated integral (see (15) in the lights paper)
+
+        Returns
+        -------
+        Eg : `np.ndarray`, shape=(n_samples,)
+            The approximated expectations for g
+        """
+        Eg = ((Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi)
+              / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)).T
+        return Eg
+
+    def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                     gamma_1_ext, long_cov, phi):
+        """Update class attributes corresponding to lights model parameters
+
+        Parameters
+        ----------
+        beta_0_ext : `np.ndarray`,
+            shape=((fixed_effect_time_order+1)*n_long_features,)
+            Fixed effect coefficient vectors for low-risk group decomposed on
+            positive and negative parts
+
+        beta_1_ext : `np.ndarray`,
+            shape=((fixed_effect_time_order+1)*n_long_features,)
+            Fixed effect coefficient vectors for high-risk group decomposed on
+            positive and negative parts
+
+        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+            Time-independent coefficient vector decomposed on positive and
+            negative parts
+
+        gamma_0_ext : `np.ndarray`, shape=(n_samples,)
+            Association coefficient vectors for low-risk group decomposed on
+            positive and negative parts
+
+        gamma_1_ext : `np.ndarray`, shape=(n_samples,)
+            Association coefficient vectors for high-risk group decomposed on
+            positive and negative parts
+
+        long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
+        Variance-covariance matrix that accounts for dependence between the
+        different longitudinal outcome. Here r = 2*n_long_features since
+        one choose linear time-varying features, so all r_l=2
+
+        phi : `np.ndarray`, shape=(n_long_features,)
+            Variance vector for the error term of the longitudinal processes
+        """
+        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
+        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
+        self.long_cov = long_cov
+        self.phi = phi
 
     def fit(self, X, Y, T, delta):
         """Fit the lights model
@@ -389,6 +572,7 @@ class QNMCEM(Learner):
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
         """
+        self._start_solve()
         verbose = self.verbose
         max_iter = self.max_iter
         print_every = self.print_every
@@ -398,56 +582,85 @@ class QNMCEM(Learner):
         fixed_effect_time_order = self.fixed_effect_time_order
 
         n_samples, n_time_indep_features = X.shape
-        n_long_features = Y.shape[1]
-        nb_asso_param = 4
-        nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
-        self._start_solve()
-
-        # Initialization
+        n_long_features = Y.shape[1]
+        q_l = fixed_effect_time_order + 1
+        r_l = 2  # linear time-varying features, so all r_l=2
+        nb_asso_param = 4
         if fit_intercept:
             n_time_indep_features += 1
+        nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
+        N = 5  # number of initial Monte Carlo sample for S
+
+        # features extraction
+        extracted_features = extract_features(Y, fixed_effect_time_order)
+
+        # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
+        # TODO : initialize gamma_0 and lambda_0 with a standard Cox model
+        #  from statmodel
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
-        # We initialize the longitudinal submodels parameters by fitting a
-        # multivariate linear mixed model
-        mlmm = MLMM(max_iter=max_iter, verbose=verbose, print_every=print_every,
-                    tol=tol)
-        mlmm.fit(Y)
-        beta_init = mlmm.beta
-        beta_0_ext = np.concatenate((beta_init, -beta_init))
+        # initialize longitudinal submodels
+        if self.initialize:
+            mlmm = MLMM(max_iter=max_iter, verbose=verbose,
+                        print_every=print_every, tol=tol,
+                        fixed_effect_time_order=fixed_effect_time_order)
+            mlmm.fit(extracted_features)
+            beta = mlmm.fixed_effect_coeffs
+            D = mlmm.long_cov
+            phi = mlmm.phi
+        else:
+            # fixed initialization
+            q = q_l * n_long_features
+            r = r_l * n_long_features
+            beta = np.zeros((q, 1))
+            D = np.diag(np.ones(r))
+            phi = np.ones((n_long_features, 1))
+
+        beta_0_ext = np.concatenate((beta, -beta))
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
-        D = mlmm.D
-        phi = mlmm.phi
 
+        self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                          gamma_1_ext, D, phi)
         func_obj = self._func_obj
         P_func = self._P_func
         grad_P = self._grad_P
 
         obj = func_obj(X, Y, T, delta, xi_ext)
-        rel_obj = 1.
 
-        # Bounds vector for the L-BGFS-B algorithms
+        # bounds vector for the L-BGFS-B algorithms
         bounds_xi = [(0, None)] * n_time_indep_features * 2
         bounds_beta = [(0, None)] * n_long_features * \
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
 
-        n_iter = 0
         for n_iter in range(max_iter):
 
-            pi = self.predict_proba(X, xi_ext)
+            pi_xi = self.get_proba(X, xi_ext)
 
             # E-Step
-            # TODO Simon
-            pi_est = 0
+            Lambda_1 = 0
+            pi_est = self.get_post_proba(pi_xi, Lambda_1)
+
+            S = self.construct_MC_samples(N)
+
+            # if False: # to be defined
+            #     N *= 10
+            #     fctr *= .1
 
             # M-Step
-            # TODO Simon
+
+            # Update D
+            f = self.f_data_g_latent(Y, T, delta, S)
+            Lambda_1 = self._Lambda_g(np.ones(N), f)
+            g0 = self._g0(S)
+            Lambda_g0 = self._Lambda_g(g0, f)
+            E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
+            D = E_g0.sum(axis=0) / n_samples
 
             if warm_start:
                 x0 = xi_ext
@@ -463,31 +676,23 @@ class QNMCEM(Learner):
                 pgtol=1e-5
             )[0]
 
-            if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    D=D, phi=phi,
-                                    beta_0=self.get_vect_from_ext(beta_0_ext),
-                                    beta_1=self.get_vect_from_ext(beta_1_ext),
-                                    xi=self._get_xi_from_xi_ext(xi_ext)[1],
-                                    gamma_0=self.get_vect_from_ext(gamma_0_ext),
-                                    gamma_1=self.get_vect_from_ext(gamma_1_ext))
-                if verbose:
-                    self.history.print_history()
-
+            self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
+                              gamma_1_ext, D, phi)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+
+            if n_iter % print_every == 0:
+                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
+                                    long_cov=D, phi=phi, beta_0=self.beta_0,
+                                    beta_1=self.beta_1, xi=self.xi,
+                                    gamma_0=self.gamma_0, gamma_1=self.gamma_1)
+                if verbose:
+                    self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
 
         self._end_solve()
-        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
-        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-        self.D = D
-        self.phi = phi
 
     def score(self, X, Y, T, delta, metric):
         """Computes the score with the trained parameters on the given data,

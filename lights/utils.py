@@ -1,6 +1,7 @@
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def heatmap(data, row_labels, col_labels, ax=None,
@@ -157,3 +158,39 @@ def gompertz_survival(t, shape: float = .1, scale: float = .001):
         Time at which the survival function is returned
     """
     return np.exp(- scale * (np.exp(shape * t) - 1))
+
+
+def plot_history(learner, name, ax=None, **kwargs):
+    """
+    Plot an element history evolution through iterations
+
+    Parameters
+    ----------
+    learner : `ligths.base.Learner`
+        A base learner
+
+    name : `str`
+        Name of the element to be plotted
+
+    ax : `matplotlib.axes.Axes`, default=None
+        Axe instance to which the graph is plotted.  If not provided, use
+        current axes or create a new one
+
+    **kwargs
+        All other arguments are forwarded to the plot function of the pandas
+        DataFrame
+    """
+    history_keys = learner.get_history_keys()
+    if name not in history_keys:
+        raise ValueError("`%s` not stored in history, "
+                         "must be in %s" % (name, history_keys))
+
+    if not ax:
+        ax = plt.gca()
+
+    history = learner.get_history(name)
+    if isinstance(history[0], float):
+        history = pd.DataFrame(history)
+    else:
+        history = pd.DataFrame.from_records(history)
+    history.plot(ax=ax, **kwargs)
