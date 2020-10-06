@@ -81,7 +81,7 @@ class MLMM(Learner):
             y_i = y_list[i]
             diag = []
             for l in range(n_long_features):
-                diag += [1 / phi[l, 0]] * N[i][l]
+                diag += [phi[l, 0]]* N[i][l]
             Sigma_i = np.diag(diag)
             tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
