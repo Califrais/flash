@@ -598,7 +598,7 @@ class QNMCEM(Learner):
 
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
-        # TODO at the end : try to initialize gamma_0 with a standard Cox model
+        # TODO : initialize gamma_0 and lambda_0 with a standard Cox model
         #  from statmodel
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
