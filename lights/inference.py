@@ -599,7 +599,7 @@ class QNMCEM(Learner):
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
         # TODO at the end : try to initialize gamma_0 with a standard Cox model
-        #  from tick
+        #  from statmodel
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
@@ -609,7 +609,7 @@ class QNMCEM(Learner):
                         print_every=print_every, tol=tol,
                         fixed_effect_time_order=fixed_effect_time_order)
             mlmm.fit(extracted_features)
-            beta = mlmm.beta
+            beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
         else:
