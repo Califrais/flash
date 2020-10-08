@@ -3,10 +3,13 @@
 
 from lights.base import Learner, extract_features
 from lights.mlmm import MLMM
+from lights.association import AssociationFunctions
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
+from statsmodels.duration.hazard_regression import PHReg
+import pandas as pd
 
 
 class QNMCEM(Learner):
@@ -120,7 +123,7 @@ class QNMCEM(Learner):
         dim = len(v_ext)
         if dim % 2 != 0:
             raise ValueError("``v_ext`` dimension cannot be odd, got %s" % dim)
-        v = v_ext[:dim] - v_ext[dim:]
+        v = v_ext[:dim//2] - v_ext[dim//2:]
         return v
 
     def _get_xi_from_xi_ext(self, xi_ext):
@@ -598,8 +601,7 @@ class QNMCEM(Learner):
 
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
-        # TODO : initialize gamma_0 and lambda_0 with a standard Cox model
-        #  from statmodel
+
         gamma_0_ext = np.zeros(2 * nb_asso_features)
         gamma_1_ext = gamma_0_ext.copy()
 
@@ -637,6 +639,65 @@ class QNMCEM(Learner):
         bounds_beta = [(0, None)] * n_long_features * \
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
+
+        S = self.construct_MC_samples(N)
+
+        asso_func = AssociationFunctions(T, S, np.array([beta, beta])
+                                    ,fixed_effect_time_order,n_long_features)
+
+        # choose the first three association functions (in Table1)
+        nb_asso_func = 3
+        func1 = asso_func.phi_1()
+        # to avoid singular matrix problem, create own random effect function
+        func2 = np.zeros(shape=(n_samples, 2, r_l*n_long_features, 2*N))
+        for i in range(n_samples):
+            func2[i, 0, :] = self.construct_MC_samples(N).T
+            func2[i, 1, :] = self.construct_MC_samples(N).T
+        func3 = asso_func.phi_3()
+
+        n_Cox_samples = len(T)*2*N
+        func1_r = func1[:,0,:].swapaxes(1,2).reshape(n_Cox_samples,
+                                                        n_long_features)
+        func2_r = func2[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
+                                                        r_l * n_long_features)
+        func3_r = func3[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
+                                                        n_long_features)
+
+        T_, delta_ = np.zeros(n_Cox_samples), np.zeros(n_Cox_samples)
+        X_ = np.zeros(shape=(n_Cox_samples, X.shape[1]))
+        # duplicate each censored data with each sample in S
+        for i in range(len(T)):
+            T_[i*2*N: (i+1)*2*N] = T[i]
+            X_[i*2*N: (i+1)*2*N, :] = X[i]
+            delta_[i*2*N: (i+1)*2*N] = delta[i]
+
+        asso_columns = []
+        other_columns = ['T', 'delta']
+        X_columns = []
+        for j in range(X.shape[1]):
+            X_columns.append('X' + str(j + 1))
+
+        for i in range(nb_asso_func):
+            for j in range(n_long_features):
+                if i == 1:
+                    asso_columns.append(
+                        'L{}_{}_0'.format(str(i + 1), str(j + 1)))
+                    asso_columns.append(
+                        'L{}_{}_1'.format(str(i + 1), str(j + 1)))
+                else:
+                    asso_columns.append('L{}_{}'.format(str(i + 1), str(j + 1)))
+
+        data = pd.DataFrame(data=np.hstack((func1_r, func2_r, func3_r,
+                                X_, T_.reshape(-1, 1), delta_.reshape(-1, 1))),
+                                columns=asso_columns + X_columns + other_columns)
+
+        mod = PHReg.from_formula("T ~ " + ' + '.join(X_columns) + ' + ' + ' + '.join(asso_columns),
+                                 data, status=np.asarray(data["delta"]), ties="breslow")
+        rslt = mod.fit()
+
+        gamma_0 = rslt.param
+        gamma_1 = gamma_0.copy()
+        Lambda_0 = rslt.baseline_cumulative_hazard_function[0]
 
         for n_iter in range(max_iter):
 

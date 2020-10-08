@@ -60,6 +60,7 @@ class AssociationFunctions:
             U_l = np.c_[U_l, self.T ** t]
         V_l = np.c_[np.ones(n_samples), self.T]
 
+
         for l in range(n_long_features):
             tmp = V_l.dot(self.S[:, r_l * l: r_l * (l + 1)].T)
             beta_0l = beta[0, q_l * l: q_l * (l + 1)]
@@ -93,7 +94,12 @@ class AssociationFunctions:
             ?
         """
 
-        phi = np.array(shape=(self.n_samples, 2, self.n_long_features, self.N))
+        beta = self.fixed_effect_coeffs
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        N, r_l, q_l = self.N, self.r_l, self.q_l
+
+        phi = np.zeros(shape=(n_samples, 2, n_long_features, N))
 
         # derivative of U
         dU_l = np.zeros(self.n_samples)
@@ -102,10 +108,10 @@ class AssociationFunctions:
 
         dV_l = np.c_[np.zeros(self.n_samples), np.ones(self.n_samples)]
 
-        for l in range(self.n_long_features):
-            tmp = dV_l.dot(self.S[:, self.r_l * l: self.r_l * (l + 1)].T)
-            beta_0l = self.beta[0, self.q_l * l: self.q_l * (l + 1)]
-            beta_1l = self.beta[1, self.q_l * l: self.q_l * (l + 1)]
+        for l in range(n_long_features):
+            tmp = dV_l.dot(self.S[:, r_l * l: r_l * (l + 1)].T)
+            beta_0l = beta[0, q_l * l: q_l * (l + 1)]
+            beta_1l = beta[1, q_l * l: q_l * (l + 1)]
             phi[:, 0, l, :] = dU_l.dot(beta_0l) + tmp
             phi[:, 1, l, :] = dU_l.dot(beta_1l) + tmp
 
@@ -120,7 +126,7 @@ class AssociationFunctions:
             ?
         """
 
-        phi = np.array(shape=(self.n_samples, 2, self.n_long_features, self.N))
+        phi = np.zeros(shape=(self.n_samples, 2, self.n_long_features, self.N))
 
         # integral over U
         iU_l = self.T

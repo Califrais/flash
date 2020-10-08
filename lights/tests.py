@@ -108,8 +108,8 @@ class Test(unittest.TestCase):
         """
         X, Y, T, delta = self.get_train_data()
         # D = simu.long_cov
-        # qnmcem = QNMCEM(max_iter=3, fixed_effect_time_order=1, initialize=False)
-        # qnmcem.fit(X, Y, T, delta)
+        qnmcem = QNMCEM(max_iter=3, fixed_effect_time_order=1, initialize=False)
+        qnmcem.fit(X, Y, T, delta)
         # TODO Sim : check parameters estimation
 
 
