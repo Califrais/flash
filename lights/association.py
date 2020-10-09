@@ -55,8 +55,13 @@ class AssociationFunctions:
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
-    def _linear_predictor(self, U, V):
-        """ Compute the linear association function
+        self.assoc_func_dict = {"lp" : self.linear_predictor(),
+                                "re" : self.random_effects(),
+                                "tps" : self.time_dependent_slope(),
+                                "ce" : self.cumulative_effect()}
+
+    def _linear_association(self, U, V):
+        """ Compute the linear association function U*beta + V*b
 
         Parameters
         ----------
@@ -80,7 +85,7 @@ class AssociationFunctions:
         phi = np.zeros(shape=(n_samples, 2, n_long_features, 2 * N))
 
         for l in range(n_long_features):
-            tmp = U.dot(self.S[:, r_l * l: r_l * (l + 1)].T)
+            tmp = V.dot(self.S[:, r_l * l: r_l * (l + 1)].T)
             beta_0l = beta[0, q_l * l: q_l * (l + 1)]
             beta_1l = beta[1, q_l * l: q_l * (l + 1)]
 
@@ -90,7 +95,7 @@ class AssociationFunctions:
         return phi
 
 
-    def phi_1(self):
+    def linear_predictor(self):
         """Computes the linear predictor function
 
         Returns
@@ -100,12 +105,12 @@ class AssociationFunctions:
         """
 
         U_l, V_l = self.U_l, self.V_l
-        phi = self._linear_predictor(U_l, V_l)
+        phi = self._linear_association(U_l, V_l)
 
         return phi
 
 
-    def phi_2(self):
+    def random_effects(self):
         """ Computes the random effects function
 
         Returns
@@ -123,7 +128,7 @@ class AssociationFunctions:
 
         return phi
 
-    def phi_3(self):
+    def time_dependent_slope(self):
         """Computes the time-dependent slope function
 
         Returns
@@ -134,11 +139,11 @@ class AssociationFunctions:
 
 
         dU_l, dV_l = self.dU_l, self.dV_l
-        phi = self._linear_predictor(dU_l, dV_l)
+        phi = self._linear_association(dU_l, dV_l)
 
         return phi
 
-    def phi_4(self):
+    def cumulative_effect(self):
         """Computes the cumulative effect function
 
         Returns
@@ -148,6 +153,6 @@ class AssociationFunctions:
         """
 
         iU_l, iV_l = self.iU_l, self.iV_l
-        phi = self._linear_predictor(iU_l, iV_l)
+        phi = self._linear_association(iU_l, iV_l)
 
         return phi

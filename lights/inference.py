@@ -557,7 +557,7 @@ class QNMCEM(Learner):
         self.long_cov = long_cov
         self.phi = phi
 
-    def fit(self, X, Y, T, delta):
+    def fit(self, X, Y, T, delta, asso_func_list):
         """Fit the lights model
 
         Parameters
@@ -574,6 +574,10 @@ class QNMCEM(Learner):
 
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
+
+        asso_func_list: `list` or `str`
+            List of association functions or string "all" to select all defined
+            association functions
         """
         self._start_solve()
         verbose = self.verbose
@@ -644,26 +648,23 @@ class QNMCEM(Learner):
 
         asso_func = AssociationFunctions(T, S, np.array([beta, beta])
                                     ,fixed_effect_time_order,n_long_features)
-
-        # choose the first three association functions (in Table1)
-        asso_func_list = ['func_1', 'func_2', 'func_3']
-        func1 = asso_func.phi_1()
-        # to avoid singular matrix problem, create own random effect function
-        func2 = np.zeros(shape=(n_samples, 2, r_l * n_long_features, 2 * N))
-        for i in range(n_samples):
-            func2[i, 0, :] = self.construct_MC_samples(N).T
-            func2[i, 1, :] = self.construct_MC_samples(N).T
-        func3 = asso_func.phi_3()
-
-
         n_Cox_samples = len(T) * 2 * N
-        # assume no latent factor
-        func1_r = func1[:,0,:].swapaxes(1,2).reshape(n_Cox_samples,
-                                                        n_long_features)
-        func2_r = func2[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
-                                                        r_l * n_long_features)
-        func3_r = func3[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
-                                                        n_long_features)
+        asso_func_stack = np.array([[]]*n_Cox_samples)
+        if asso_func_list == "all":
+            asso_func_list = list(asso_func.assoc_func_dict.keys())
+        for func_name in asso_func_list:
+            if func_name == "re":
+                # to avoid singular matrix problem, create own random effect function
+                func = np.zeros(shape=(n_samples, r_l * n_long_features, 2 * N))
+                for i in range(n_samples):
+                    func[i, :] = self.construct_MC_samples(N).T
+                    func_r = func.swapaxes(1, 2).reshape(n_Cox_samples,
+                                                         r_l * n_long_features)
+            else:
+                func = asso_func.assoc_func_dict[func_name]
+                func_r = func[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
+                                                            n_long_features)
+            asso_func_stack = np.hstack((asso_func_stack, func_r))
 
         T_, delta_ = np.zeros(n_Cox_samples), np.zeros(n_Cox_samples)
         X_ = np.zeros(shape=(n_Cox_samples, X.shape[1]))
@@ -681,7 +682,7 @@ class QNMCEM(Learner):
 
         for i in range(len(asso_func_list)):
             for j in range(n_long_features):
-                if asso_func_list[i] == 'func_2':
+                if asso_func_list[i] == 're':
                     asso_columns.append(
                         'L{}_{}_0'.format(str(i + 1), str(j + 1)))
                     asso_columns.append(
@@ -689,7 +690,7 @@ class QNMCEM(Learner):
                 else:
                     asso_columns.append('L{}_{}'.format(str(i + 1), str(j + 1)))
 
-        data = pd.DataFrame(data=np.hstack((func1_r, func2_r, func3_r,
+        data = pd.DataFrame(data=np.hstack((asso_func_stack,
                                 X_, T_.reshape(-1, 1), delta_.reshape(-1, 1))),
                                 columns=asso_columns + X_columns + other_columns)
 
