@@ -646,16 +646,18 @@ class QNMCEM(Learner):
                                     ,fixed_effect_time_order,n_long_features)
 
         # choose the first three association functions (in Table1)
-        nb_asso_func = 3
+        asso_func_list = ['func_1', 'func_2', 'func_3']
         func1 = asso_func.phi_1()
         # to avoid singular matrix problem, create own random effect function
-        func2 = np.zeros(shape=(n_samples, 2, r_l*n_long_features, 2*N))
+        func2 = np.zeros(shape=(n_samples, 2, r_l * n_long_features, 2 * N))
         for i in range(n_samples):
             func2[i, 0, :] = self.construct_MC_samples(N).T
             func2[i, 1, :] = self.construct_MC_samples(N).T
         func3 = asso_func.phi_3()
 
-        n_Cox_samples = len(T)*2*N
+
+        n_Cox_samples = len(T) * 2 * N
+        # assume no latent factor
         func1_r = func1[:,0,:].swapaxes(1,2).reshape(n_Cox_samples,
                                                         n_long_features)
         func2_r = func2[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
@@ -677,9 +679,9 @@ class QNMCEM(Learner):
         for j in range(X.shape[1]):
             X_columns.append('X' + str(j + 1))
 
-        for i in range(nb_asso_func):
+        for i in range(len(asso_func_list)):
             for j in range(n_long_features):
-                if i == 1:
+                if asso_func_list[i] == 'func_2':
                     asso_columns.append(
                         'L{}_{}_0'.format(str(i + 1), str(j + 1)))
                     asso_columns.append(
@@ -695,7 +697,7 @@ class QNMCEM(Learner):
                                  data, status=np.asarray(data["delta"]), ties="breslow")
         rslt = mod.fit()
 
-        gamma_0 = rslt.param
+        gamma_0 = rslt.params
         gamma_1 = gamma_0.copy()
         Lambda_0 = rslt.baseline_cumulative_hazard_function[0]
 
