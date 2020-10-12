@@ -644,61 +644,22 @@ class QNMCEM(Learner):
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
 
-        S = self.construct_MC_samples(N)
 
-        asso_func = AssociationFunctions(T, S, np.array([beta, beta])
-                                    ,fixed_effect_time_order,n_long_features)
-        n_Cox_samples = len(T) * 2 * N
-        asso_func_stack = np.array([[]]*n_Cox_samples)
-        if asso_func_list == "all":
-            asso_func_list = list(asso_func.assoc_func_dict.keys())
-        for func_name in asso_func_list:
-            if func_name == "re":
-                # to avoid singular matrix problem, create own random effect function
-                func = np.zeros(shape=(n_samples, r_l * n_long_features, 2 * N))
-                for i in range(n_samples):
-                    func[i, :] = self.construct_MC_samples(N).T
-                    func_r = func.swapaxes(1, 2).reshape(n_Cox_samples,
-                                                         r_l * n_long_features)
-            else:
-                func = asso_func.assoc_func_dict[func_name]
-                func_r = func[:, 0, :].swapaxes(1, 2).reshape(n_Cox_samples,
-                                                            n_long_features)
-            asso_func_stack = np.hstack((asso_func_stack, func_r))
-
-        T_, delta_ = np.zeros(n_Cox_samples), np.zeros(n_Cox_samples)
-        X_ = np.zeros(shape=(n_Cox_samples, X.shape[1]))
-        # duplicate each censored data with each sample in S
-        for i in range(len(T)):
-            T_[i*2*N: (i+1)*2*N] = T[i]
-            X_[i*2*N: (i+1)*2*N, :] = X[i]
-            delta_[i*2*N: (i+1)*2*N] = delta[i]
-
-        asso_columns = []
+        # intialize Lambda_0 and gamma by Cox model
         other_columns = ['T', 'delta']
         X_columns = []
         for j in range(X.shape[1]):
             X_columns.append('X' + str(j + 1))
 
-        for i in range(len(asso_func_list)):
-            for j in range(n_long_features):
-                if asso_func_list[i] == 're':
-                    asso_columns.append(
-                        'L{}_{}_0'.format(str(i + 1), str(j + 1)))
-                    asso_columns.append(
-                        'L{}_{}_1'.format(str(i + 1), str(j + 1)))
-                else:
-                    asso_columns.append('L{}_{}'.format(str(i + 1), str(j + 1)))
+        data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1), delta.reshape(-1, 1))),
+                                columns=X_columns + other_columns)
 
-        data = pd.DataFrame(data=np.hstack((asso_func_stack,
-                                X_, T_.reshape(-1, 1), delta_.reshape(-1, 1))),
-                                columns=asso_columns + X_columns + other_columns)
-
-        mod = PHReg.from_formula("T ~ " + ' + '.join(X_columns) + ' + ' + ' + '.join(asso_columns),
-                                 data, status=np.asarray(data["delta"]), ties="breslow")
+        mod = PHReg.from_formula("T ~ " + ' + '.join(X_columns),data,
+                                 status=np.asarray(data["delta"]), ties="breslow")
         rslt = mod.fit()
 
-        gamma_0 = rslt.params
+        gamma_0 = np.zeros(nb_asso_features)
+        gamma_0[:n_time_indep_features] = rslt.params
         gamma_1 = gamma_0.copy()
         Lambda_0 = rslt.baseline_cumulative_hazard_function[0]
 
