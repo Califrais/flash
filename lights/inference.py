@@ -557,6 +557,51 @@ class QNMCEM(Learner):
         self.long_cov = long_cov
         self.phi = phi
 
+    def initialize_asso_params(self, X, T, delta,
+                               nb_asso_features, n_time_indep_features):
+
+        """ Initialize the associated parameters and baseline Hazard by Cox model
+
+        Parameters
+        ----------
+        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
+            The time-independent features matrix
+
+        T : `np.ndarray`, shape=(n_samples,)
+            Times of the event of interest
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            Censoring indicator
+
+        nb_asso_features: `int`
+            Number of associated features
+
+        n_time_indep_features: `int`
+            Number of time independence features
+
+        """
+
+        # intialize Lambda_0 and gamma by Cox model
+        other_columns = ['T', 'delta']
+        X_columns = []
+        for j in range(X.shape[1]):
+            X_columns.append('X' + str(j + 1))
+
+        data = pd.DataFrame(
+            data=np.hstack((X, T.reshape(-1, 1), delta.reshape(-1, 1))),
+            columns=X_columns + other_columns)
+
+        mod = PHReg.from_formula("T ~ " + ' + '.join(X_columns), data,
+                                 status=np.asarray(data["delta"]),
+                                 ties="breslow")
+        rslt = mod.fit()
+
+        gamma = np.zeros(nb_asso_features)
+        gamma[:n_time_indep_features] = rslt.params
+        baseline_hazard = rslt.baseline_cumulative_hazard_function[0](T)
+
+        return gamma, baseline_hazard
+
     def fit(self, X, Y, T, delta, asso_func_list):
         """Fit the lights model
 
@@ -618,6 +663,8 @@ class QNMCEM(Learner):
             beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
+            gamma, baseline_hazard = self.initialize_asso_params(X, T, delta,
+                                        nb_asso_features, n_time_indep_features)
         else:
             # fixed initialization
             q = q_l * n_long_features
@@ -625,6 +672,8 @@ class QNMCEM(Learner):
             beta = np.zeros((q, 1))
             D = np.diag(np.ones(r))
             phi = np.ones((n_long_features, 1))
+            gamma = np.zeros(nb_asso_features)
+            baseline_hazard = np.zeros(n_samples)
 
         beta_0_ext = np.concatenate((beta, -beta))
         beta_0_ext[beta_0_ext < 0] = 0
@@ -643,25 +692,6 @@ class QNMCEM(Learner):
         bounds_beta = [(0, None)] * n_long_features * \
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
-
-
-        # intialize Lambda_0 and gamma by Cox model
-        other_columns = ['T', 'delta']
-        X_columns = []
-        for j in range(X.shape[1]):
-            X_columns.append('X' + str(j + 1))
-
-        data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1), delta.reshape(-1, 1))),
-                                columns=X_columns + other_columns)
-
-        mod = PHReg.from_formula("T ~ " + ' + '.join(X_columns),data,
-                                 status=np.asarray(data["delta"]), ties="breslow")
-        rslt = mod.fit()
-
-        gamma_0 = np.zeros(nb_asso_features)
-        gamma_0[:n_time_indep_features] = rslt.params
-        gamma_1 = gamma_0.copy()
-        Lambda_0 = rslt.baseline_cumulative_hazard_function[0]
 
         for n_iter in range(max_iter):
 
