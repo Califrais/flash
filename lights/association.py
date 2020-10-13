@@ -55,13 +55,13 @@ class AssociationFunctions:
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
-        self.assoc_func_dict = {"lp" : self.linear_predictor(),
-                                "re" : self.random_effects(),
-                                "tps" : self.time_dependent_slope(),
-                                "ce" : self.cumulative_effect()}
+        self.assoc_func_dict = {"lp": self.linear_predictor(),
+                                "re": self.random_effects(),
+                                "tps": self.time_dependent_slope(),
+                                "ce": self.cumulative_effect()}
 
     def _linear_association(self, U, V):
-        """ Compute the linear association function U*beta + V*b
+        """ Computes the linear association function U*beta + V*b
 
         Parameters
         ----------
@@ -77,7 +77,6 @@ class AssociationFunctions:
             The value of linear association function
 
         """
-
         beta = self.fixed_effect_coeffs
         n_samples = self.n_samples
         n_long_features = self.n_long_features
@@ -94,7 +93,6 @@ class AssociationFunctions:
 
         return phi
 
-
     def linear_predictor(self):
         """Computes the linear predictor function
 
@@ -103,12 +101,8 @@ class AssociationFunctions:
         phi : `np.ndarray`, shape=(n_samples, 2, n_long_features, 2*N)
             The value of linear predictor function
         """
-
         U_l, V_l = self.U_l, self.V_l
-        phi = self._linear_association(U_l, V_l)
-
-        return phi
-
+        return self._linear_association(U_l, V_l)
 
     def random_effects(self):
         """ Computes the random effects function
@@ -123,10 +117,8 @@ class AssociationFunctions:
         n_long_features = self.n_long_features
         N, r_l = self.N, self.r_l
 
-        phi = np.broadcast_to(self.S.T, (n_samples, 2,
+        return np.broadcast_to(self.S.T, (n_samples, 2,
                                          r_l * n_long_features, 2 * N))
-
-        return phi
 
     def time_dependent_slope(self):
         """Computes the time-dependent slope function
@@ -136,7 +128,6 @@ class AssociationFunctions:
         phi : `np.ndarray`, shape=(n_samples, 2, n_long_features, 2*N)
             The value of time-dependent slope function
         """
-
 
         dU_l, dV_l = self.dU_l, self.dV_l
         phi = self._linear_association(dU_l, dV_l)
@@ -151,7 +142,6 @@ class AssociationFunctions:
         phi : `np.ndarray`, shape=(n_samples, 2, n_long_features, 2*N)
             The value of cumulative effect function
         """
-
         iU_l, iV_l = self.iU_l, self.iV_l
         phi = self._linear_association(iU_l, iV_l)
 
