@@ -8,8 +8,7 @@ import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
-from statsmodels.duration.hazard_regression import PHReg
-import pandas as pd
+from lights.initialization import initialize_asso_params
 
 
 class QNMCEM(Learner):
@@ -557,37 +556,6 @@ class QNMCEM(Learner):
         self.long_cov = long_cov
         self.phi = phi
 
-    def initialize_asso_params(self, X, T, delta):
-        """Initialize the time-independent associated parameters and baseline
-        Hazard by standard Cox model
-
-        Parameters
-        ----------
-        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Censored times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
-
-        # TODO : add returns
-            gamma_0 :time-independent associated parameters
-        """
-        n_time_indep_features = X.shape[1]
-        X_columns = ['X' + str(j + 1) for j in range(X.shape[1])]
-        data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1))),
-                            columns=X_columns + ['T'])
-        cox = PHReg.from_formula("T ~ " + ' + '.join(X_columns), data,
-                                 status=delta, ties="breslow")
-        rslt = cox.fit()
-
-        gamma_0 = rslt.params
-        baseline_hazard = rslt.baseline_cumulative_hazard_function[0](T)
-
-        return gamma_0, baseline_hazard
-
     def fit(self, X, Y, T, delta, asso_func_list):
         """Fit the lights model
 
@@ -649,7 +617,7 @@ class QNMCEM(Learner):
             beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
-            gamma_0, baseline_hazard = self.initialize_asso_params(X, T, delta)
+            gamma_0, baseline_hazard = initialize_asso_params(X, T, delta)
         else:
             # fixed initialization
             q = q_l * n_long_features
