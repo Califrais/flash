@@ -36,6 +36,6 @@ def initialize_asso_params(self, X, T, delta):
     cox.fit(data, duration_col='T', event_col='delta')
 
     gamma_0 = cox.params_.values
-    baseline_hazard = cox.baseline_hazard_ * np.exp(gamma_0.dot(data[X_columns].mean()))
+    baseline_hazard = cox.baseline_hazard_ / np.exp(gamma_0.dot(data[X_columns].mean()))
 
     return gamma_0, baseline_hazard
