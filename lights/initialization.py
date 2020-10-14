@@ -2,9 +2,10 @@ from statsmodels.duration.hazard_regression import PHReg
 import pandas as pd
 import numpy as np
 
-def initialize_asso_params(self, X, T, delta):
-    """Initialize the time-independent associated parameters and baseline
-    Hazard by standard Cox model
+
+def initialize_asso_params(X, T, delta):
+    """Initialize the time-independent association parameters and baseline
+    hazard using a standard Cox model
 
     Parameters
     ----------
@@ -20,12 +21,11 @@ def initialize_asso_params(self, X, T, delta):
     Returns
     -------
     gamma_0 : `np.ndarray`, shape=(n_time_indep_features,)
-        The time-independent associated parameters
+        The time-independent association parameters
 
     baseline_hazard : `np.ndarray`, shape=(n_samples,)
-        The baseline Hazard
+        The baseline hazard function evaluated at each censored time
     """
-    n_time_indep_features = X.shape[1]
     X_columns = ['X' + str(j + 1) for j in range(X.shape[1])]
     data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1))),
                         columns=X_columns + ['T'])
