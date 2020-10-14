@@ -1,4 +1,4 @@
-from statsmodels.duration.hazard_regression import PHReg
+from lifelines import CoxPHFitter
 import pandas as pd
 import numpy as np
 
@@ -26,14 +26,19 @@ def initialize_asso_params(X, T, delta):
     baseline_hazard : `np.ndarray`, shape=(n_samples,)
         The baseline hazard function evaluated at each censored time
     """
-    X_columns = ['X' + str(j + 1) for j in range(X.shape[1])]
+    n_time_indep_features = X.shape[1]
+    X_columns = ['X' + str(j + 1) for j in range(n_time_indep_features)]
+    survival_labels = ['T', 'delta']
     data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1))),
-                        columns=X_columns + ['T'])
-    cox = PHReg.from_formula("T ~ " + ' + '.join(X_columns), data,
-                             status=delta, ties="breslow")
-    rslt = cox.fit()
+                        columns=X_columns + survival_labels)
 
-    gamma_0 = rslt.params
-    baseline_hazard = rslt.baseline_cumulative_hazard_function[0](T)
+    cox = CoxPHFitter()
+    cox.fit(data, duration_col='T', event_col='delta')
+
+    gamma_0 = cox.params_.values
+    baseline_hazard = cox.baseline_hazard_
+    # since the baseline hazard returned is the hazard function when all
+    # covariates are set to their mean
+    baseline_hazard /= np.exp(gamma_0.dot(data[X_columns].mean()))
 
     return gamma_0, baseline_hazard
