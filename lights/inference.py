@@ -400,7 +400,7 @@ class QNMCEM(Learner):
         # TODO (only if self.fitted = True, else raise error)
         return marker
 
-    def f_data_g_latent(self, Y, T, delta, S):
+    def f_data_g_latent(self, X, Y, T, delta, S, baseline_hazard, asso_func_list):
         """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
@@ -423,10 +423,53 @@ class QNMCEM(Learner):
         f : `np.ndarray`, shape=(n_samples, 2, N)
             The value of the f(Y, T, delta| S, G, theta)
         """
-        # TODO : return list for version G=0 and G=1 ; and fill a docstring
-        N = S.shape[0]
-        n_samples = Y.shape[0]
-        f = np.zeros(shape=(n_samples, 2,  N))
+        n_samples, n_time_indep_features = X.shape
+        n_long_features = Y.shape[1]
+        N = S.shape[0]//2
+        fixed_effect_time_order = self.fixed_effect_time_order
+        f = np.ones(shape=(n_samples, 2, N * 2))
+
+        T_u = np.unique(T)
+        asso_func = AssociationFunctions(T_u, S, np.array([self.beta_0, self.beta_1])
+                                          , fixed_effect_time_order,n_long_features)
+
+        asso_func_stack_0 = np.array([[]] * n_samples * 2 * N)
+        asso_func_stack_1 = np.array([[]] * n_samples * 2 * N)
+
+        if asso_func_list == "all":
+            asso_func_list = list(asso_func.assoc_func_dict.keys())
+
+        for func_name in asso_func_list:
+            func = asso_func.assoc_func_dict[func_name]
+            if func_name == 're':
+                func0_r = func[:, 0, :].swapaxes(1, 2).reshape(n_samples * 2 * N,
+                                                              2 * n_long_features)
+                func1_r = func[:, 1, :].swapaxes(1, 2).reshape(n_samples * 2 * N,
+                                                               2 * n_long_features)
+            else:
+                func0_r = func[:, 0, :].swapaxes(1, 2).reshape(n_samples * 2 * N, n_long_features)
+                func1_r = func[:, 1, :].swapaxes(1, 2).reshape(n_samples * 2 * N, n_long_features)
+            asso_func_stack_0 = np.hstack((asso_func_stack_0, func0_r))
+            asso_func_stack_1 = np.hstack((asso_func_stack_1, func1_r))
+
+        sum_asso_0 = asso_func_stack_0.dot(self.gamma_0[n_time_indep_features:]).reshape(n_samples, 2*N)
+        sum_asso_1 = asso_func_stack_1.dot(self.gamma_1[n_time_indep_features:]).reshape(n_samples, 2*N)
+
+        for i in range(n_samples):
+            t = T[i]
+
+            Lambda_0_t = baseline_hazard.loc[[t]].values
+            e_indep = np.exp(X[i].dot(self.gamma_0[:n_time_indep_features]))
+            op1_0 = (Lambda_0_t * e_indep * sum_asso_0[T_u == t])**delta[i]
+            op2_0 = e_indep * np.sum(sum_asso_0[T_u <= t] *
+                            baseline_hazard.loc[T_u[T_u <= t]].values, axis = 0)
+            op1_1 = (Lambda_0_t * e_indep * sum_asso_1[T_u == t]) ** delta[i]
+            op2_1 = e_indep * np.sum(sum_asso_1[T_u <= t] *
+                                     baseline_hazard.loc[T_u[T_u <= t]].values,
+                                     axis=0)
+
+            f[i, 0] = op1_0 * op2_0
+            f[i, 1] = op1_1 * op2_1
 
         return f
 
@@ -457,9 +500,10 @@ class QNMCEM(Learner):
         """
         g0 = []
         for s in S:
-            g0.append(s.dot(s.T))
+            s_r = s.reshape(-1, 1)
+            g0.append(s_r.dot(s_r.T))
 
-        return g0
+        return np.array(g0)
 
     def _Lambda_g(self, g, f):
         """Approximated integral (see (15) in the lights paper)
@@ -483,7 +527,11 @@ class QNMCEM(Learner):
             all Monte Carlo samples. Each element could be real or matrices
             depending on Im(\tilde{g}_i)
         """
-        Lambda_g = 0
+        n_samples = f.shape[0]
+        Lambda_g = np.zeros(shape=(n_samples, 2) + g[0].shape)
+        for i in range(n_samples):
+            Lambda_g[i, 0] = np.mean((g.T * f[i, 0]).T, axis=0)
+            Lambda_g[i, 1] = np.mean((g.T * f[i, 1]).T, axis=0)
         return Lambda_g
 
     def _Eg(self, pi_xi, Lambda_1, Lambda_g):
@@ -630,6 +678,9 @@ class QNMCEM(Learner):
 
         gamma = np.zeros(nb_asso_features)
         gamma[:n_time_indep_features] = gamma_0
+        gamma_0_ext = np.concatenate((gamma, -gamma))
+        gamma_0_ext[gamma_0_ext < 0] = 0
+        gamma_1_ext = gamma_0_ext.copy()
 
         beta_0_ext = np.concatenate((beta, -beta))
         beta_0_ext[beta_0_ext < 0] = 0
@@ -666,8 +717,8 @@ class QNMCEM(Learner):
             # M-Step
 
             # Update D
-            f = self.f_data_g_latent(Y, T, delta, S)
-            Lambda_1 = self._Lambda_g(np.ones(N), f)
+            f = self.f_data_g_latent(X, Y, T, delta, S, baseline_hazard, asso_func_list)
+            Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
             g0 = self._g0(S)
             Lambda_g0 = self._Lambda_g(g0, f)
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
