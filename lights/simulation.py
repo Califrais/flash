@@ -376,6 +376,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         X[G == 1, :nb_active_time_indep_features] += gap
         X[G == 0, :nb_active_time_indep_features] -= gap
 
+        # Normalize time-independent features
+        X = (X - X.mean(0)) / X.std(0)
+
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
 
