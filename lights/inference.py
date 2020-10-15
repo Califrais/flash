@@ -433,8 +433,7 @@ class QNMCEM(Learner):
         asso_func = AssociationFunctions(T_u, S, np.array([self.beta_0, self.beta_1])
                                           , fixed_effect_time_order,n_long_features)
 
-        asso_func_stack_0 = np.array([[]] * n_samples * 2 * N)
-        asso_func_stack_1 = np.array([[]] * n_samples * 2 * N)
+        asso_func_stack = np.empty(shape=(2, n_samples * 2 * N, 0))
 
         if asso_func_list == "all":
             asso_func_list = list(asso_func.assoc_func_dict.keys())
@@ -442,34 +441,28 @@ class QNMCEM(Learner):
         for func_name in asso_func_list:
             func = asso_func.assoc_func_dict[func_name]
             if func_name == 're':
-                func0_r = func[:, 0, :].swapaxes(1, 2).reshape(n_samples * 2 * N,
-                                                              2 * n_long_features)
-                func1_r = func[:, 1, :].swapaxes(1, 2).reshape(n_samples * 2 * N,
-                                                               2 * n_long_features)
+                func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(2, n_samples * 2 * N, 2 * n_long_features)
             else:
-                func0_r = func[:, 0, :].swapaxes(1, 2).reshape(n_samples * 2 * N, n_long_features)
-                func1_r = func[:, 1, :].swapaxes(1, 2).reshape(n_samples * 2 * N, n_long_features)
-            asso_func_stack_0 = np.hstack((asso_func_stack_0, func0_r))
-            asso_func_stack_1 = np.hstack((asso_func_stack_1, func1_r))
+                func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(2, n_samples * 2 * N, n_long_features)
+            asso_func_stack = np.dstack((asso_func_stack, func_r))
 
-        sum_asso_0 = asso_func_stack_0.dot(self.gamma_0[n_time_indep_features:]).reshape(n_samples, 2*N)
-        sum_asso_1 = asso_func_stack_1.dot(self.gamma_1[n_time_indep_features:]).reshape(n_samples, 2*N)
+        sum_asso = np.zeros(shape=(n_samples, 2, 2*N))
+        sum_asso[:, 0] = asso_func_stack[0].dot(self.gamma_0[n_time_indep_features:]).reshape(n_samples, 2*N)
+        sum_asso[:, 1] = asso_func_stack[1].dot(self.gamma_1[n_time_indep_features:]).reshape(n_samples, 2*N)
 
         for i in range(n_samples):
             t = T[i]
 
             Lambda_0_t = baseline_hazard.loc[[t]].values
             e_indep = np.exp(X[i].dot(self.gamma_0[:n_time_indep_features]))
-            op1_0 = (Lambda_0_t * e_indep * sum_asso_0[T_u == t])**delta[i]
-            op2_0 = e_indep * np.sum(sum_asso_0[T_u <= t] *
-                            baseline_hazard.loc[T_u[T_u <= t]].values, axis = 0)
-            op1_1 = (Lambda_0_t * e_indep * sum_asso_1[T_u == t]) ** delta[i]
-            op2_1 = e_indep * np.sum(sum_asso_1[T_u <= t] *
-                                     baseline_hazard.loc[T_u[T_u <= t]].values,
-                                     axis=0)
 
-            f[i, 0] = op1_0 * op2_0
-            f[i, 1] = op1_1 * op2_1
+            op1 = (Lambda_0_t * e_indep * sum_asso[T_u == t]) ** delta[i]
+            op2 = e_indep * np.sum(sum_asso[T_u <= t] * baseline_hazard.
+                            loc[T_u[T_u <= t]].values.reshape(-1, 1, 1), axis=0)
+
+            #TODO: Add f(y_i | b_i)
+
+            f[i] = op1 * op2
 
         return f
 
