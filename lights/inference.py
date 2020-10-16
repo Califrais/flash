@@ -20,8 +20,8 @@ class QNMCEM(Learner):
         If `True`, include an intercept in the model for the time independant
         features
 
-    l_elastic_net : `float`, default=0
-        Level of ElasticNet penalization
+    l_pen : `float`, default=0
+        Level of penalization for the ElasticNet and the Sparse Group l1
 
     eta: `float`, default=0.1
         The ElasticNet mixing parameter, with 0 <= eta <= 1.
@@ -55,41 +55,84 @@ class QNMCEM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
+    asso_functions : `list` or `str`='all', default='all'
+        List of association functions wanted or string 'all' to select all
+        defined association functions. The available functions are :
+            - 'lp' : linear predictor
+            - 're' : random effects
+            - 'tps' : time dependent slope
+            - 'ce' : cumulative effects
+
     initialize : `bool`, default=True
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization
     """
 
-    def __init__(self, fit_intercept=False, l_elastic_net=0.,
-                 eta=.1, max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 warm_start=False, fixed_effect_time_order=5, initialize=True):
+    def __init__(self, fit_intercept=False, l_pen=0., eta=.1, max_iter=100,
+                 verbose=True, print_every=10, tol=1e-5, warm_start=False,
+                 fixed_effect_time_order=5, asso_functions='all',
+                 initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
-        self.l_elastic_net = l_elastic_net
+        self.l_pen = l_pen
         self.eta = eta
         self.max_iter = max_iter
         self.tol = tol
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.asso_functions = asso_functions
         self.initialize = initialize
 
         # Attributes that will be instantiated afterwards
         self.n_time_indep_features = None
         self.n_samples = None
+        self.n_long_features = None
         self.beta_0 = None
         self.beta_1 = None
         self.long_cov = None
         self.phi = None
         self.xi = None
+        self.baseline_hazard = None
         self.gamma_0 = None
         self.gamma_1 = None
         self.avg_scores = None
         self.scores = None
-        self.l_elastic_net_best = None
-        self.l_elastic_net_chosen = None
+        self.l_pen_best = None
+        self.l_pen_chosen = None
         self.grid_elastic_net = None
         self.adaptative_grid_el = None
         self.grid_size = None
+
+    @property
+    def l_pen(self):
+        return self._l_pen
+
+    @l_pen.setter
+    def l_pen(self, val):
+        if not val >= 0:
+            raise ValueError("``l_pen`` must be non negative")
+        self._l_pen = val
+
+    @property
+    def eta(self):
+        return self._eta
+
+    @eta.setter
+    def eta(self, val):
+        if not 0 <= val <= 1:
+            raise ValueError("``eta`` must be in (0, 1)")
+        self._eta = val
+
+    @property
+    def asso_functions(self):
+        return self._asso_functions
+
+    @asso_functions.setter
+    def asso_functions(self, val):
+        if not (val == 'all' or set(val) in {'lp', 're', 'tps', 'ce'}):
+            raise ValueError("``asso_functions`` must be either 'all', or a "
+                             "`list` in ['lp', 're', 'tps', 'ce']")
+        self._asso_functions = val
 
     @staticmethod
     def logistic_grad(z):
@@ -177,12 +220,12 @@ class QNMCEM(Learner):
             The value of the elasticNet penalization part of the global
             objective
         """
-        l_elastic_net = self.l_elastic_net
+        l_pen = self.l_pen
         eta = self.eta
         xi = self._get_xi_from_xi_ext(xi_ext)[1]
         xi_ext = self._clean_xi_ext(xi_ext)
-        return l_elastic_net * ((1. - eta) * xi_ext.sum()
-                                + 0.5 * eta * np.linalg.norm(xi) ** 2)
+        return l_pen * ((1. - eta) * xi_ext.sum() +
+                        0.5 * eta * np.linalg.norm(xi) ** 2)
 
     def _grad_elastic_net_pen(self, xi):
         """Computes the gradient of the elasticNet penalization of the global
@@ -199,14 +242,14 @@ class QNMCEM(Learner):
             The gradient of the elasticNet penalization part of the global
             objective
         """
-        l_elastic_net = self.l_elastic_net
+        l_pen = self.l_pen
         eta = self.eta
         n_time_indep_features = self.n_time_indep_features
         grad = np.zeros(2 * n_time_indep_features)
         # Gradient of lasso penalization
-        grad += l_elastic_net * (1 - eta)
+        grad += l_pen * (1 - eta)
         # Gradient of ridge penalization
-        grad_pos = (l_elastic_net * eta)
+        grad_pos = (l_pen * eta)
         grad[:n_time_indep_features] += grad_pos * xi
         grad[n_time_indep_features:] -= grad_pos * xi
         return grad
@@ -400,20 +443,63 @@ class QNMCEM(Learner):
         # TODO (only if self.fitted = True, else raise error)
         return marker
 
-    def f_data_g_latent(self, X, Y, T, delta, S, baseline_hazard, asso_func_list):
+    def get_asso_func(self, T, S):
+        """Computes blabla #TODO Van Tuan
+
+        Parameters
+        ----------
+        T : `np.ndarray`, shape=(J,)
+            The J unique censored times of the event of interest
+
+        S: `np.ndarray`, , shape=(2*N, r)
+            Set of constructed samples
+
+        Returns
+        -------
+        asso_func_stack : #TODO Van Tuan
+        """
+        fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
+        fixed_effect_time_order = self.fixed_effect_time_order
+        n_long_features = self.n_long_features
+        n_samples = self.n_samples
+        asso_functions = self.asso_functions
+
+        N = S.shape[0] // 2
+        asso_func = AssociationFunctions(T, S, fixed_effect_coeffs,
+                                         fixed_effect_time_order,
+                                         n_long_features)
+        if asso_functions == "all":
+            asso_functions = list(asso_func.assoc_func_dict.keys())
+
+        asso_func_stack = np.empty(shape=(2, n_samples * 2 * N, 0))
+        for func_name in asso_functions:
+            func = asso_func.assoc_func_dict[func_name]
+            dim = n_long_features
+            if func_name == 're':
+                dim *= 2
+            func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
+                    2, n_samples * 2 * N, dim)
+            asso_func_stack = np.dstack((asso_func_stack, func_r))
+
+        return asso_func_stack
+
+    def f_data_g_latent(self, X, Y, T, delta, S):
         """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
         ----------
+        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
+            The time-independent features matrix
+
         Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
+            The longitudinal data. Each element of the dataframe is
             a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
-            The simulated censored times of the event of interest
+            The censored times of the event of interest
 
         delta : `np.ndarray`, shape=(n_samples,)
-            The simulated censoring indicator
+            The censoring indicator
 
         S: `np.ndarray`, , shape=(2*N, r)
             Set of constructed samples
@@ -423,38 +509,24 @@ class QNMCEM(Learner):
         f : `np.ndarray`, shape=(n_samples, 2, N)
             The value of the f(Y, T, delta| S, G, theta)
         """
-        n_samples, n_time_indep_features = X.shape
-        n_long_features = Y.shape[1]
-        N = S.shape[0]//2
-        fixed_effect_time_order = self.fixed_effect_time_order
-        f = np.ones(shape=(n_samples, 2, N * 2))
-
+        n_samples = self.n_samples
+        p = self.n_time_indep_features
+        gamma_0, gamma_1 = self.gamma_0, self.gamma_1
         T_u = np.unique(T)
-        asso_func = AssociationFunctions(T_u, S, np.array([self.beta_0, self.beta_1])
-                                          , fixed_effect_time_order,n_long_features)
+        asso_func = self.get_asso_func(T_u, S)
+        baseline_hazard = self.baseline_hazard
 
-        asso_func_stack = np.empty(shape=(2, n_samples * 2 * N, 0))
-
-        if asso_func_list == "all":
-            asso_func_list = list(asso_func.assoc_func_dict.keys())
-
-        for func_name in asso_func_list:
-            func = asso_func.assoc_func_dict[func_name]
-            if func_name == 're':
-                func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(2, n_samples * 2 * N, 2 * n_long_features)
-            else:
-                func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(2, n_samples * 2 * N, n_long_features)
-            asso_func_stack = np.dstack((asso_func_stack, func_r))
-
+        N = S.shape[0] // 2
         sum_asso = np.zeros(shape=(n_samples, 2, 2*N))
-        sum_asso[:, 0] = asso_func_stack[0].dot(self.gamma_0[n_time_indep_features:]).reshape(n_samples, 2*N)
-        sum_asso[:, 1] = asso_func_stack[1].dot(self.gamma_1[n_time_indep_features:]).reshape(n_samples, 2*N)
+        sum_asso[:, 0] = asso_func[0].dot(gamma_0[p:]).reshape(n_samples, 2*N)
+        sum_asso[:, 1] = asso_func[1].dot(gamma_1[p:]).reshape(n_samples, 2*N)
 
+        f = np.ones(shape=(n_samples, 2, N * 2))
         for i in range(n_samples):
             t = T[i]
-
             Lambda_0_t = baseline_hazard.loc[[t]].values
-            e_indep = np.exp(X[i].dot(self.gamma_0[:n_time_indep_features]))
+            e_indep = np.exp(X[i].dot(gamma_0[:p]))
+            #TODO carefull ! gamma_{k,0} != gamma_0 !! see paper
 
             op1 = (Lambda_0_t * e_indep * sum_asso[T_u == t]) ** delta[i]
             op2 = e_indep * np.sum(sum_asso[T_u <= t] * baseline_hazard.
@@ -489,7 +561,7 @@ class QNMCEM(Learner):
 
     def _g0(self, S):
         """Computes g0
-
+            #TODO: static ?
         """
         g0 = []
         for s in S:
@@ -498,7 +570,8 @@ class QNMCEM(Learner):
 
         return np.array(g0)
 
-    def _Lambda_g(self, g, f):
+    @staticmethod
+    def _Lambda_g(g, f):
         """Approximated integral (see (15) in the lights paper)
 
         Parameters
@@ -527,7 +600,8 @@ class QNMCEM(Learner):
             Lambda_g[i, 1] = np.mean((g.T * f[i, 1]).T, axis=0)
         return Lambda_g
 
-    def _Eg(self, pi_xi, Lambda_1, Lambda_g):
+    @staticmethod
+    def _Eg(pi_xi, Lambda_1, Lambda_g):
         """Computes approximated expectations of different functions g taking
         random effects as input, conditional on the observed data and the
         current estimate of the parameters. See (14) in the lights paper
@@ -554,7 +628,7 @@ class QNMCEM(Learner):
         return Eg
 
     def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                     gamma_1_ext, long_cov, phi):
+                     gamma_1_ext, long_cov, phi, baseline_hazard):
         """Update class attributes corresponding to lights model parameters
 
         Parameters
@@ -588,6 +662,9 @@ class QNMCEM(Learner):
 
         phi : `np.ndarray`, shape=(n_long_features,)
             Variance vector for the error term of the longitudinal processes
+
+        baseline_hazard : `np.ndarray`, shape=(n_samples,)
+        The baseline hazard function evaluated at each censored time
         """
         self.beta_0 = self.get_vect_from_ext(beta_0_ext)
         self.beta_1 = self.get_vect_from_ext(beta_1_ext)
@@ -596,8 +673,9 @@ class QNMCEM(Learner):
         self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
         self.long_cov = long_cov
         self.phi = phi
+        self.baseline_hazard = baseline_hazard
 
-    def fit(self, X, Y, T, delta, asso_func_list):
+    def fit(self, X, Y, T, delta):
         """Fit the lights model
 
         Parameters
@@ -614,10 +692,6 @@ class QNMCEM(Learner):
 
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
-
-        asso_func_list: `list` or `str`
-            List of association functions or string "all" to select all defined
-            association functions
         """
         self._start_solve()
         verbose = self.verbose
@@ -629,9 +703,10 @@ class QNMCEM(Learner):
         fixed_effect_time_order = self.fixed_effect_time_order
 
         n_samples, n_time_indep_features = X.shape
+        n_long_features = Y.shape[1]
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
-        n_long_features = Y.shape[1]
+        self.n_long_features = n_long_features
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
         nb_asso_param = 4
@@ -680,7 +755,7 @@ class QNMCEM(Learner):
         beta_1_ext = beta_0_ext.copy()
 
         self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                          gamma_1_ext, D, phi)
+                          gamma_1_ext, D, phi, baseline_hazard)
         func_obj = self._func_obj
         P_func = self._P_func
         grad_P = self._grad_P
@@ -710,7 +785,7 @@ class QNMCEM(Learner):
             # M-Step
 
             # Update D
-            f = self.f_data_g_latent(X, Y, T, delta, S, baseline_hazard, asso_func_list)
+            f = self.f_data_g_latent(X, Y, T, delta, S)
             Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
             g0 = self._g0(S)
             Lambda_g0 = self._Lambda_g(g0, f)
@@ -732,7 +807,7 @@ class QNMCEM(Learner):
             )[0]
 
             self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                              gamma_1_ext, D, phi)
+                              gamma_1_ext, D, phi, baseline_hazard)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
@@ -864,9 +939,9 @@ class QNMCEM(Learner):
         scores = np.empty((n_grid_elastic_net, n_folds))
         if verbose is not None:
             verbose = self.verbose
-        for idx_elasticNet, l_elastic_net in enumerate(grid_elastic_net):
+        for idx_elasticNet, l_pen in enumerate(grid_elastic_net):
             if verbose:
-                print("Testing l_elastic_net=%.2e" % l_elastic_net, "on fold ",
+                print("Testing l_pen=%.2e" % l_pen, "on fold ",
                       end="")
             for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
                 if verbose:
@@ -875,7 +950,7 @@ class QNMCEM(Learner):
                 T_train, T_test = Y[idx_train], T[idx_test]
                 delta_train, delta_test = delta[idx_train], delta[idx_test]
                 learner = learners[n_fold]
-                learner.l_elastic_net = l_elastic_net
+                learner.l_pen = l_pen
                 learner.fit(X_train, T_train, delta_train)
                 scores[idx_elasticNet, n_fold] = learner.score(
                     X_test, T_test, delta_test, metric)
@@ -885,13 +960,13 @@ class QNMCEM(Learner):
         avg_scores = scores.mean(1)
         std_scores = scores.std(1)
         idx_best = avg_scores.argmax()
-        l_elastic_net_best = grid_elastic_net[idx_best]
+        l_pen_best = grid_elastic_net[idx_best]
         idx_chosen = max([i for i, j in enumerate(
             list(avg_scores >= avg_scores.max() - std_scores[idx_best])) if j])
-        l_elastic_net_chosen = grid_elastic_net[idx_chosen]
+        l_pen_chosen = grid_elastic_net[idx_chosen]
 
         self.grid_elastic_net = grid_elastic_net
-        self.l_elastic_net_best = l_elastic_net_best
-        self.l_elastic_net_chosen = l_elastic_net_chosen
+        self.l_pen_best = l_pen_best
+        self.l_pen_chosen = l_pen_chosen
         self.scores = scores
         self.avg_scores = avg_scores

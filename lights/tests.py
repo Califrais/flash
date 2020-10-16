@@ -108,8 +108,7 @@ class Test(unittest.TestCase):
         """
         X, Y, T, delta = self.get_train_data()
         qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3)
-        asso_func_list = ['lp', 're', 'tps']
-        qnmcem.fit(X, Y, T, delta, asso_func_list=asso_func_list)
+        qnmcem.fit(X, Y, T, delta)
 
 
 if __name__ == "main":
