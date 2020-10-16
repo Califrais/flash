@@ -37,8 +37,5 @@ def initialize_asso_params(X, T, delta):
 
     gamma_0 = cox.params_.values
     baseline_hazard = cox.baseline_hazard_
-    # since the baseline hazard returned is the hazard function when all
-    # covariates are set to their mean
-    baseline_hazard /= np.exp(gamma_0.dot(data[X_columns].mean()))
 
     return gamma_0, baseline_hazard

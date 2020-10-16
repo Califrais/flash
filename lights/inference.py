@@ -8,7 +8,7 @@ import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
-from lights.initialization import initialize_asso_params
+from lights.cox_init import initialize_asso_params
 
 
 class QNMCEM(Learner):

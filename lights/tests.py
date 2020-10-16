@@ -107,12 +107,9 @@ class Test(unittest.TestCase):
         """Test QNMCEM Algorithm
         """
         X, Y, T, delta = self.get_train_data()
-        # D = simu.long_cov
-        qnmcem = QNMCEM(max_iter=3, fixed_effect_time_order=1, initialize=True)
-
+        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3)
         asso_func_list = ['lp', 're', 'tps']
-        qnmcem.fit(X, Y, T, delta, asso_func_list= asso_func_list)
-        # TODO Sim : check parameters estimation
+        qnmcem.fit(X, Y, T, delta, asso_func_list=asso_func_list)
 
 
 if __name__ == "main":
