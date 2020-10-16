@@ -129,7 +129,7 @@ class QNMCEM(Learner):
 
     @asso_functions.setter
     def asso_functions(self, val):
-        if not (val == 'all' or set(val) in {'lp', 're', 'tps', 'ce'}):
+        if not (val == 'all' or set(val).issubset({'lp', 're', 'tps', 'ce'})):
             raise ValueError("``asso_functions`` must be either 'all', or a "
                              "`list` in ['lp', 're', 'tps', 'ce']")
         self._asso_functions = val
