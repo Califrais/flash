@@ -27,29 +27,28 @@ class AssociationFunctions:
     """
     def __init__(self, T, S, fixed_effect_coeffs, fixed_effect_time_order=5,
                  n_long_features=5):
-        self.T = T
         self.S = S
         self.fixed_effect_coeffs = fixed_effect_coeffs
-        self.fixed_effect_time_order = fixed_effect_time_order
         self.n_long_features = n_long_features
-        self.n_samples = len(self.T)
-        self.N = len(self.S) // 2
+        n_samples = len(T)
+        self.n_samples = n_samples
+        self.N = len(S) // 2
         self.r_l = 2  # linear time-varying features, so all r_l=2
-        self.q_l = self.fixed_effect_time_order + 1
+        self.q_l = fixed_effect_time_order + 1
 
-        U_l = np.ones(self.n_samples)
+        U_l = np.ones(n_samples)
         # integral over U
-        iU_l = self.T
+        iU_l = T
         # derivative of U
-        dU_l = np.zeros(self.n_samples)
+        dU_l = np.zeros(n_samples)
         for t in range(1, self.q_l):
-            U_l = np.c_[U_l, self.T ** t]
-            iU_l = np.c_[iU_l, (self.T ** (t + 1)) / (t + 1)]
-            dU_l = np.c_[dU_l, t * self.T ** (t - 1)]
+            U_l = np.c_[U_l, T ** t]
+            iU_l = np.c_[iU_l, (T ** (t + 1)) / (t + 1)]
+            dU_l = np.c_[dU_l, t * T ** (t - 1)]
 
-        V_l = np.c_[np.ones(self.n_samples), self.T]
-        iV_l = np.c_[self.T, (self.T ** 2) / 2]
-        dV_l = np.c_[np.zeros(self.n_samples), np.ones(self.n_samples)]
+        V_l = np.c_[np.ones(n_samples), T]
+        iV_l = np.c_[T, (T ** 2) / 2]
+        dV_l = np.c_[np.zeros(n_samples), np.ones(n_samples)]
 
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
@@ -79,11 +78,11 @@ class AssociationFunctions:
         beta = self.fixed_effect_coeffs
         n_samples = self.n_samples
         n_long_features = self.n_long_features
-        N, r_l, q_l = self.N, self.r_l, self.q_l
+        S, N, r_l, q_l = self.S, self.N, self.r_l, self.q_l
         phi = np.zeros(shape=(n_samples, 2, n_long_features, 2 * N))
 
         for l in range(n_long_features):
-            tmp = V.dot(self.S[:, r_l * l: r_l * (l + 1)].T)
+            tmp = V.dot(S[:, r_l * l: r_l * (l + 1)].T)
             beta_0l = beta[0, q_l * l: q_l * (l + 1)]
             beta_1l = beta[1, q_l * l: q_l * (l + 1)]
             phi[:, 0, l, :] = U.dot(beta_0l) + tmp
@@ -111,12 +110,10 @@ class AssociationFunctions:
         phi : `np.ndarray`, shape=(n_samples, 2, r_l*n_long_features, 2*N)
             The value of random effects function
         """
-
         n_samples = self.n_samples
         n_long_features = self.n_long_features
-        N, r_l = self.N, self.r_l
-        phi = np.broadcast_to(self.S.T, (n_samples, 2,
-                                         r_l * n_long_features, 2 * N))
+        S, N, r_l = self.S, self.N, self.r_l
+        phi = np.broadcast_to(S.T, (n_samples, 2, r_l * n_long_features, 2 * N))
         return phi
 
     def time_dependent_slope(self):
