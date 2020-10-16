@@ -165,7 +165,7 @@ class QNMCEM(Learner):
         dim = len(v_ext)
         if dim % 2 != 0:
             raise ValueError("``v_ext`` dimension cannot be odd, got %s" % dim)
-        v = v_ext[:dim//2] - v_ext[dim//2:]
+        v = v_ext[:dim // 2] - v_ext[dim // 2:]
         return v
 
     def _get_xi_from_xi_ext(self, xi_ext):
@@ -468,8 +468,6 @@ class QNMCEM(Learner):
         asso_func = AssociationFunctions(T, S, fixed_effect_coeffs,
                                          fixed_effect_time_order,
                                          n_long_features)
-        if asso_functions == "all":
-            asso_functions = list(asso_func.assoc_func_dict.keys())
 
         asso_func_stack = np.empty(shape=(2, n_samples * 2 * N, 0))
         for func_name in asso_functions:
@@ -478,7 +476,7 @@ class QNMCEM(Learner):
             if func_name == 're':
                 dim *= 2
             func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
-                    2, n_samples * 2 * N, dim)
+                2, n_samples * 2 * N, dim)
             asso_func_stack = np.dstack((asso_func_stack, func_r))
 
         return asso_func_stack
@@ -517,9 +515,9 @@ class QNMCEM(Learner):
         baseline_hazard = self.baseline_hazard
 
         N = S.shape[0] // 2
-        sum_asso = np.zeros(shape=(n_samples, 2, 2*N))
-        sum_asso[:, 0] = asso_func[0].dot(gamma_0[p:]).reshape(n_samples, 2*N)
-        sum_asso[:, 1] = asso_func[1].dot(gamma_1[p:]).reshape(n_samples, 2*N)
+        sum_asso = np.zeros(shape=(n_samples, 2, 2 * N))
+        sum_asso[:, 0] = asso_func[0].dot(gamma_0[p:]).reshape(n_samples, 2 * N)
+        sum_asso[:, 1] = asso_func[1].dot(gamma_1[p:]).reshape(n_samples, 2 * N)
 
         f = np.ones(shape=(n_samples, 2, N * 2))
         for i in range(n_samples):
@@ -530,9 +528,10 @@ class QNMCEM(Learner):
 
             op1 = (Lambda_0_t * e_indep * sum_asso[T_u == t]) ** delta[i]
             op2 = e_indep * np.sum(sum_asso[T_u <= t] * baseline_hazard.
-                            loc[T_u[T_u <= t]].values.reshape(-1, 1, 1), axis=0)
+                                   loc[T_u[T_u <= t]].values.reshape(-1, 1, 1),
+                                   axis=0)
 
-            #TODO: Add f(y_i | b_i)
+            # TODO: Add f(y_i | b_i)
 
             f[i] = op1 * op2
 
@@ -712,10 +711,9 @@ class QNMCEM(Learner):
         if fit_intercept:
             n_time_indep_features += 1
 
-        asso_functions= self.asso_functions
-        if asso_functions == "all":
-            asso_functions = ["lp", "re", "tps", "ce"]
-
+        if self.asso_functions == 'all':
+            self.asso_functions = ['lp', 're', 'tps', 'ce']
+        asso_functions = self.asso_functions
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1

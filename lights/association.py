@@ -9,7 +9,7 @@ class AssociationFunctions:
     T : `np.ndarray`, shape=(n_samples,)
         Censored times of the event of interest
 
-    S : `np.ndarray`, , shape=(2*N, r)
+    S : `np.ndarray`, shape=(2*N, r)
         Set of samples used for Monte Carlo approximation
 
     fixed_effect_coeffs : `np.ndarray`,
@@ -25,7 +25,6 @@ class AssociationFunctions:
     n_long_features: `int`, default=5
         Number of longitudinal features
     """
-
     def __init__(self, T, S, fixed_effect_coeffs, fixed_effect_time_order=5,
                  n_long_features=5):
         self.T = T
