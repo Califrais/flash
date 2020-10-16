@@ -525,8 +525,8 @@ class QNMCEM(Learner):
         for i in range(n_samples):
             t = T[i]
             Lambda_0_t = baseline_hazard.loc[[t]].values
-            e_indep = np.exp(X[i].dot(gamma_0[:p]))
-            #TODO carefull ! gamma_{k,0} != gamma_0 !! see paper
+            gamma_indep_stack = np.vstack((gamma_0[:p], gamma_1[:p])).T
+            e_indep = np.exp(X[i].dot(gamma_indep_stack)).reshape(-1, 1)
 
             op1 = (Lambda_0_t * e_indep * sum_asso[T_u == t]) ** delta[i]
             op2 = e_indep * np.sum(sum_asso[T_u <= t] * baseline_hazard.
@@ -709,9 +709,16 @@ class QNMCEM(Learner):
         self.n_long_features = n_long_features
         q_l = fixed_effect_time_order + 1
         r_l = 2  # linear time-varying features, so all r_l=2
-        nb_asso_param = 4
         if fit_intercept:
             n_time_indep_features += 1
+
+        asso_functions= self.asso_functions
+        if asso_functions == "all":
+            asso_functions = ["lp", "re", "tps", "ce"]
+
+        nb_asso_param = len(asso_functions)
+        if 're' in asso_functions:
+            nb_asso_param += 1
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         N = 5  # number of initial Monte Carlo sample for S
 
