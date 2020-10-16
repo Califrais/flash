@@ -77,7 +77,7 @@ class Test(unittest.TestCase):
         """Test an initialization algorithm estimation
         """
         Y, beta_, D_, phi_ = self.get_Y_without_subgroups()
-        fixed_effect_time_order = 1  # q_l=2 in the simulations
+        fixed_effect_time_order = initializer.fixed_effect_time_order
         extracted_features = extract_features(Y, fixed_effect_time_order)
         initializer.fit(extracted_features)
         beta = initializer.fixed_effect_coeffs
