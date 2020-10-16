@@ -7,7 +7,7 @@ from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
 from scipy.stats import uniform, beta
 from scipy.sparse import random
-from lights.base import normalize
+from lights.base.base import normalize
 import numpy as np
 import pandas as pd
 

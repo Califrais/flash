@@ -2,7 +2,7 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 from datetime import datetime
-from lights.history import History
+from lights.base.history import History
 from time import time
 import numpy as np
 

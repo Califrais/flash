@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner, extract_features, normalize
-from lights.mlmm import MLMM
+from lights.base.base import Learner, extract_features, normalize
+from lights.init.mlmm import MLMM
 from lights.association import AssociationFunctions
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
-from lights.cox_init import initialize_asso_params
+from lights.init.cox import initialize_asso_params
 
 
 class QNMCEM(Learner):

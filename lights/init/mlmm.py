@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner, block_diag
-from lights.ulmm import ULMM
+from lights.base.base import Learner, block_diag
+from lights.init.ulmm import ULMM
 import numpy as np
 from numpy.linalg import multi_dot
 

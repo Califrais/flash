@@ -2,10 +2,10 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import unittest
-from lights.base import extract_features
+from lights.base.base import extract_features
 from lights.simulation import SimuJointLongitudinalSurvival
-from lights.mlmm import MLMM
-from lights.ulmm import ULMM
+from lights.init.mlmm import MLMM
+from lights.init.ulmm import ULMM
 from lights.inference import QNMCEM
 import numpy as np
 import pandas as pd
