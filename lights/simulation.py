@@ -7,6 +7,7 @@ from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
 from scipy.stats import uniform, beta
 from scipy.sparse import random
+from lights.base import normalize
 import numpy as np
 import pandas as pd
 
@@ -377,7 +378,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         X[G == 0, :nb_active_time_indep_features] -= gap
 
         # Normalize time-independent features
-        X = (X - X.mean(0)) / X.std(0)
+        X = normalize(X)
 
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)

@@ -91,6 +91,7 @@ def block_diag(l_arr):
     ----------
     l_arr : list of arrays, up to 2-D
         Input arrays.
+
     Returns
     -------
     out : ndarray
@@ -107,6 +108,26 @@ def block_diag(l_arr):
         c += cc
 
     return out
+
+
+def normalize(X):
+    """Normalize X to have mean 0 and std 1
+
+    Parameters
+    ----------
+    X : `np.ndarray`, shape=(n, d)
+        A time-independent features matrix
+
+    Returns
+    -------
+    X_norm : `np.ndarray`, shape=(n, d)
+        The corresponding normilized matrix with mean 0 and std 1
+    """
+    mean = X.mean(0)
+    std = X.std(0)
+    X_norm = (X - mean) / std
+
+    return X_norm
 
 
 def from_ts_to_design_features(Y_il, fixed_effect_time_order):

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base import Learner, extract_features
+from lights.base import Learner, extract_features, normalize
 from lights.mlmm import MLMM
 from lights.association import AssociationFunctions
 import numpy as np
@@ -714,6 +714,9 @@ class QNMCEM(Learner):
             n_time_indep_features += 1
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
         N = 5  # number of initial Monte Carlo sample for S
+
+        # normalize time-independent features
+        X = normalize(X)
 
         # features extraction
         extracted_features = extract_features(Y, fixed_effect_time_order)
