@@ -7,10 +7,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def heatmap(data, row_labels, col_labels, ax=None,
-            cbar_kw={}, cbarlabel="", **kwargs):
-    """
-    Create a heatmap from a numpy array and two lists of labels.
+def heatmap(data, row_labels, col_labels, ax=None, cbar_kw={}, cbarlabel="",
+            **kwargs):
+    """Creates a heatmap from a numpy array and two lists of labels.
 
     Parameters
     ----------
@@ -69,10 +68,8 @@ def heatmap(data, row_labels, col_labels, ax=None,
 
 
 def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
-                     textcolors=("black", "white"),
-                     threshold=None, **textkw):
-    """
-    A function to annotate a heatmap.
+                     textcolors=("black", "white"), threshold=None, **textkw):
+    """A function to annotate a heatmap.
 
     Parameters
     ----------
@@ -128,8 +125,7 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
 
 
 def gompertz_pdf(t, shape: float = .1, scale: float = .001):
-    """
-    Probability density function of a Gompertz random variable.
+    """Probability density function of a Gompertz random variable.
 
     Parameters
     ----------
@@ -146,8 +142,7 @@ def gompertz_pdf(t, shape: float = .1, scale: float = .001):
 
 
 def gompertz_survival(t, shape: float = .1, scale: float = .001):
-    """
-    Survival function of a Gompertz random variable.
+    """Survival function of a Gompertz random variable.
 
     Parameters
     ----------
@@ -164,8 +159,7 @@ def gompertz_survival(t, shape: float = .1, scale: float = .001):
 
 
 def plot_history(learner, name, ax=None, **kwargs):
-    """
-    Plot an element history evolution through iterations
+    """Plot an element history evolution through iterations
 
     Parameters
     ----------
@@ -201,3 +195,72 @@ def plot_history(learner, name, ax=None, **kwargs):
     history.index = n_iter
 
     history.plot(ax=ax, **kwargs)
+
+
+def visualize_vect_learning(learner, name, symbol, true_coeffs, legend_est,
+                            legend_true):
+    """Plots learning for a given parameter vector : objective and relative
+    objective function, as well as evolution of estimators through iterations
+
+    Parameters
+    ----------
+    learner : `ligths.base.base.Learner`
+        A base learner
+
+    name : `str`
+        Name of the element to be plotted
+
+    symbol : `str`
+        Symbol of the element to be plotted
+
+    true_coeffs : `np.ndarray`
+        True coefficient vector to be estimated
+
+    legend_est : `list`
+        Names of each estimator coefficients
+
+    legend_true : `list`
+        Names of each true parameter coefficients
+    """
+    fig = plt.figure(figsize=(12, 3))
+    ax = fig.add_subplot(121)
+    fs = 18
+    plt.title("Objective convergence", fontsize=fs + 2)
+    plt.xlabel('iterations', fontsize=fs + 2)
+    plt.ylabel('Obj', fontsize=fs + 2)
+    plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
+    plot_history(learner, name="obj", ax=ax, color='b', legend=False)
+
+    ax = fig.add_subplot(122)
+    plt.title("Relative objective convergence", fontsize=fs + 2)
+    plt.xlabel('iterations', fontsize=fs + 2)
+    plt.ylabel('Rel obj', fontsize=fs + 2)
+    plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
+    plot_history(learner, name="rel_obj", ax=ax, color='r', logy=True,
+                 legend=False)
+    fig.tight_layout()
+
+    fig = plt.figure(figsize=(8, 4))
+    ax = fig.add_subplot(111)
+    plt.title("%s learning" % symbol, fontsize=fs + 2)
+    plt.xlabel('iterations', fontsize=fs + 2)
+    plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
+    cm = 'Dark2'
+    plot_history(learner, name=name, ax=ax, colormap=cm, alpha=.8)
+
+    legend1 = ax.legend(legend_est, loc='center right',
+                        bbox_to_anchor=(-0.1, 0.5), fontsize=fs)
+    plt.gca().add_artist(legend1)
+
+    last_iter = learner.get_history("n_iter")[-1]
+    data = np.concatenate((true_coeffs, true_coeffs), axis=1).T
+    df_true_coeffs = pd.DataFrame(data=data, index=[0, last_iter])
+    df_true_coeffs.plot(ax=ax, colormap=cm, linestyle=':')
+
+    lines = plt.gca().get_lines()
+    to = len(true_coeffs) + 1
+    plt.legend([lines[i] for i in range(to - 1, 2 * to - 2)], legend_true,
+               loc='center left', bbox_to_anchor=(1, 0.5), fontsize=fs)
+
+    fig.tight_layout()
+    plt.show()
