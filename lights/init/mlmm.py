@@ -156,8 +156,14 @@ class MLMM(Learner):
 
         self.update_theta(beta, D, phi)
         obj = -self.log_lik(extracted_features)
+        # store init values
+        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf,
+                            fixed_effect_coeffs=beta.ravel(), long_cov=D,
+                            phi=phi)
+        if verbose:
+            self.history.print_history()
 
-        for n_iter in range(max_iter):
+        for n_iter in range(1, max_iter + 1):
 
             # E-Step
             Omega = []

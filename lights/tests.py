@@ -101,7 +101,7 @@ class Test(unittest.TestCase):
         """
         fixed_effect_time_order = 1  # q_l=2 in the simulations
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order,
-                    initialize=False, tol=1e-4, print_every=1)
+                    initialize=False, tol=1e-4)
         self._test_initializer(mlmm)
 
     def test_QNMCEM(self):

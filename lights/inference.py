@@ -741,7 +741,8 @@ class QNMCEM(Learner):
             beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
-            gamma_0, baseline_hazard = initialize_asso_params(X, T, delta)
+            est = initialize_asso_params(X, T, delta)
+            time_indep_cox_coeffs, baseline_hazard = est
         else:
             # fixed initialization
             q = q_l * n_long_features
@@ -749,11 +750,11 @@ class QNMCEM(Learner):
             beta = np.zeros((q, 1))
             D = np.diag(np.ones(r))
             phi = np.ones((n_long_features, 1))
-            gamma_0 = np.zeros(n_time_indep_features)
+            time_indep_cox_coeffs = np.zeros(n_time_indep_features)
             baseline_hazard = np.zeros(n_samples)
 
         gamma = np.zeros(nb_asso_features)
-        gamma[:n_time_indep_features] = gamma_0
+        gamma[:n_time_indep_features] = time_indep_cox_coeffs
         gamma_0_ext = np.concatenate((gamma, -gamma))
         gamma_0_ext[gamma_0_ext < 0] = 0
         gamma_1_ext = gamma_0_ext.copy()
@@ -769,6 +770,13 @@ class QNMCEM(Learner):
         grad_P = self._grad_P
 
         obj = func_obj(X, Y, T, delta, xi_ext)
+        # store init values
+        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf,
+                            long_cov=D, phi=phi, beta_0=self.beta_0,
+                            beta_1=self.beta_1, xi=self.xi,
+                            gamma_0=self.gamma_0, gamma_1=self.gamma_1)
+        if verbose:
+            self.history.print_history()
 
         # bounds vector for the L-BGFS-B algorithms
         bounds_xi = [(0, None)] * n_time_indep_features * 2
@@ -776,7 +784,7 @@ class QNMCEM(Learner):
                       (fixed_effect_time_order + 1) * 2
         bounds_gamma = [(0, None)] * nb_asso_features * 2
 
-        for n_iter in range(max_iter):
+        for n_iter in range(1, max_iter + 1):
 
             pi_xi = self.get_proba(X, xi_ext)
 
