@@ -169,7 +169,7 @@ def plot_history(learner, name, ax=None, **kwargs):
 
     Parameters
     ----------
-    learner : `ligths.base.Learner`
+    learner : `ligths.base.base.Learner`
         A base learner
 
     name : `str`
@@ -196,4 +196,8 @@ def plot_history(learner, name, ax=None, **kwargs):
         history = pd.DataFrame(history)
     else:
         history = pd.DataFrame.from_records(history)
+
+    n_iter = learner.get_history("n_iter")
+    history.index = n_iter
+
     history.plot(ax=ax, **kwargs)
