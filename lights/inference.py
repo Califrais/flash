@@ -444,7 +444,7 @@ class QNMCEM(Learner):
         return marker
 
     def get_asso_func(self, T, S):
-        """Computes blabla #TODO Van Tuan
+        """Computes association functions wanted
 
         Parameters
         ----------
@@ -456,7 +456,10 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        asso_func_stack : #TODO Van Tuan
+        asso_func_stack : `np.ndarray`, , shape=(2, n_samples*2*N, dim)
+            Stack version of association functions wanted for all subjects,
+            all groups and all Monte Carlo samples. "Dim" is the total dimension
+            of returned association functions.
         """
         fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
         fixed_effect_time_order = self.fixed_effect_time_order
@@ -558,16 +561,13 @@ class QNMCEM(Learner):
         S = np.vstack((b, -b))
         return S
 
-    def _g0(self, S):
+    @staticmethod
+    def _g0(S):
         """Computes g0
-            #TODO: static ?
         """
-        g0 = []
-        for s in S:
-            s_r = s.reshape(-1, 1)
-            g0.append(s_r.dot(s_r.T))
+        g0 = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
 
-        return np.array(g0)
+        return g0
 
     @staticmethod
     def _Lambda_g(g, f):
