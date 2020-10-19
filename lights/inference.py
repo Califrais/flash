@@ -9,6 +9,7 @@ from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
 from lights.init.cox import initialize_asso_params
+from lights.base.base import block_diag
 
 
 class QNMCEM(Learner):
@@ -484,7 +485,7 @@ class QNMCEM(Learner):
 
         return asso_func_stack
 
-    def f_data_g_latent(self, X, Y, T, delta, S):
+    def f_data_g_latent(self, X, extracted_features, T, delta, S):
         """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
@@ -492,9 +493,11 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The longitudinal data. Each element of the dataframe is
-            a pandas.Series
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
 
         T : `np.ndarray`, shape=(n_samples,)
             The censored times of the event of interest
@@ -512,10 +515,14 @@ class QNMCEM(Learner):
         """
         n_samples = self.n_samples
         p = self.n_time_indep_features
+        n_long_features = self.n_long_features
+        beta_0, beta_1 = self.beta_0, self.beta_1
         gamma_0, gamma_1 = self.gamma_0, self.gamma_1
         T_u = np.unique(T)
         asso_func = self.get_asso_func(T_u, S)
         baseline_hazard = self.baseline_hazard
+        (U_list, V_list, y_list, N_list), (U_L, V_L, y_L, N_L) = extracted_features
+        phi = self.phi
 
         N = S.shape[0] // 2
         sum_asso = np.zeros(shape=(n_samples, 2, 2 * N))
@@ -534,9 +541,19 @@ class QNMCEM(Learner):
                                    loc[T_u[T_u <= t]].values.reshape(-1, 1, 1),
                                    axis=0)
 
-            # TODO: Add f(y_i | b_i)
+            # Compute f(y|b)
+            beta_stack = np.hstack((beta_0, beta_1))
+            U_i = U_list[i]
+            V_i = V_list[i]
+            n_i = sum(N_list[i])
+            y_i = y_list[i]
+            diag = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
+            diag = np.array(diag).reshape(-1, 1)
+            tmp = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
+            f_y = (2 * np.pi) ** (-.5 * n_i) * np.prod(diag) ** (-.5) \
+                  * np.exp(np.sum((y_i-tmp)**2 * (1 / diag), axis=1))
 
-            f[i] = op1 * op2
+            f[i] = op1 * op2 * f_y
 
         return f
 
@@ -801,7 +818,7 @@ class QNMCEM(Learner):
             # M-Step
 
             # Update D
-            f = self.f_data_g_latent(X, Y, T, delta, S)
+            f = self.f_data_g_latent(X, extracted_features, T, delta, S)
             Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
             g0 = self._g0(S)
             Lambda_g0 = self._Lambda_g(g0, f)
