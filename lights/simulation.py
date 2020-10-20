@@ -507,4 +507,4 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         self.long_features = Y
 
-        return X, Y, T, delta
+        return X, Y, T.astype(int), delta
