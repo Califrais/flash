@@ -9,7 +9,6 @@ from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
 from lights.init.cox import initialize_asso_params
-from lights.base.base import block_diag
 
 
 class QNMCEM(Learner):
@@ -24,12 +23,15 @@ class QNMCEM(Learner):
     l_pen : `float`, default=0
         Level of penalization for the ElasticNet and the Sparse Group l1
 
-    eta: `float`, default=0.1
-        The ElasticNet mixing parameter, with 0 <= eta <= 1.
-        For eta = 0 this is ridge (L2) regularization
-        For eta = 1 this is lasso (L1) regularization
-        For 0 < eta < 1, the regularization is a linear combination
+    eta_elastic_net: `float`, default=0.1
+        The ElasticNet mixing parameter, with 0 <= eta_elastic_net <= 1.
+        For eta_elastic_net = 0 this is ridge (L2) regularization
+        For eta_elastic_net = 1 this is lasso (L1) regularization
+        For 0 < eta_elastic_net < 1, the regularization is a linear combination
         of L1 and L2
+
+    eta_sp_gp_l1: `float`, default=0.1
+        The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
 
     max_iter : `int`, default=100
         Maximum number of iterations of the solver
@@ -47,7 +49,7 @@ class QNMCEM(Learner):
         criterion is below it). By default the solver does ``max_iter``
         iterations
 
-    warm_start : `bool`, default=False
+    warm_start : `bool`, default=True
         If true, learning will start from the last reached solution
 
     fixed_effect_time_order : `int`, default=5
@@ -69,13 +71,14 @@ class QNMCEM(Learner):
         use arbitrarily chosen fixed initialization
     """
 
-    def __init__(self, fit_intercept=False, l_pen=0., eta=.1, max_iter=100,
-                 verbose=True, print_every=10, tol=1e-5, warm_start=False,
-                 fixed_effect_time_order=5, asso_functions='all',
-                 initialize=True):
+    def __init__(self, fit_intercept=False, l_pen=0., eta_elastic_net=.1,
+                 eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
+                 tol=1e-5, warm_start=True, fixed_effect_time_order=5,
+                 asso_functions='all', initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.l_pen = l_pen
-        self.eta = eta
+        self.eta_elastic_net = eta_elastic_net
+        self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.max_iter = max_iter
         self.tol = tol
         self.warm_start = warm_start
@@ -115,14 +118,24 @@ class QNMCEM(Learner):
         self._l_pen = val
 
     @property
-    def eta(self):
-        return self._eta
+    def eta_elastic_net(self):
+        return self._eta_elastic_net
 
-    @eta.setter
-    def eta(self, val):
+    @eta_elastic_net.setter
+    def eta_elastic_net(self, val):
         if not 0 <= val <= 1:
-            raise ValueError("``eta`` must be in (0, 1)")
-        self._eta = val
+            raise ValueError("``eta_elastic_net`` must be in (0, 1)")
+        self._eta_elastic_net = val
+
+    @property
+    def eta_sp_gp_l1(self):
+        return self._eta_sp_gp_l1
+
+    @eta_sp_gp_l1.setter
+    def eta_sp_gp_l1(self, val):
+        if not 0 <= val <= 1:
+            raise ValueError("``eta_sp_gp_l1`` must be in (0, 1)")
+        self._eta_sp_gp_l1 = val
 
     @property
     def asso_functions(self):
@@ -181,6 +194,8 @@ class QNMCEM(Learner):
 
         Returns
         -------
+        xi_0 : `float`
+            The intercept term
 
         xi : `np.ndarray`, shape=(n_time_indep_features,)
             The time-independent coefficient vector
@@ -206,8 +221,7 @@ class QNMCEM(Learner):
         return xi_ext
 
     def _elastic_net_pen(self, xi_ext):
-        """Computes the elasticNet penalization of the global objective to be
-        minimized by the QNMCEM algorithm
+        """Computes the elasticNet penalization of vector xi
 
         Parameters
         ----------
@@ -218,19 +232,17 @@ class QNMCEM(Learner):
         Returns
         -------
         output : `float`
-            The value of the elasticNet penalization part of the global
-            objective
+            The value of the elasticNet penalization part of vector xi
         """
         l_pen = self.l_pen
-        eta = self.eta
+        eta = self.eta_elastic_net
         xi = self._get_xi_from_xi_ext(xi_ext)[1]
         xi_ext = self._clean_xi_ext(xi_ext)
         return l_pen * ((1. - eta) * xi_ext.sum() +
                         0.5 * eta * np.linalg.norm(xi) ** 2)
 
     def _grad_elastic_net_pen(self, xi):
-        """Computes the gradient of the elasticNet penalization of the global
-        objective to be minimized by the QNMCEM algorithm
+        """Computes the gradient of the elasticNet penalization of vector xi
 
         Parameters
         ----------
@@ -240,19 +252,66 @@ class QNMCEM(Learner):
         Returns
         -------
         output : `float`
-            The gradient of the elasticNet penalization part of the global
-            objective
+            The gradient of the elasticNet penalization part of vector xi
         """
         l_pen = self.l_pen
-        eta = self.eta
+        eta = self.eta_elastic_net
         n_time_indep_features = self.n_time_indep_features
         grad = np.zeros(2 * n_time_indep_features)
         # Gradient of lasso penalization
         grad += l_pen * (1 - eta)
         # Gradient of ridge penalization
-        grad_pos = (l_pen * eta)
-        grad[:n_time_indep_features] += grad_pos * xi
-        grad[n_time_indep_features:] -= grad_pos * xi
+        grad_pos = (l_pen * eta) * xi
+        grad[:n_time_indep_features] += grad_pos
+        grad[n_time_indep_features:] -= grad_pos
+        return grad
+
+    def _sparse_group_l1_pen(self, v_ext):
+        """Computes the sparse group l1 penalization of vector v
+
+        Parameters
+        ----------
+        v_ext: `np.ndarray`
+            A vector decomposed on positive and negative parts
+
+        Returns
+        -------
+        output : `float`
+            The value of the sparse group l1 penalization of vector v
+        """
+        l_pen = self.l_pen
+        eta = self.eta_sp_gp_l1
+        v = self.get_vect_from_ext(v_ext)
+        return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
+
+    def _grad_sparse_group_l1_pen(self, v):
+        """Computes the gradient of the sparse group l1 penalization of a
+        vector v
+
+        Parameters
+        ----------
+        v : `np.ndarray`
+            A coefficient vector
+
+        Returns
+        -------
+        output : `float`
+            The gradient of the sparse group l1 penalization of vector v
+        """
+        l_pen = self.l_pen
+        eta = self.eta_sp_gp_l1
+        L = self.n_long_features
+        dim = len(v)
+        grad = np.zeros(2 * dim)
+        # Gradient of lasso penalization
+        grad += l_pen * (1 - eta)
+        # Gradient of sparse group l1 penalization
+        # TODO Van Tuan : to be verified
+        tmp = np.array([np.repeat(np.linalg.norm(v_l), dim // L)
+                        for v_l in np.array_split(v, L)]).flatten()
+        grad_pos = (l_pen * eta) * v / tmp
+        grad[:dim] += grad_pos
+        grad[dim:] -= grad_pos
         return grad
 
     def _log_lik(self, X, Y, T, delta):
@@ -375,6 +434,80 @@ class QNMCEM(Learner):
                                        [0], grad_pen[n_time_indep_features:]])
         grad = (X * (pi_est - self.logistic_grad(-u)).reshape(
             n_samples, 1)).mean(axis=0)
+        grad_sub_obj = np.concatenate([grad, -grad])
+        return grad_sub_obj + grad_pen
+
+    def _R_func(self, beta_ext):
+        """Computes the sub objective function denoted R in the lights paper,
+        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+
+        Parameters
+        ----------
+        # TODO Van Tuan. The G=0 or 1 dimension is missing here
+
+        Returns
+        -------
+        output : `float`
+            The value of the R sub objective to be minimized at each QNMCEM step
+        """
+        pen = self._sparse_group_l1_pen(beta_ext)
+        # TODO Van Tuan
+        sub_obj = 0
+        return sub_obj + pen
+
+    def _grad_R(self, beta_ext):
+        """Computes the gradient of the sub objective R
+
+        Parameters
+        ----------
+        # TODO Van Tuan
+
+        Returns
+        -------
+        output : `float`
+            The value of the R sub objective gradient
+        """
+        beta = self.get_vect_from_ext(beta_ext)
+        grad_pen = self._grad_sparse_group_l1_pen(beta)
+        # TODO Van Tuan
+        grad = 0
+        grad_sub_obj = np.concatenate([grad, -grad])
+        return grad_sub_obj + grad_pen
+
+    def _Q_func(self, gamma_ext):
+        """Computes the sub objective function denoted Q in the lights paper,
+        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+
+        Parameters
+        ----------
+        # TODO Van Tuan
+
+        Returns
+        -------
+        output : `float`
+            The value of the Q sub objective to be minimized at each QNMCEM step
+        """
+        pen = self._sparse_group_l1_pen(gamma_ext)
+        # TODO Van Tuan
+        sub_obj = 0
+        return sub_obj + pen
+
+    def _grad_Q(self, gamma_ext):
+        """Computes the gradient of the sub objective Q
+
+        Parameters
+        ----------
+        # TODO Van Tuan
+
+        Returns
+        -------
+        output : `float`
+            The value of the Q sub objective gradient
+        """
+        gamma = self.get_vect_from_ext(gamma_ext)
+        grad_pen = self._grad_sparse_group_l1_pen(gamma)
+        # TODO Van Tuan
+        grad = 0
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
@@ -676,15 +809,15 @@ class QNMCEM(Learner):
             positive and negative parts
 
         long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
-        Variance-covariance matrix that accounts for dependence between the
-        different longitudinal outcome. Here r = 2*n_long_features since
-        one choose linear time-varying features, so all r_l=2
+            Variance-covariance matrix that accounts for dependence between the
+            different longitudinal outcome. Here r = 2*n_long_features since
+            one choose linear time-varying features, so all r_l=2
 
         phi : `np.ndarray`, shape=(n_long_features,)
             Variance vector for the error term of the longitudinal processes
 
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
-        The baseline hazard function evaluated at each censored time
+            The baseline hazard function evaluated at each censored time
         """
         self.beta_0 = self.get_vect_from_ext(beta_0_ext)
         self.beta_1 = self.get_vect_from_ext(beta_1_ext)
@@ -750,9 +883,6 @@ class QNMCEM(Learner):
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
 
-        gamma_0_ext = np.zeros(2 * nb_asso_features)
-        gamma_1_ext = gamma_0_ext.copy()
-
         # initialize longitudinal submodels
         if self.initialize:
             mlmm = MLMM(max_iter=max_iter, verbose=verbose,
@@ -787,8 +917,9 @@ class QNMCEM(Learner):
         self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
                           gamma_1_ext, D, phi, baseline_hazard)
         func_obj = self._func_obj
-        P_func = self._P_func
-        grad_P = self._grad_P
+        P_func, grad_P = self._P_func, self._grad_P
+        R_func, grad_R = self._R_func, self._grad_R
+        Q_func, grad_Q = self._Q_func, self._grad_Q
 
         obj = func_obj(X, Y, T, delta, xi_ext)
         # store init values
@@ -799,11 +930,12 @@ class QNMCEM(Learner):
         if verbose:
             self.history.print_history()
 
-        # bounds vector for the L-BGFS-B algorithms
-        bounds_xi = [(0, None)] * n_time_indep_features * 2
-        bounds_beta = [(0, None)] * n_long_features * \
-                      (fixed_effect_time_order + 1) * 2
-        bounds_gamma = [(0, None)] * nb_asso_features * 2
+        # stopping criteria and bounds vector for the L-BGFS-B algorithms
+        maxiter, pgtol = 60, 1e-5
+        bounds_xi = [(0, None)] * 2 * n_time_indep_features
+        bounds_beta = [(0, None)] * 2 * n_long_features * \
+                      (fixed_effect_time_order + 1)
+        bounds_gamma = [(0, None)] * 2 * nb_asso_features
 
         for n_iter in range(1, max_iter + 1):
 
@@ -829,18 +961,46 @@ class QNMCEM(Learner):
             D = E_g0.sum(axis=0) / n_samples
 
             if warm_start:
-                x0 = xi_ext
+                xi_0 = xi_ext
+                beta_0_0, beta_1_0 = beta_0_ext, beta_1_ext
+                gamma_0_0, gamma_1_0 = gamma_0_ext, gamma_1_ext
             else:
-                x0 = np.zeros(2 * n_time_indep_features)
+                xi_0 = np.zeros(2 * n_time_indep_features)
+                beta_0_0 = np.zeros(2 * n_long_features *
+                                    (fixed_effect_time_order + 1))
+                beta_1_0 = beta_0_0.copy()
+                gamma_0_0 = np.zeros(2 * nb_asso_features)
+                gamma_1_0 = gamma_0_0.copy()
+
+            # Update xi
             xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: P_func(X, pi_est, xi_ext_),
-                x0=x0,
+                func=lambda xi_ext_: P_func(X, pi_est, xi_ext_), x0=xi_0,
                 fprime=lambda xi_ext_: grad_P(X, pi_est, xi_ext_),
-                disp=False,
-                bounds=bounds_xi,
-                maxiter=60,
-                pgtol=1e-5
-            )[0]
+                disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
+
+            # Update beta_0
+            beta_0_ext = fmin_l_bfgs_b(
+                func=lambda beta_ext_: R_func(beta_ext_), x0=beta_0_0,
+                fprime=lambda beta_ext_: grad_R(beta_ext_), disp=False,
+                bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
+
+            # Update beta_1
+            beta_1_ext = fmin_l_bfgs_b(
+                func=lambda beta_ext_: R_func(beta_ext_), x0=beta_1_0,
+                fprime=lambda beta_ext_: grad_R(beta_ext_), disp=False,
+                bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
+
+            # Update gamma_0
+            gamma_0_ext = fmin_l_bfgs_b(
+                func=lambda gamma_ext_: Q_func(gamma_ext_), x0=gamma_0_0,
+                fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
+                bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
+
+            # Update gamma_1
+            gamma_1_ext = fmin_l_bfgs_b(
+                func=lambda gamma_ext_: Q_func(gamma_ext_), x0=gamma_1_0,
+                fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
+                bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
             self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
                               gamma_1_ext, D, phi, baseline_hazard)
