@@ -465,7 +465,7 @@ class QNMCEM(Learner):
         fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
         fixed_effect_time_order = self.fixed_effect_time_order
         n_long_features = self.n_long_features
-        n_samples = self.n_samples
+        J = T.shape[0]
         asso_functions = self.asso_functions
 
         N = S.shape[0] // 2
@@ -473,14 +473,14 @@ class QNMCEM(Learner):
                                          fixed_effect_time_order,
                                          n_long_features)
 
-        asso_func_stack = np.empty(shape=(2, n_samples * 2 * N, 0))
+        asso_func_stack = np.empty(shape=(2, J * 2 * N, 0))
         for func_name in asso_functions:
             func = asso_func.assoc_func_dict[func_name]
             dim = n_long_features
             if func_name == 're':
                 dim *= 2
             func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
-                2, n_samples * 2 * N, dim)
+                2, J * 2 * N, dim)
             asso_func_stack = np.dstack((asso_func_stack, func_r))
 
         return asso_func_stack
@@ -552,11 +552,10 @@ class QNMCEM(Learner):
             n_i = sum(N_list[i])
             y_i = y_list[i]
             Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
-            Phi_i = np.array(Phi_i).reshape(-1, 1)
+            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
-            # TODO : to be verify
-            f_y = np.sqrt((2 * np.pi) ** n_i * np.prod(Phi_i)) * np.exp(
-                np.sum((y_i - M_iS) ** 2 / Phi_i, axis=1))
+            f_y = 1 / np.sqrt((2 * np.pi) ** n_i * np.prod(Phi_i) * np.exp(
+                np.sum(((y_i - M_iS) ** 2) / Phi_i, axis=1)))
 
             f[i] = op1 * np.exp(-op2) * f_y
 
