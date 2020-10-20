@@ -452,14 +452,14 @@ class QNMCEM(Learner):
         T : `np.ndarray`, shape=(J,)
             The J unique censored times of the event of interest
 
-        S: `np.ndarray`, , shape=(2*N, r)
-            Set of constructed samples
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
 
         Returns
         -------
         asso_func_stack : `np.ndarray`, , shape=(2, n_samples*2*N, dim)
             Stack version of association functions wanted for all subjects,
-            all groups and all Monte Carlo samples. "Dim" is the total dimension
+            all groups and all Monte Carlo samples. `dim` is the total dimension
             of returned association functions.
         """
         fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
@@ -485,7 +485,7 @@ class QNMCEM(Learner):
 
         return asso_func_stack
 
-    def f_data_g_latent(self, X, extracted_features, T, delta, S):
+    def f_data_given_latent(self, X, extracted_features, T, delta, S):
         """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
@@ -506,7 +506,7 @@ class QNMCEM(Learner):
             The censoring indicator
 
         S: `np.ndarray`, , shape=(2*N, r)
-            Set of constructed samples
+            Set of constructed Monte Carlo samples
 
         Returns
         -------
@@ -521,25 +521,29 @@ class QNMCEM(Learner):
         T_u = np.unique(T)
         asso_func = self.get_asso_func(T_u, S)
         baseline_hazard = self.baseline_hazard
-        (U_list, V_list, y_list, N_list), (U_L, V_L, y_L, N_L) = extracted_features
+        (U_list, V_list, y_list, N_list) = extracted_features[0]
         phi = self.phi
 
         N = S.shape[0] // 2
-        sum_asso = np.zeros(shape=(n_samples, 2, 2 * N))
-        sum_asso[:, 0] = asso_func[0].dot(gamma_0[p:]).reshape(n_samples, 2 * N)
-        sum_asso[:, 1] = asso_func[1].dot(gamma_1[p:]).reshape(n_samples, 2 * N)
+        J = T_u.shape[0]
+        sum_asso = np.zeros(shape=(J, 2, 2 * N))
+        sum_asso[:, 0] = asso_func[0].dot(gamma_0[p:]).reshape(J, 2 * N)
+        sum_asso[:, 1] = asso_func[1].dot(gamma_1[p:]).reshape(J, 2 * N)
+        # TODO : create _g1 and _g2
 
         f = np.ones(shape=(n_samples, 2, N * 2))
+        # TODO LATER : to be optimized
         for i in range(n_samples):
-            t = T[i]
-            Lambda_0_t = baseline_hazard.loc[[t]].values
+            t_i = T[i]
+            baseline_hazard_t_i = baseline_hazard.loc[[t_i]].values
             gamma_indep_stack = np.vstack((gamma_0[:p], gamma_1[:p])).T
-            e_indep = np.exp(X[i].dot(gamma_indep_stack)).reshape(-1, 1)
+            exp_time_indep = np.exp(X[i].dot(gamma_indep_stack)).reshape(-1, 1)
 
-            op1 = (Lambda_0_t * e_indep * sum_asso[T_u == t]) ** delta[i]
-            op2 = e_indep * np.sum(sum_asso[T_u <= t] * baseline_hazard.
-                                   loc[T_u[T_u <= t]].values.reshape(-1, 1, 1),
-                                   axis=0)
+            op1 = (baseline_hazard_t_i * exp_time_indep *
+                   np.exp(sum_asso[T_u == t_i])) ** delta[i]
+            op2 = exp_time_indep * np.sum(
+                np.exp(sum_asso[T_u <= t_i]) * baseline_hazard.loc[
+                    T_u[T_u <= t_i]].values.reshape(-1, 1, 1), axis=0)
 
             # Compute f(y|b)
             beta_stack = np.hstack((beta_0, beta_1))
@@ -547,13 +551,14 @@ class QNMCEM(Learner):
             V_i = V_list[i]
             n_i = sum(N_list[i])
             y_i = y_list[i]
-            diag = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
-            diag = np.array(diag).reshape(-1, 1)
-            tmp = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
-            f_y = (2 * np.pi) ** (-.5 * n_i) * np.prod(diag) ** (-.5) \
-                  * np.exp(np.sum((y_i-tmp)**2 * (1 / diag), axis=1))
+            Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
+            Phi_i = np.array(Phi_i).reshape(-1, 1)
+            M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
+            # TODO : to be verify
+            f_y = np.sqrt((2 * np.pi) ** n_i * np.prod(Phi_i)) * np.exp(
+                np.sum((y_i - M_iS) ** 2 / Phi_i, axis=1))
 
-            f[i] = op1 * op2 * f_y
+            f[i] = op1 * np.exp(-op2) * f_y
 
         return f
 
@@ -567,8 +572,8 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        S : `np.ndarray`, , shape=(2*N, r)
-            Set of constructed samples
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
         """
         D = self.long_cov
         C = np.linalg.cholesky(D)
@@ -583,7 +588,6 @@ class QNMCEM(Learner):
         """Computes g0
         """
         g0 = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
-
         return g0
 
     @staticmethod
@@ -806,10 +810,14 @@ class QNMCEM(Learner):
             pi_xi = self.get_proba(X, xi_ext)
 
             # E-Step
-            Lambda_1 = 0
+            S = self.construct_MC_samples(N)
+            f = self.f_data_given_latent(X, extracted_features, T, delta, S)
+            Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            S = self.construct_MC_samples(N)
+            g0 = self._g0(S)
+            Lambda_g0 = self._Lambda_g(g0, f)
+            E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
 
             # if False: # to be defined
             #     N *= 10
@@ -818,11 +826,6 @@ class QNMCEM(Learner):
             # M-Step
 
             # Update D
-            f = self.f_data_g_latent(X, extracted_features, T, delta, S)
-            Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
-            g0 = self._g0(S)
-            Lambda_g0 = self._Lambda_g(g0, f)
-            E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
             D = E_g0.sum(axis=0) / n_samples
 
             if warm_start:
