@@ -647,18 +647,13 @@ class QNMCEM(Learner):
             The value of the f(Y, T, delta| S, G, theta)
         """
         n_samples = self.n_samples
-        p = self.n_time_indep_features
         n_long_features = self.n_long_features
         beta_0, beta_1 = self.beta_0, self.beta_1
-        gamma_0, gamma_1 = self.gamma_0, self.gamma_1
         T_u = np.unique(T)
-        asso_func = self.get_asso_func(T_u, S)
         baseline_hazard = self.baseline_hazard
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         phi = self.phi
-
         N = S.shape[0] // 2
-        J = T_u.shape[0]
         g1 = self._g1(X, T, S)
 
         f = np.ones(shape=(n_samples, 2, N * 2))
@@ -998,8 +993,6 @@ class QNMCEM(Learner):
             g0 = self._g0(S)
             Lambda_g0 = self._Lambda_g(g0, f)
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
-
-            g1 = self._g1(X, T, S)
 
             # if False: # to be defined
             #     N *= 10
