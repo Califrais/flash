@@ -56,7 +56,12 @@ class AssociationFunctions:
         self.assoc_func_dict = {"lp": self.linear_predictor(),
                                 "re": self.random_effects(),
                                 "tps": self.time_dependent_slope(),
-                                "ce": self.cumulative_effects()}
+                                "ce": self.cumulative_effects(),
+                                "d_lp": self.derivative_linear_predictor(),
+                                "d_re": self.derivative_random_effects(),
+                                "d_tps": self.derivative_time_dependent_slope(),
+                                "d_ce": self.derivative_cumulative_effects()
+                                }
 
     def _linear_association(self, U, V):
         """ Computes the linear association function U*beta + V*b
@@ -139,3 +144,62 @@ class AssociationFunctions:
         iU_l, iV_l = self.iU_l, self.iV_l
         phi = self._linear_association(iU_l, iV_l)
         return phi
+
+    def derivative_linear_predictor(self):
+        """Computes the derivative of linear predictor function
+
+        Returns
+        -------
+        phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The value of linear predictor function
+        """
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        N, q_l = self.N, self.q_l
+        U_l = self.U_l
+        d_phi = np.broadcast_to(U_l, (n_long_features, 2, 2*N, n_samples, q_l))
+        return d_phi
+
+    def derivative_random_effects(self):
+        """ Computes the derivative of random effects function
+
+        Returns
+        -------
+        phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The value of random effects function
+        """
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        N, q_l = self.N, self.q_l
+        d_phi = np.zeros(shape = (n_long_features, 2, 2 * N, n_samples, q_l))
+        return d_phi
+
+    def derivative_time_dependent_slope(self):
+        """Computes the derivative of time-dependent slope function
+
+        Returns
+        -------
+        phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The value of time-dependent slope function
+        """
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        N, q_l = self.N, self.q_l
+        dU_l= self.dU_l
+        d_phi = np.broadcast_to(dU_l, (n_long_features, 2, 2 * N, n_samples, q_l))
+        return d_phi
+
+    def derivative_cumulative_effects(self):
+        """Computes the derivative of cumulative effects function
+
+        Returns
+        -------
+        phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The value of cumulative effects function
+        """
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        N, q_l = self.N, self.q_l
+        iU_l = self.iU_l
+        d_phi = np.broadcast_to(iU_l, (n_long_features, 2, 2 * N, n_samples, q_l))
+        return d_phi

@@ -577,7 +577,7 @@ class QNMCEM(Learner):
         # TODO (only if self.fitted = True, else raise error)
         return marker
 
-    def get_asso_func(self, T, S):
+    def get_asso_func(self, T, S, derivative=False):
         """Computes association functions wanted
 
         Parameters
@@ -600,21 +600,30 @@ class QNMCEM(Learner):
         n_long_features = self.n_long_features
         J = T.shape[0]
         asso_functions = self.asso_functions
+        q_l = fixed_effect_time_order + 1
 
         N = S.shape[0] // 2
         asso_func = AssociationFunctions(T, S, fixed_effect_coeffs,
                                          fixed_effect_time_order,
                                          n_long_features)
 
-        asso_func_stack = np.empty(shape=(2, J * 2 * N, 0))
+        if derivative:
+            asso_func_stack = np.empty(shape=(n_long_features, 2, J * 2 * N, 0))
+        else:
+            asso_func_stack = np.empty(shape=(2, J * 2 * N, 0))
+
         for func_name in asso_functions:
-            func = asso_func.assoc_func_dict[func_name]
-            dim = n_long_features
-            if func_name == 're':
-                dim *= 2
-            func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
-                2, J * 2 * N, dim)
-            asso_func_stack = np.dstack((asso_func_stack, func_r))
+            if derivative:
+                func = asso_func.assoc_func_dict["d_" + func_name]
+                func_r = func.reshape(n_long_features, 2, J * 2 * N, q_l)
+            else:
+                func = asso_func.assoc_func_dict[func_name]
+                dim = n_long_features
+                if func_name == 're':
+                    dim *= 2
+                func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
+                    2, J * 2 * N, dim)
+            asso_func_stack = np.concatenate((asso_func_stack, func_r), axis=-1)
 
         return asso_func_stack
 
@@ -765,6 +774,27 @@ class QNMCEM(Learner):
         gamma_time_depend_stack = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(2, 1, -1)
         g2 = np.sum(asso_func * gamma_time_depend_stack, axis = 2).reshape(2, J, 2 * N)
         return g2
+
+    def _g5(self, T, S):
+        """Computes g2
+
+        Parameters
+        ----------
+        T : `np.ndarray`, shape=(n_samples,)
+            The censored times of the event of interest
+
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g5 : `np.ndarray`, shape=(n_long_features, 2, 2 * N * J, q_l)
+            The values of g2 function
+        """
+        T_u = np.unique(T)
+        g5 = self.get_asso_func(T, S, derivative=True)
+        return g5
+
 
     @staticmethod
     def _Lambda_g(g, f):
