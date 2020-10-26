@@ -157,7 +157,8 @@ class AssociationFunctions:
         n_long_features = self.n_long_features
         N, q_l = self.N, self.q_l
         U_l = self.U_l
-        d_phi = np.broadcast_to(U_l, (n_long_features, 2, 2*N, n_samples, q_l))
+        U = np.broadcast_to(U_l, (n_long_features,) + U_l.shape).swapaxes(0,1)
+        d_phi = np.broadcast_to(U, (2, 2 * N) + U.shape)
         return d_phi
 
     def derivative_random_effects(self):
@@ -171,7 +172,7 @@ class AssociationFunctions:
         n_samples = self.n_samples
         n_long_features = self.n_long_features
         N, q_l = self.N, self.q_l
-        d_phi = np.zeros(shape = (n_long_features, 2, 2 * N, n_samples, q_l))
+        d_phi = np.zeros(shape = (2, 2 * N, n_samples, n_long_features, q_l))
         return d_phi
 
     def derivative_time_dependent_slope(self):
@@ -179,14 +180,15 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+        phi : `np.ndarray`, shape= (2, 2*N, n_samples, n_l, q_l)
             The value of time-dependent slope function
         """
         n_samples = self.n_samples
         n_long_features = self.n_long_features
         N, q_l = self.N, self.q_l
         dU_l= self.dU_l
-        d_phi = np.broadcast_to(dU_l, (n_long_features, 2, 2 * N, n_samples, q_l))
+        dU = np.broadcast_to(dU_l, (n_long_features, ) + dU_l.shape).swapaxes(0,1)
+        d_phi = np.broadcast_to(dU, (2, 2 * N) + dU.shape)
         return d_phi
 
     def derivative_cumulative_effects(self):
@@ -201,5 +203,6 @@ class AssociationFunctions:
         n_long_features = self.n_long_features
         N, q_l = self.N, self.q_l
         iU_l = self.iU_l
-        d_phi = np.broadcast_to(iU_l, (n_long_features, 2, 2 * N, n_samples, q_l))
+        iU = np.broadcast_to(iU_l, (n_long_features,) + iU_l.shape).swapaxes(0,1)
+        d_phi = np.broadcast_to(iU, (2, 2 * N) + iU.shape)
         return d_phi

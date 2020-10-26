@@ -608,14 +608,14 @@ class QNMCEM(Learner):
                                          n_long_features)
 
         if derivative:
-            asso_func_stack = np.empty(shape=(n_long_features, 2, J * 2 * N, 0))
+            asso_func_stack = np.empty(shape=(2, 2 * N, J, n_long_features, 0))
         else:
             asso_func_stack = np.empty(shape=(2, J * 2 * N, 0))
 
         for func_name in asso_functions:
             if derivative:
                 func = asso_func.assoc_func_dict["d_" + func_name]
-                func_r = func.reshape(n_long_features, 2, J * 2 * N, q_l)
+                func_r = func.reshape(2, 2 * N, J, n_long_features, q_l)
             else:
                 func = asso_func.assoc_func_dict[func_name]
                 dim = n_long_features
@@ -670,10 +670,9 @@ class QNMCEM(Learner):
         for i in range(n_samples):
             t_i = T[i]
             baseline_hazard_t_i = baseline_hazard.loc[[t_i]].values
-            tmp = g1[:,i].swapaxes(0, 1)
+            tmp = g1[i].swapaxes(2,1).swapaxes(1,0)
             op1 = (baseline_hazard_t_i * tmp[T_u == t_i]) ** delta[i]
-            op2 = np.sum(tmp[T_u <= t_i] * baseline_hazard.loc[
-                    T_u[T_u <= t_i]].values.reshape(-1, 1, 1), axis=0)
+            op2 = np.sum(tmp[T_u <= t_i] * baseline_hazard.loc[T_u[T_u <= t_i]].values.reshape(-1,1,1), axis=0)
 
             # Compute f(y|b)
             beta_stack = np.hstack((beta_0, beta_1))
@@ -735,7 +734,7 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        g1 : `np.ndarray`, shape=(2, n_samples, J, 2*N)
+        g1 : `np.ndarray`, shape=(n_samples, 2, 2*N, J)
             The values of g1 function
         """
         T_u = np.unique(T)
@@ -748,6 +747,7 @@ class QNMCEM(Learner):
         g2 = self._g2(T_u, S)
         tmp = X.dot(gamma_indep_stack)
         g1 = np.exp(tmp.T.reshape(2, n_samples, 1, 1) + g2.reshape(2, 1, J, 2 * N))
+        g1 = g1.swapaxes(0,1).swapaxes(2,3)
         return g1
 
     def _g2(self, T_u, S):
@@ -788,13 +788,35 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        g5 : `np.ndarray`, shape=(n_long_features, 2, 2 * N * J, q_l)
+        g5 : `np.ndarray`, shape=(2, 2 * N, J, n_long_features, q_l)
             The values of g2 function
         """
+        n_samples = T.shape[0]
         T_u = np.unique(T)
-        g5 = self.get_asso_func(T, S, derivative=True)
+        tmp = self.get_asso_func(T_u, S, derivative=True)
+        g5 = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
         return g5
 
+    def _g6(self, X, T, S):
+        """Computes g6
+
+        Parameters
+        ----------
+        T : `np.ndarray`, shape=(n_samples,)
+            The censored times of the event of interest
+
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g6 : `np.ndarray`, shape=(n_long_features, 2, 2 * N * J, q_l)
+            The values of g2 function
+        """
+        g5 = self._g5(T, S)
+        g1 = self._g1(X, T, S)
+        g6 = (g1.T * g5.T).T
+        return g6
 
     @staticmethod
     def _Lambda_g(g, f):
@@ -819,11 +841,7 @@ class QNMCEM(Learner):
             all Monte Carlo samples. Each element could be real or matrices
             depending on Im(\tilde{g}_i)
         """
-        n_samples = f.shape[0]
-        Lambda_g = np.zeros(shape=(n_samples, 2) + g[0].shape)
-        for i in range(n_samples):
-            Lambda_g[i, 0] = np.mean((g.T * f[i, 0]).T, axis=0)
-            Lambda_g[i, 1] = np.mean((g.T * f[i, 1]).T, axis=0)
+        Lambda_g = np.mean((g.T * f.T).T, axis=2)
         return Lambda_g
 
     @staticmethod
@@ -956,6 +974,10 @@ class QNMCEM(Learner):
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
 
+        # create indicator matrix to compare event times
+        tmp = np.broadcast_to(T, (n_samples, n_samples))
+        indicator = (tmp < tmp.T) * 1 + np.eye(n_samples)
+
         # initialize longitudinal submodels
         if self.initialize:
             mlmm = MLMM(max_iter=max_iter, verbose=verbose,
@@ -1017,12 +1039,21 @@ class QNMCEM(Learner):
             # E-Step
             S = self.construct_MC_samples(N)
             f = self.f_data_given_latent(X, extracted_features, T, delta, S)
-            Lambda_1 = self._Lambda_g(np.ones(shape=(2 * N)), f)
+            Lambda_1 = self._Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            g0 = self._g0(S)
+            tmp = self._g0(S)
+            g0 = np.broadcast_to(tmp, (n_samples, 2) + tmp.shape)
             Lambda_g0 = self._Lambda_g(g0, f)
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
+
+            g1 = self._g1(X, T, S)
+            Lambda_g1= self._Lambda_g(g1, f)
+            E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
+
+            g6 = self._g6(X, T, S)
+            Lambda_g6= self._Lambda_g(g6, f)
+            E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
 
             # if False: # to be defined
             #     N *= 10
