@@ -1056,6 +1056,7 @@ class QNMCEM(Learner):
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
 
             g1 = self._g1(X, T, S)
+            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(3, 4)
             Lambda_g1 = self._Lambda_g(g1, f)
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
 
@@ -1083,6 +1084,15 @@ class QNMCEM(Learner):
                 beta_1_0 = beta_0_0.copy()
                 gamma_0_0 = np.zeros(2 * nb_asso_features)
                 gamma_1_0 = gamma_0_0.copy()
+
+            # Update baseline hazard
+            T_u = np.unique(T)
+            indicator_1 = (T[:, None] == T_u)
+            indicator_2 = (T[:, None] >= T_u)
+            pi_est = np.ones((n_samples, 2))
+            baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
+                              ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:, indicator_1].sum(axis=0)
+                               * (indicator_2 * 1).T).sum(axis=1)
 
             # Update xi
             xi_ext = fmin_l_bfgs_b(
