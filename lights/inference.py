@@ -553,7 +553,8 @@ class QNMCEM(Learner):
             high-risk group given all observed data
         """
         # TODO
-        return 1
+        n_samples = self.n_samples
+        return np.ones((n_samples, 2))
 
     def predict_marker(self, X, Y):
         """Marker rule of the lights model for being on the high-risk group
@@ -879,44 +880,12 @@ class QNMCEM(Learner):
               / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)).T
         return Eg
 
-    def update_theta(self, beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                     gamma_1_ext, long_cov, phi, baseline_hazard):
+    def update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
 
         Parameters
         ----------
-        beta_0_ext : `np.ndarray`,
-            shape=((fixed_effect_time_order+1)*n_long_features,)
-            Fixed effect coefficient vectors for low-risk group decomposed on
-            positive and negative parts
 
-        beta_1_ext : `np.ndarray`,
-            shape=((fixed_effect_time_order+1)*n_long_features,)
-            Fixed effect coefficient vectors for high-risk group decomposed on
-            positive and negative parts
-
-        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            Time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        gamma_0_ext : `np.ndarray`, shape=(n_samples,)
-            Association coefficient vectors for low-risk group decomposed on
-            positive and negative parts
-
-        gamma_1_ext : `np.ndarray`, shape=(n_samples,)
-            Association coefficient vectors for high-risk group decomposed on
-            positive and negative parts
-
-        long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
-            Variance-covariance matrix that accounts for dependence between the
-            different longitudinal outcome. Here r = 2*n_long_features since
-            one choose linear time-varying features, so all r_l=2
-
-        phi : `np.ndarray`, shape=(n_long_features,)
-            Variance vector for the error term of the longitudinal processes
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
         """
         self.beta_0 = self.get_vect_from_ext(beta_0_ext)
         self.beta_1 = self.get_vect_from_ext(beta_1_ext)
@@ -1040,6 +1009,7 @@ class QNMCEM(Learner):
                       (fixed_effect_time_order + 1)
         bounds_gamma = [(0, None)] * 2 * nb_asso_features
 
+        # TODO : E_g1 = None
         for n_iter in range(1, max_iter + 1):
 
             pi_xi = self.get_proba(X, xi_ext)
@@ -1058,6 +1028,8 @@ class QNMCEM(Learner):
             g1 = self._g1(X, T, S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(3, 4)
             Lambda_g1 = self._Lambda_g(g1, f)
+            # TODO : if E_g1 == None then E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1) otherwise you already have it
+
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
 
             g6 = self._g6(X, T, S)
@@ -1084,15 +1056,6 @@ class QNMCEM(Learner):
                 beta_1_0 = beta_0_0.copy()
                 gamma_0_0 = np.zeros(2 * nb_asso_features)
                 gamma_1_0 = gamma_0_0.copy()
-
-            # Update baseline hazard
-            T_u = np.unique(T)
-            indicator_1 = (T[:, None] == T_u)
-            indicator_2 = (T[:, None] >= T_u)
-            pi_est = np.ones((n_samples, 2))
-            baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
-                              ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:, indicator_1].sum(axis=0)
-                               * (indicator_2 * 1).T).sum(axis=1)
 
             # Update xi
             xi_ext = fmin_l_bfgs_b(
@@ -1124,8 +1087,24 @@ class QNMCEM(Learner):
                 fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
-            self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                              gamma_1_ext, D, phi, baseline_hazard)
+            self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
+            self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
+            self.beta_0 = self.get_vect_from_ext(beta_0_ext)
+            self.beta_1 = self.get_vect_from_ext(beta_1_ext)
+
+            # TODO : update the update_theta with {key: values} dictionary that only updates the given parameters
+
+            # Update baseline hazard
+            T_u = np.unique(T)
+            indicator_1 = T.reshape(-1, 1) == T_u
+            indicator_2 = T.reshape(-1, 1) >= T_u
+            E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
+            baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
+                              ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
+                               indicator_1].sum(axis=0)
+                               * (indicator_2 * 1).T).sum(axis=1)
+
+            self.update_theta(phi, baseline_hazard)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
