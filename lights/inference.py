@@ -578,7 +578,7 @@ class QNMCEM(Learner):
         return marker
 
     def get_asso_func(self, T, S, derivative=False):
-        """Computes association functions wanted
+        """Computes association functions or derivatives association ones
 
         Parameters
         ----------
@@ -588,12 +588,16 @@ class QNMCEM(Learner):
         S : `np.ndarray`, shape=(2*N, r)
             Set of constructed Monte Carlo samples
 
+        derivative : `bool`, default=False
+        If `False`, returns the association functions, otherwise returns the
+        derivative versions
+
         Returns
         -------
         asso_func_stack : `np.ndarray`, , shape=(2, n_samples*2*N, dim)
-            Stack version of association functions wanted for all subjects,
-            all groups and all Monte Carlo samples. `dim` is the total dimension
-            of returned association functions.
+            Stack version of association functions or derivatives for all
+            subjects, all groups and all Monte Carlo samples. `dim` is the
+            total dimension of returned association functions.
         """
         fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
         fixed_effect_time_order = self.fixed_effect_time_order
@@ -670,9 +674,10 @@ class QNMCEM(Learner):
         for i in range(n_samples):
             t_i = T[i]
             baseline_hazard_t_i = baseline_hazard.loc[[t_i]].values
-            tmp = g1[i].swapaxes(2,1).swapaxes(1,0)
+            tmp = g1[i].swapaxes(2, 1).swapaxes(1, 0)
             op1 = (baseline_hazard_t_i * tmp[T_u == t_i]) ** delta[i]
-            op2 = np.sum(tmp[T_u <= t_i] * baseline_hazard.loc[T_u[T_u <= t_i]].values.reshape(-1,1,1), axis=0)
+            op2 = np.sum(tmp[T_u <= t_i] * baseline_hazard.loc[
+                T_u[T_u <= t_i]].values.reshape(-1, 1, 1), axis=0)
 
             # Compute f(y|b)
             beta_stack = np.hstack((beta_0, beta_1))
@@ -746,8 +751,9 @@ class QNMCEM(Learner):
         gamma_indep_stack = np.vstack((gamma_0[:p], gamma_1[:p])).T
         g2 = self._g2(T_u, S)
         tmp = X.dot(gamma_indep_stack)
-        g1 = np.exp(tmp.T.reshape(2, n_samples, 1, 1) + g2.reshape(2, 1, J, 2 * N))
-        g1 = g1.swapaxes(0,1).swapaxes(2,3)
+        g1 = np.exp(
+            tmp.T.reshape(2, n_samples, 1, 1) + g2.reshape(2, 1, J, 2 * N))
+        g1 = g1.swapaxes(0, 1).swapaxes(2, 3)
         return g1
 
     def _g2(self, T_u, S):
@@ -771,12 +777,14 @@ class QNMCEM(Learner):
         gamma_0, gamma_1 = self.gamma_0, self.gamma_1
         asso_func = self.get_asso_func(T_u, S)
         J = T_u.shape[0]
-        gamma_time_depend_stack = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(2, 1, -1)
-        g2 = np.sum(asso_func * gamma_time_depend_stack, axis = 2).reshape(2, J, 2 * N)
+        gamma_time_depend_stack = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(
+            2, 1, -1)
+        g2 = np.sum(asso_func * gamma_time_depend_stack, axis=2).reshape(2, J,
+                                                                         2 * N)
         return g2
 
     def _g5(self, T, S):
-        """Computes g2
+        """Computes g5
 
         Parameters
         ----------
@@ -788,13 +796,13 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        g5 : `np.ndarray`, shape=(2, 2 * N, J, n_long_features, q_l)
-            The values of g2 function
+        g5 : `np.ndarray`, shape=(n_samples, 2, 2 * N, J, n_long_features, q_l)
+            The values of g5 function
         """
         n_samples = T.shape[0]
         T_u = np.unique(T)
-        tmp = self.get_asso_func(T_u, S, derivative=True)
-        g5 = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
+        asso_func = self.get_asso_func(T_u, S, derivative=True)
+        g5 = np.broadcast_to(asso_func, (n_samples,) + asso_func.shape)
         return g5
 
     def _g6(self, X, T, S):
@@ -810,8 +818,8 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        g6 : `np.ndarray`, shape=(n_long_features, 2, 2 * N * J, q_l)
-            The values of g2 function
+        g6 : `np.ndarray`, shape=(n_samples, n_long_features, 2, 2 * N * J, q_l)
+            The values of g6 function
         """
         g5 = self._g5(T, S)
         g1 = self._g1(X, T, S)
@@ -1042,17 +1050,17 @@ class QNMCEM(Learner):
             Lambda_1 = self._Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            tmp = self._g0(S)
-            g0 = np.broadcast_to(tmp, (n_samples, 2) + tmp.shape)
+            g0 = self._g0(S)
+            g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
             Lambda_g0 = self._Lambda_g(g0, f)
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
 
             g1 = self._g1(X, T, S)
-            Lambda_g1= self._Lambda_g(g1, f)
+            Lambda_g1 = self._Lambda_g(g1, f)
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
 
             g6 = self._g6(X, T, S)
-            Lambda_g6= self._Lambda_g(g6, f)
+            Lambda_g6 = self._Lambda_g(g6, f)
             E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
 
             # if False: # to be defined
