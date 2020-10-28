@@ -91,14 +91,16 @@ class QNMCEM(Learner):
         self.n_time_indep_features = None
         self.n_samples = None
         self.n_long_features = None
-        self.beta_0 = None
-        self.beta_1 = None
-        self.long_cov = None
-        self.phi = None
-        self.xi = None
-        self.baseline_hazard = None
-        self.gamma_0 = None
-        self.gamma_1 = None
+        self.params = {
+            "beta_0" : None,
+            "beta_1" : None,
+            "long_cov" : None,
+            "phi" : None,
+            "xi" : None,
+            "baseline_hazard" : None,
+            "gamma_0" : None,
+            "gamma_1" : None
+        }
         self.avg_scores = None
         self.scores = None
         self.l_pen_best = None
@@ -600,7 +602,7 @@ class QNMCEM(Learner):
             subjects, all groups and all Monte Carlo samples. `dim` is the
             total dimension of returned association functions.
         """
-        fixed_effect_coeffs = np.array([self.beta_0, self.beta_1])
+        fixed_effect_coeffs = np.array([self.params["beta_0"], self.params["beta_1"]])
         fixed_effect_time_order = self.fixed_effect_time_order
         n_long_features = self.n_long_features
         J = T.shape[0]
@@ -662,11 +664,11 @@ class QNMCEM(Learner):
         """
         n_samples = self.n_samples
         n_long_features = self.n_long_features
-        beta_0, beta_1 = self.beta_0, self.beta_1
+        beta_0, beta_1 = self.params["beta_0"], self.params["beta_1"]
+        baseline_hazard = self.params["baseline_hazard"]
+        phi = self.params["phi"]
         T_u = np.unique(T)
-        baseline_hazard = self.baseline_hazard
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-        phi = self.phi
         N = S.shape[0] // 2
         g1 = self._g1(X, T, S)
 
@@ -709,7 +711,7 @@ class QNMCEM(Learner):
         S : `np.ndarray`, shape=(2*N, r)
             Set of constructed Monte Carlo samples
         """
-        D = self.long_cov
+        D = self.params["long_cov"]
         C = np.linalg.cholesky(D)
         r = D.shape[0]
         Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
@@ -748,7 +750,7 @@ class QNMCEM(Learner):
         N = S.shape[0] // 2
         J = T_u.shape[0]
         p = self.n_time_indep_features
-        gamma_0, gamma_1 = self.gamma_0, self.gamma_1
+        gamma_0, gamma_1 = self.params["gamma_0"], self.params["gamma_1"]
         gamma_indep_stack = np.vstack((gamma_0[:p], gamma_1[:p])).T
         g2 = self._g2(T_u, S)
         tmp = X.dot(gamma_indep_stack)
@@ -775,7 +777,7 @@ class QNMCEM(Learner):
         """
         N = S.shape[0] // 2
         p = self.n_time_indep_features
-        gamma_0, gamma_1 = self.gamma_0, self.gamma_1
+        gamma_0, gamma_1 = self.params["gamma_0"], self.params["gamma_1"]
         asso_func = self.get_asso_func(T_u, S)
         J = T_u.shape[0]
         gamma_time_depend_stack = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(
@@ -887,14 +889,15 @@ class QNMCEM(Learner):
         ----------
 
         """
-        self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-        self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-        self.xi = self._get_xi_from_xi_ext(xi_ext)[1]
-        self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-        self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-        self.long_cov = long_cov
-        self.phi = phi
-        self.baseline_hazard = baseline_hazard
+        for key, value in kwargs.items():
+            if key in ["beta_0", "beta_1", "gamma_0", "gamma_1"]:
+                self.params[key] = self.get_vect_from_ext(value)
+            elif key in ["long_cov", "phi", "baseline_hazard"]:
+                self.params[key] = value
+            elif key in ["xi"]:
+                self.params[key] = self._get_xi_from_xi_ext(value)[1]
+            else:
+                raise NameError('Parameter {} has not defined'.format(key))
 
     def fit(self, X, Y, T, delta):
         """Fit the lights model
@@ -986,8 +989,10 @@ class QNMCEM(Learner):
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
 
-        self.update_theta(beta_0_ext, beta_1_ext, xi_ext, gamma_0_ext,
-                          gamma_1_ext, D, phi, baseline_hazard)
+        self.update_theta(beta_0 = beta_0_ext, beta_1 = beta_1_ext,
+                          xi = xi_ext, gamma_0 = gamma_0_ext,
+                          gamma_1 = gamma_1_ext, long_cov = D, phi = phi,
+                          baseline_hazard = baseline_hazard)
         func_obj = self._func_obj
         P_func, grad_P = self._P_func, self._grad_P
         R_func, grad_R = self._R_func, self._grad_R
@@ -996,9 +1001,9 @@ class QNMCEM(Learner):
         obj = func_obj(X, Y, T, delta, xi_ext)
         # store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf,
-                            long_cov=D, phi=phi, beta_0=self.beta_0,
-                            beta_1=self.beta_1, xi=self.xi,
-                            gamma_0=self.gamma_0, gamma_1=self.gamma_1)
+                            long_cov=D, phi=phi, beta_0=self.params["beta_0"],
+                            beta_1=self.params["beta_1"], xi=self.params["xi"],
+                            gamma_0=self.params["gamma_0"], gamma_1=self.params["gamma_1"])
         if verbose:
             self.history.print_history()
 
@@ -1087,12 +1092,8 @@ class QNMCEM(Learner):
                 fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
-            self.gamma_0 = self.get_vect_from_ext(gamma_0_ext)
-            self.gamma_1 = self.get_vect_from_ext(gamma_1_ext)
-            self.beta_0 = self.get_vect_from_ext(beta_0_ext)
-            self.beta_1 = self.get_vect_from_ext(beta_1_ext)
-
-            # TODO : update the update_theta with {key: values} dictionary that only updates the given parameters
+            self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext,
+                              gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
             T_u = np.unique(T)
@@ -1104,16 +1105,16 @@ class QNMCEM(Learner):
                                indicator_1].sum(axis=0)
                                * (indicator_2 * 1).T).sum(axis=1)
 
-            self.update_theta(phi, baseline_hazard)
+            self.update_theta(phi = phi, baseline_hazard = baseline_hazard)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    long_cov=D, phi=phi, beta_0=self.beta_0,
-                                    beta_1=self.beta_1, xi=self.xi,
-                                    gamma_0=self.gamma_0, gamma_1=self.gamma_1)
+                                    long_cov=D, phi=phi,beta_0=self.params["beta_0"],
+                                    beta_1=self.params["beta_1"], xi=self.params["xi"],
+                                    gamma_0=self.params["gamma_0"], gamma_1=self.params["gamma_1"])
                 if verbose:
                     self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):
