@@ -50,7 +50,11 @@ class History:
         self.n_iter = n_iter
         history = self.values
         for key, val in kwargs.items():
-            history[key].append(val)
+            if key == 'theta':
+                for key_, val_ in val.items():
+                    history[key_].append(val_)
+            else:
+                history[key].append(val)
 
     def print_history(self):
         """Verbose for the current line of history regarding print_order
