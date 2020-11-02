@@ -456,9 +456,11 @@ class QNMCEM(Learner):
 
         sub_obj = np.sum(pi_est * (E_g2 * delta.reshape(-1, 1) + E_g8 + np.sum(E_g1.swapaxes(1, 2)
                 .swapaxes(0, 1) * baseline_hazard.values.flatten() * (indicator * 1), axis=2).T))
+        tmp = 0
+
         return sub_obj + pen
 
-    def _grad_R(self, beta_ext):
+    def _grad_R(self, beta_ext, E_g5, E_g6, delta, baseline_hazard, indicator):
         """Computes the gradient of the sub objective R
 
         Parameters
@@ -472,12 +474,14 @@ class QNMCEM(Learner):
         """
         beta = self.get_vect_from_ext(beta_ext)
         grad_pen = self._grad_sparse_group_l1_pen(beta)
-        # TODO Van Tuan
-        grad = 0
+        # TODO: handle gamma
+        tmp1 = (E_g5.T * delta).T - np.sum((E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1)
+        tmp2 = 0
+        grad = tmp1 + tmp2
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def _Q_func(self, gamma_ext):
+    def _Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta, indicator):
         """Computes the sub objective function denoted Q in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -491,8 +495,9 @@ class QNMCEM(Learner):
             The value of the Q sub objective to be minimized at each QNMCEM step
         """
         pen = self._sparse_group_l1_pen(gamma_ext)
-        # TODO Van Tuan
-        sub_obj = 0
+        sub_obj = np.sum(pi_est * ( E_log_g1 * delta.reshape(-1, 1) + np.sum(E_g1.swapaxes(1, 2)
+                .swapaxes(0, 1) * baseline_hazard.values.flatten() * (indicator * 1), axis=2).T))
+        tmp = 0
         return sub_obj + pen
 
     def _grad_Q(self, gamma_ext):
@@ -801,13 +806,10 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        g5 : `np.ndarray`, shape=(n_samples, 2, 2 * N, J, n_long_features, q_l)
+        g5 : `np.ndarray`, shape=(2, 2 * N, J, n_long_features, q_l)
             The values of g5 function
         """
-        n_samples = T.shape[0]
-        T_u = np.unique(T)
-        asso_func = self.get_asso_func(T_u, S, derivative=True)
-        g5 = np.broadcast_to(asso_func, (n_samples,) + asso_func.shape)
+        g5 = self.get_asso_func(T, S, derivative=True)
         return g5
 
     def _g6(self, X, T, S):
@@ -826,7 +828,10 @@ class QNMCEM(Learner):
         g6 : `np.ndarray`, shape=(n_samples, n_long_features, 2, 2 * N * J, q_l)
             The values of g6 function
         """
-        g5 = self._g5(T, S)
+        T_u = np.unique(T)
+        n_samples = T.shape[0]
+        g5 = self._g5(T_u, S)
+        g5 = np.broadcast_to(g5, (n_samples,) + g5.shape)
         g1 = self._g1(X, T, S)
         g6 = (g1.T * g5.T).T
         return g6
@@ -1079,23 +1084,31 @@ class QNMCEM(Learner):
             Lambda_g1 = self._Lambda_g(g1, f).swapaxes(1, 3)
 
             # TODO : if E_g1 == None then E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1) otherwise you already have it
-
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
+
+            log_g1 = np.log(g1)
+            Lambda_log_g1 = self._Lambda_g(log_g1, f).swapaxes(1, 3)
+            E_log_g1 = (self._Eg(pi_xi, Lambda_1, Lambda_log_g1).T * (indicator_1 * 1).T).sum(axis = 1).T
 
             g2 = self._g2(T, S).swapaxes(0, 1)
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
             Lambda_g2 = self._Lambda_g(g2, f).swapaxes(1, 2)
             E_g2 = self._Eg(pi_xi, Lambda_1, Lambda_g2)
 
+            g5 = self._g5(T, S)
+            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5)
+            Lambda_g5 = self._Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2), f).swapaxes(1, 4)
+            E_g5 = self._Eg(pi_xi, Lambda_1, Lambda_g5)
+
+            g6 = self._g6(X, T, S)
+            g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
+            Lambda_g6 = self._Lambda_g(g6, f).swapaxes(1, 5)
+            E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
+
             g8 = self._g8(extracted_features, S)
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
             Lambda_g8 = self._Lambda_g(g8, f).swapaxes(1, 2)
             E_g8 = self._Eg(pi_xi, Lambda_1, Lambda_g8)
-
-            g6 = self._g6(X, T, S)
-            Lambda_g6 = self._Lambda_g(g6, f)
-            E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
-
 
 
             # if False: # to be defined
