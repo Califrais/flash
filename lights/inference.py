@@ -9,6 +9,7 @@ from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from sklearn.model_selection import KFold
 from lights.init.cox import initialize_asso_params
+import pandas as pd
 
 
 class QNMCEM(Learner):
@@ -976,6 +977,8 @@ class QNMCEM(Learner):
 
         n_samples, n_time_indep_features = X.shape
         n_long_features = Y.shape[1]
+        T_u = np.unique(T)
+        J = T_u.shape[0]
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
         self.n_long_features = n_long_features
@@ -1025,7 +1028,7 @@ class QNMCEM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((n_long_features, 1))
             time_indep_cox_coeffs = np.zeros(n_time_indep_features)
-            baseline_hazard = np.zeros(n_samples)
+            baseline_hazard = pd.Series(data = np.zeros(J), index=T_u)
 
         gamma = np.zeros(nb_asso_features)
         gamma[:n_time_indep_features] = time_indep_cox_coeffs
