@@ -830,6 +830,45 @@ class QNMCEM(Learner):
         g6 = (g1.T * g5.T).T
         return g6
 
+    def _g8(self, extracted_features, S):
+        """Computes g8
+
+        Parameters
+        ----------
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g8 : `np.ndarray`, shape=(n_samples, 2, 2 * N)
+            The values of g8 function
+        """
+        n_samples = self.n_samples
+        n_long_features = self.n_long_features
+        beta_0, beta_1 = self.params["beta_0"], self.params["beta_1"]
+        baseline_hazard = self.params["baseline_hazard"]
+        phi = self.params["phi"]
+        (U_list, V_list, y_list, N_list) = extracted_features[0]
+
+        g8 = np.zeros(shape=(n_samples, 2, S.shape[0]))
+        for i in range(n_samples):
+            beta_stack = np.hstack((beta_0, beta_1))
+            U_i = U_list[i]
+            V_i = V_list[i]
+            n_i = sum(N_list[i])
+            y_i = y_list[i]
+            Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
+            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
+            M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
+
+            g8[i] =  np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+
     @staticmethod
     def _Lambda_g(g, f):
         """Approximated integral (see (15) in the lights paper)
@@ -1047,6 +1086,8 @@ class QNMCEM(Learner):
 
             # Update D
             D = E_g0.sum(axis=0) / n_samples
+
+            g8 = self._g8(extracted_features, S)
 
             if warm_start:
                 xi_0 = xi_ext
