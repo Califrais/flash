@@ -108,7 +108,7 @@ class Test(unittest.TestCase):
         """Test QNMCEM Algorithm
         """
         X, Y, T, delta = self.get_train_data()
-        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3, initialize=False)
+        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3, initialize=True)
         qnmcem.fit(X, Y, T, delta)
 
 

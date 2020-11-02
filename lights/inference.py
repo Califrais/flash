@@ -439,7 +439,7 @@ class QNMCEM(Learner):
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def _R_func(self, beta_ext):
+    def _R_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard, delta, indicator):
         """Computes the sub objective function denoted R in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -453,8 +453,9 @@ class QNMCEM(Learner):
             The value of the R sub objective to be minimized at each QNMCEM step
         """
         pen = self._sparse_group_l1_pen(beta_ext)
-        # TODO Van Tuan
-        sub_obj = 0
+
+        sub_obj = np.sum(pi_est * (E_g2 * delta.reshape(-1, 1) + E_g8 + np.sum(E_g1.swapaxes(1, 2)
+                .swapaxes(0, 1) * baseline_hazard.values.flatten() * (indicator * 1), axis=2).T))
         return sub_obj + pen
 
     def _grad_R(self, beta_ext):
@@ -851,9 +852,9 @@ class QNMCEM(Learner):
         """
         n_samples = self.n_samples
         n_long_features = self.n_long_features
-        beta_0, beta_1 = self.params["beta_0"], self.params["beta_1"]
-        baseline_hazard = self.params["baseline_hazard"]
-        phi = self.params["phi"]
+        beta_0, beta_1 = self.theta["beta_0"], self.theta["beta_1"]
+        baseline_hazard = self.theta["baseline_hazard"]
+        phi = self.theta["phi"]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
 
         g8 = np.zeros(shape=(n_samples, 2, S.shape[0]))
@@ -868,6 +869,8 @@ class QNMCEM(Learner):
             M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
 
             g8[i] =  np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+
+        return g8
 
     @staticmethod
     def _Lambda_g(g, f):
@@ -1051,6 +1054,10 @@ class QNMCEM(Learner):
                       (fixed_effect_time_order + 1)
         bounds_gamma = [(0, None)] * 2 * nb_asso_features
 
+        T_u = np.unique(T)
+        indicator_1 = T.reshape(-1, 1) == T_u
+        indicator_2 = T.reshape(-1, 1) >= T_u
+
         # TODO : E_g1 = None
         for n_iter in range(1, max_iter + 1):
 
@@ -1068,15 +1075,28 @@ class QNMCEM(Learner):
             E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
 
             g1 = self._g1(X, T, S)
-            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(3, 4)
-            Lambda_g1 = self._Lambda_g(g1, f)
+            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
+            Lambda_g1 = self._Lambda_g(g1, f).swapaxes(1, 3)
+
             # TODO : if E_g1 == None then E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1) otherwise you already have it
 
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
 
+            g2 = self._g2(T, S).swapaxes(0, 1)
+            g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
+            Lambda_g2 = self._Lambda_g(g2, f).swapaxes(1, 2)
+            E_g2 = self._Eg(pi_xi, Lambda_1, Lambda_g2)
+
+            g8 = self._g8(extracted_features, S)
+            g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
+            Lambda_g8 = self._Lambda_g(g8, f).swapaxes(1, 2)
+            E_g8 = self._Eg(pi_xi, Lambda_1, Lambda_g8)
+
             g6 = self._g6(X, T, S)
             Lambda_g6 = self._Lambda_g(g6, f)
             E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
+
+
 
             # if False: # to be defined
             #     N *= 10
@@ -1086,8 +1106,6 @@ class QNMCEM(Learner):
 
             # Update D
             D = E_g0.sum(axis=0) / n_samples
-
-            g8 = self._g8(extracted_features, S)
 
             if warm_start:
                 xi_0 = xi_ext
@@ -1136,8 +1154,6 @@ class QNMCEM(Learner):
 
             # Update baseline hazard
             T_u = np.unique(T)
-            indicator_1 = T.reshape(-1, 1) == T_u
-            indicator_2 = T.reshape(-1, 1) >= T_u
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
