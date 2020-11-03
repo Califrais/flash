@@ -1,6 +1,61 @@
 import numpy as np
 
 
+def get_asso_func(self, T, S, derivative=False):
+    """Computes association functions or derivatives association ones
+
+    Parameters
+    ----------
+    T : `np.ndarray`, shape=(J,)
+        The J unique censored times of the event of interest
+
+    S : `np.ndarray`, shape=(2*N, r)
+        Set of constructed Monte Carlo samples
+
+    derivative : `bool`, default=False
+    If `False`, returns the association functions, otherwise returns the
+    derivative versions
+
+    Returns
+    -------
+    asso_func_stack : `np.ndarray`, , shape=(2, n_samples*2*N, dim)
+        Stack version of association functions or derivatives for all
+        subjects, all groups and all Monte Carlo samples. `dim` is the
+        total dimension of returned association functions.
+    """
+    fixed_effect_coeffs = np.array([self.theta["beta_0"],
+                                    self.theta["beta_1"]])
+    fixed_effect_time_order = self.fixed_effect_time_order
+    n_long_features = self.n_long_features
+    J = T.shape[0]
+    asso_functions = self.asso_functions
+    q_l = fixed_effect_time_order + 1
+
+    N = S.shape[0] // 2
+    asso_func = AssociationFunctions(T, S, fixed_effect_coeffs,
+                                     fixed_effect_time_order,
+                                     n_long_features)
+
+    if derivative:
+        asso_func_stack = np.empty(shape=(2, 2 * N, J, n_long_features, 0))
+    else:
+        asso_func_stack = np.empty(shape=(2, J * 2 * N, 0))
+
+    for func_name in asso_functions:
+        if derivative:
+            func = asso_func.assoc_func_dict["d_" + func_name]
+            func_r = func.reshape(2, 2 * N, J, n_long_features, q_l)
+        else:
+            func = asso_func.assoc_func_dict[func_name]
+            dim = n_long_features
+            if func_name == 're':
+                dim *= 2
+            func_r = func.swapaxes(0, 1).swapaxes(2, 3).reshape(
+                2, J * 2 * N, dim)
+        asso_func_stack = np.concatenate((asso_func_stack, func_r), axis=-1)
+
+    return asso_func_stack
+
 class AssociationFunctions:
     """A class to define all the association functions
 

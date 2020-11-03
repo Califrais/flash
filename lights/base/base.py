@@ -236,3 +236,77 @@ def extract_features(Y, fixed_effect_time_order):
         y_L[l] = np.concatenate(tuple(y_L[l]))
 
     return (U, V, y, N), (U_L, V_L, y_L, N_L)
+
+
+def logistic_grad(z):
+    """Overflow proof computation of 1 / (1 + exp(-z)))
+    """
+    idx_pos = np.where(z >= 0.)
+    idx_neg = np.where(z < 0.)
+    res = np.empty(z.shape)
+    res[idx_pos] = 1. / (1. + np.exp(-z[idx_pos]))
+    res[idx_neg] = 1 - 1. / (1. + np.exp(z[idx_neg]))
+    return res
+
+
+def logistic_loss(z):
+    """Overflow proof computation of log(1 + exp(-z))
+    """
+    idx_pos = np.where(z >= 0.)
+    idx_neg = np.where(z < 0.)
+    res = np.empty(z.shape)
+    res[idx_pos] = np.log(1. + np.exp(-z[idx_pos]))
+    z_neg = z[idx_neg]
+    res[idx_neg] = -z_neg + np.log(1. + np.exp(z_neg))
+    return res
+
+
+def get_vect_from_ext(v_ext):
+    """Obtain the signed coefficient vector from its extension on positive
+    and negative parts
+    """
+    dim = len(v_ext)
+    if dim % 2 != 0:
+        raise ValueError("``v_ext`` dimension cannot be odd, got %s" % dim)
+    v = v_ext[:dim // 2] - v_ext[dim // 2:]
+    return v
+
+
+def _get_xi_from_xi_ext(xi_ext, fit_intercept):
+    """Get the time-independent coefficient vector from its extension on
+    positive and negative parts
+
+    Parameters
+    ----------
+    xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+        The time-independent coefficient vector decomposed on positive and
+        negative parts
+
+    Returns
+    -------
+    xi_0 : `float`
+        The intercept term
+
+    xi : `np.ndarray`, shape=(n_time_indep_features,)
+        The time-independent coefficient vector
+    """
+    n_time_indep_features = len(xi_ext) // 2
+    if fit_intercept:
+        xi = xi_ext[:n_time_indep_features + 1] - \
+             xi_ext[n_time_indep_features + 1:]
+        xi_0 = xi[0]
+        xi = xi[1:]
+    else:
+        xi_0 = 0
+        xi = xi_ext[:n_time_indep_features] - xi_ext[n_time_indep_features:]
+    return xi_0, xi
+
+
+def _clean_xi_ext(xi_ext, fit_intercept):
+    """Removes potential intercept coefficients in the time-independent
+    coefficient vector decomposed on positive and negative parts
+    """
+    if fit_intercept:
+        n_time_indep_features = len(xi_ext) // 2
+        xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
+    return xi_ext
