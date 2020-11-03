@@ -444,14 +444,40 @@ class QNMCEM(Learner):
         """Computes the sub objective function denoted R in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
 
+        # TODO Van Tuan. The G=0 or 1 dimension is missing here
+
         Parameters
         ----------
-        # TODO Van Tuan. The G=0 or 1 dimension is missing here
+        beta_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+            The time-independent coefficient vector decomposed on positive and
+            negative parts
+
+        pi_est : `np.ndarray`, shape=(n_samples,)
+            The estimated posterior probability of the latent class membership
+            obtained by the E-step
+
+        E_g1 : `np.ndarray`, shape=()
+            The approximated expectations of function g1
+
+        E_g2 : `np.ndarray`, shape=()
+            The approximated expectations of function g2
+
+        E_g8 : `np.ndarray`, shape=()
+            The approximated expectations of function g8
+
+        baseline_hazard : `np.ndarray`, shape=(n_samples,)
+            The baseline hazard function evaluated at each censored time
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            Censoring indicator
+
+        indicator : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
 
         Returns
         -------
         output : `float`
-            The value of the R sub objective to be minimized at each QNMCEM step
+            The value of the P sub objective to be minimized at each QNMCEM step
         """
         pen = self._sparse_group_l1_pen(beta_ext)
 
@@ -488,7 +514,28 @@ class QNMCEM(Learner):
 
         Parameters
         ----------
-        # TODO Van Tuan
+        gamma_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+            The time-independent coefficient vector decomposed on positive and
+            negative parts
+
+        pi_est : `np.ndarray`, shape=(n_samples,)
+            The estimated posterior probability of the latent class membership
+            obtained by the E-step
+
+        E_log_g1 : `np.ndarray`, shape=()
+            The approximated expectations of function logarithm of g1
+
+        E_g1 : `np.ndarray`, shape=()
+            The approximated expectations of function g1
+
+        baseline_hazard : `np.ndarray`, shape=(n_samples,)
+            The baseline hazard function evaluated at each censored time
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            Censoring indicator
+
+        indicator : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
 
         Returns
         -------
@@ -1005,9 +1052,12 @@ class QNMCEM(Learner):
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
 
-        # create indicator matrix to compare event times
+        # create indicator matrices to compare event times
         tmp = np.broadcast_to(T, (n_samples, n_samples))
         indicator = (tmp < tmp.T) * 1 + np.eye(n_samples)
+        T_u = np.unique(T)
+        indicator_1 = T.reshape(-1, 1) == T_u
+        indicator_2 = T.reshape(-1, 1) >= T_u
 
         # initialize longitudinal submodels
         if self.initialize:
@@ -1061,10 +1111,6 @@ class QNMCEM(Learner):
         bounds_beta = [(0, None)] * 2 * n_long_features * \
                       (fixed_effect_time_order + 1)
         bounds_gamma = [(0, None)] * 2 * nb_asso_features
-
-        T_u = np.unique(T)
-        indicator_1 = T.reshape(-1, 1) == T_u
-        indicator_2 = T.reshape(-1, 1) >= T_u
 
         # TODO : E_g1 = None
         for n_iter in range(1, max_iter + 1):
