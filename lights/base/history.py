@@ -44,7 +44,7 @@ class History:
         self.values = defaultdict(list)
 
     def update(self, **kwargs):
-        """Update the history along the iterations.
+        """Update the history along the iterations
         """
         n_iter = kwargs["n_iter"]
         self.n_iter = n_iter

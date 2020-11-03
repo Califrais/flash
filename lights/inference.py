@@ -440,11 +440,10 @@ class QNMCEM(Learner):
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def _R_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard, delta, indicator):
+    def _R_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard,
+                delta, indicator):
         """Computes the sub objective function denoted R in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
-
-        # TODO Van Tuan. The G=0 or 1 dimension is missing here
 
         Parameters
         ----------
@@ -456,14 +455,9 @@ class QNMCEM(Learner):
             The estimated posterior probability of the latent class membership
             obtained by the E-step
 
-        E_g1 : `np.ndarray`, shape=()
-            The approximated expectations of function g1
-
-        E_g2 : `np.ndarray`, shape=()
-            The approximated expectations of function g2
-
-        E_g8 : `np.ndarray`, shape=()
-            The approximated expectations of function g8
+        #TODO : E_g1, E_g2, E_g8 need to be computed inside since they all depend on
+        # the current beta_ext which is the variable on which we try to optimize the function R
+        # use the current (previous) version of gamma (self.theta -> so update theta when necessary)
 
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
             The baseline hazard function evaluated at each censored time
@@ -477,15 +471,17 @@ class QNMCEM(Learner):
         Returns
         -------
         output : `float`
-            The value of the P sub objective to be minimized at each QNMCEM step
+            The value of the R sub objective to be minimized at each QNMCEM step
         """
+        n_samples = delta.shape[0]
         pen = self._sparse_group_l1_pen(beta_ext)
-
-        sub_obj = np.sum(pi_est * (E_g2 * delta.reshape(-1, 1) + E_g8 + np.sum(E_g1.swapaxes(1, 2)
-                .swapaxes(0, 1) * baseline_hazard.values.flatten() * (indicator * 1), axis=2).T))
-        tmp = 0
-
-        return sub_obj + pen
+        E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
+        baseline_val = baseline_hazard.values.flatten()
+        ind_ = indicator * 1
+        sub_obj = E_g2 * delta.reshape(-1, 1) + E_g8 - np.sum(
+            E_g1_ * baseline_val * ind_, axis=2).T
+        sub_obj = (pi_est * sub_obj).sum()
+        return -sub_obj / n_samples + pen
 
     def _grad_R(self, beta_ext, E_g5, E_g6, delta, baseline_hazard, indicator):
         """Computes the gradient of the sub objective R
@@ -502,15 +498,17 @@ class QNMCEM(Learner):
         beta = self.get_vect_from_ext(beta_ext)
         grad_pen = self._grad_sparse_group_l1_pen(beta)
         # TODO: handle gamma
-        tmp1 = (E_g5.T * delta).T - np.sum((E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1)
+        tmp1 = (E_g5.T * delta).T - np.sum(
+            (E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1)
         tmp2 = 0
         grad = tmp1 + tmp2
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
-    def _Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta, indicator):
+    def _Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta,
+                indicator):
         """Computes the sub objective function denoted Q in the lights paper,
-        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
 
         Parameters
         ----------
@@ -521,12 +519,6 @@ class QNMCEM(Learner):
         pi_est : `np.ndarray`, shape=(n_samples,)
             The estimated posterior probability of the latent class membership
             obtained by the E-step
-
-        E_log_g1 : `np.ndarray`, shape=()
-            The approximated expectations of function logarithm of g1
-
-        E_g1 : `np.ndarray`, shape=()
-            The approximated expectations of function g1
 
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
             The baseline hazard function evaluated at each censored time
@@ -542,11 +534,19 @@ class QNMCEM(Learner):
         output : `float`
             The value of the Q sub objective to be minimized at each QNMCEM step
         """
+        n_samples = delta.shape[0]
         pen = self._sparse_group_l1_pen(gamma_ext)
-        sub_obj = np.sum(pi_est * ( E_log_g1 * delta.reshape(-1, 1) + np.sum(E_g1.swapaxes(1, 2)
-                .swapaxes(0, 1) * baseline_hazard.values.flatten() * (indicator * 1), axis=2).T))
-        tmp = 0
-        return sub_obj + pen
+
+        # TODO : E_log_g1, E_g1 need to be computed inside : they depend on the variable gamma_ext
+        # and use the current version of beta (self.theta -> so update theta when necessary)
+
+        E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
+        baseline_val = baseline_hazard.values.flatten()
+        ind_ = indicator * 1
+        sub_obj = E_log_g1 * delta.reshape(-1, 1) - np.sum(
+            E_g1_ * baseline_val * ind_, axis=2).T
+        sub_obj = (pi_est * sub_obj).sum()
+        return -sub_obj / n_samples + pen
 
     def _grad_Q(self, gamma_ext):
         """Computes the gradient of the sub objective Q
@@ -800,6 +800,7 @@ class QNMCEM(Learner):
         g1 : `np.ndarray`, shape=(n_samples, 2, 2*N, J)
             The values of g1 function
         """
+        #TODO Simon: pass directly the T_u
         T_u = np.unique(T)
         n_samples = self.n_samples
         N = S.shape[0] // 2
@@ -906,7 +907,6 @@ class QNMCEM(Learner):
         n_samples = self.n_samples
         n_long_features = self.n_long_features
         beta_0, beta_1 = self.theta["beta_0"], self.theta["beta_1"]
-        baseline_hazard = self.theta["baseline_hazard"]
         phi = self.theta["phi"]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
 
@@ -915,13 +915,11 @@ class QNMCEM(Learner):
             beta_stack = np.hstack((beta_0, beta_1))
             U_i = U_list[i]
             V_i = V_list[i]
-            n_i = sum(N_list[i])
             y_i = y_list[i]
             Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
-
-            g8[i] =  np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+            g8[i] = np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
 
         return g8
 
@@ -1024,8 +1022,7 @@ class QNMCEM(Learner):
 
         n_samples, n_time_indep_features = X.shape
         n_long_features = Y.shape[1]
-        T_u = np.unique(T)
-        J = T_u.shape[0]
+
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
         self.n_long_features = n_long_features
@@ -1052,10 +1049,14 @@ class QNMCEM(Learner):
         # initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
 
+        # the J unique censored times of the event of interest
+        T_u = np.unique(T)
+        J = T_u.shape[0]
+
         # create indicator matrices to compare event times
+        # TODO: use indicator to update f_data_given_latent
         tmp = np.broadcast_to(T, (n_samples, n_samples))
         indicator = (tmp < tmp.T) * 1 + np.eye(n_samples)
-        T_u = np.unique(T)
         indicator_1 = T.reshape(-1, 1) == T_u
         indicator_2 = T.reshape(-1, 1) >= T_u
 
@@ -1078,7 +1079,7 @@ class QNMCEM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((n_long_features, 1))
             time_indep_cox_coeffs = np.zeros(n_time_indep_features)
-            baseline_hazard = pd.Series(data = np.zeros(J), index=T_u)
+            baseline_hazard = pd.Series(data=np.zeros(J), index=T_u)
 
         gamma = np.zeros(nb_asso_features)
         gamma[:n_time_indep_features] = time_indep_cox_coeffs
@@ -1137,7 +1138,8 @@ class QNMCEM(Learner):
 
             log_g1 = np.log(g1)
             Lambda_log_g1 = self._Lambda_g(log_g1, f).swapaxes(1, 3)
-            E_log_g1 = (self._Eg(pi_xi, Lambda_1, Lambda_log_g1).T * (indicator_1 * 1).T).sum(axis = 1).T
+            E_log_g1 = (self._Eg(pi_xi, Lambda_1, Lambda_log_g1).T * (
+                        indicator_1 * 1).T).sum(axis=1).T
 
             g2 = self._g2(T, S).swapaxes(0, 1)
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
@@ -1146,7 +1148,8 @@ class QNMCEM(Learner):
 
             g5 = self._g5(T, S)
             g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5)
-            Lambda_g5 = self._Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2), f).swapaxes(1, 4)
+            Lambda_g5 = self._Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
+                                       f).swapaxes(1, 4)
             E_g5 = self._Eg(pi_xi, Lambda_1, Lambda_g5)
 
             g6 = self._g6(X, T, S)
@@ -1158,7 +1161,6 @@ class QNMCEM(Learner):
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
             Lambda_g8 = self._Lambda_g(g8, f).swapaxes(1, 2)
             E_g8 = self._Eg(pi_xi, Lambda_1, Lambda_g8)
-
 
             # if False: # to be defined
             #     N *= 10
@@ -1215,14 +1217,14 @@ class QNMCEM(Learner):
                               gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
-            T_u = np.unique(T)
             E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
                                indicator_1].sum(axis=0)
                                * (indicator_2 * 1).T).sum(axis=1)
 
-            self.update_theta(phi=phi, baseline_hazard=baseline_hazard)
+            self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
+                              long_cov=D)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
