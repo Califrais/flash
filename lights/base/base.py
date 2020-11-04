@@ -309,6 +309,22 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
 def clean_xi_ext(xi_ext, fit_intercept):
     """Removes potential intercept coefficients in the time-independent
     coefficient vector decomposed on positive and negative parts
+
+    Parameters
+    ----------
+    xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+        The time-independent coefficient vector decomposed on positive and
+        negative parts
+
+    fit_intercept : `bool`
+        If `True`, include an intercept in the model for the time independant
+        features
+
+    Returns
+    -------
+    xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
+        The time-independent coefficient vector decomposed on positive and
+        negative parts without potential intercept coefficients
     """
     if fit_intercept:
         n_time_indep_features = len(xi_ext) // 2
