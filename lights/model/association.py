@@ -1,7 +1,6 @@
 import numpy as np
 
-
-def get_asso_func(self, T, S, derivative=False):
+def get_asso_func(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order, derivative=False):
     """Computes association functions or derivatives association ones
 
     Parameters
@@ -23,12 +22,9 @@ def get_asso_func(self, T, S, derivative=False):
         subjects, all groups and all Monte Carlo samples. `dim` is the
         total dimension of returned association functions.
     """
-    fixed_effect_coeffs = np.array([self.theta["beta_0"],
-                                    self.theta["beta_1"]])
-    fixed_effect_time_order = self.fixed_effect_time_order
-    n_long_features = self.n_long_features
+    fixed_effect_coeffs = np.array([theta["beta_0"],
+                                    theta["beta_1"]])
     J = T.shape[0]
-    asso_functions = self.asso_functions
     q_l = fixed_effect_time_order + 1
 
     N = S.shape[0] // 2

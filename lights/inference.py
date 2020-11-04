@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base.base import Learner, extract_features, normalize
+from lights.base.base import Learner, extract_features, normalize, get_vect_from_ext,_get_xi_from_xi_ext, _clean_xi_ext, logistic_grad
 from lights.init.mlmm import MLMM
-from lights.association import AssociationFunctions
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
-from sklearn.model_selection import KFold
 from lights.init.cox import initialize_asso_params
 import pandas as pd
+from lights.model.e_step_functions import _Lambda_g, _Eg, _g0, _g1, _g2, _g5, _g6, _g8, construct_MC_samples, f_data_given_latent
+from lights.model.m_step_functions import _P_func, _grad_P, _R_func, _grad_R, _Q_func, _grad_Q, _elastic_net_pen
+
 
 
 class QNMCEM(Learner):
@@ -151,100 +152,6 @@ class QNMCEM(Learner):
                              "`list` in ['lp', 're', 'tps', 'ce']")
         self._asso_functions = val
 
-    def _elastic_net_pen(self, xi_ext):
-        """Computes the elasticNet penalization of vector xi
-
-        Parameters
-        ----------
-        xi_ext: `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        Returns
-        -------
-        output : `float`
-            The value of the elasticNet penalization part of vector xi
-        """
-        l_pen = self.l_pen
-        eta = self.eta_elastic_net
-        xi = self._get_xi_from_xi_ext(xi_ext)[1]
-        xi_ext = self._clean_xi_ext(xi_ext)
-        return l_pen * ((1. - eta) * xi_ext.sum() +
-                        0.5 * eta * np.linalg.norm(xi) ** 2)
-
-    def _grad_elastic_net_pen(self, xi):
-        """Computes the gradient of the elasticNet penalization of vector xi
-
-        Parameters
-        ----------
-        xi : `np.ndarray`, shape=(n_time_indep_features,)
-            The time-independent coefficient vector
-
-        Returns
-        -------
-        output : `float`
-            The gradient of the elasticNet penalization part of vector xi
-        """
-        l_pen = self.l_pen
-        eta = self.eta_elastic_net
-        n_time_indep_features = self.n_time_indep_features
-        grad = np.zeros(2 * n_time_indep_features)
-        # Gradient of lasso penalization
-        grad += l_pen * (1 - eta)
-        # Gradient of ridge penalization
-        grad_pos = (l_pen * eta) * xi
-        grad[:n_time_indep_features] += grad_pos
-        grad[n_time_indep_features:] -= grad_pos
-        return grad
-
-    def _sparse_group_l1_pen(self, v_ext):
-        """Computes the sparse group l1 penalization of vector v
-
-        Parameters
-        ----------
-        v_ext: `np.ndarray`
-            A vector decomposed on positive and negative parts
-
-        Returns
-        -------
-        output : `float`
-            The value of the sparse group l1 penalization of vector v
-        """
-        l_pen = self.l_pen
-        eta = self.eta_sp_gp_l1
-        v = self.get_vect_from_ext(v_ext)
-        return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
-
-    def _grad_sparse_group_l1_pen(self, v):
-        """Computes the gradient of the sparse group l1 penalization of a
-        vector v
-
-        Parameters
-        ----------
-        v : `np.ndarray`
-            A coefficient vector
-
-        Returns
-        -------
-        output : `float`
-            The gradient of the sparse group l1 penalization of vector v
-        """
-        l_pen = self.l_pen
-        eta = self.eta_sp_gp_l1
-        L = self.n_long_features
-        dim = len(v)
-        grad = np.zeros(2 * dim)
-        # Gradient of lasso penalization
-        grad += l_pen * (1 - eta)
-        # Gradient of sparse group l1 penalization
-        # TODO Van Tuan : to be verified
-        tmp = np.array([np.repeat(np.linalg.norm(v_l), dim // L)
-                        for v_l in np.array_split(v, L)]).flatten()
-        grad_pos = (l_pen * eta) * v / tmp
-        grad[:dim] += grad_pos
-        grad[dim:] -= grad_pos
-        return grad
-
     def _log_lik(self, X, Y, T, delta):
         """Computes the likelihood of the lights model
 
@@ -301,7 +208,10 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         log_lik = self._log_lik(X, Y, T, delta)
-        pen = self._elastic_net_pen(xi_ext)
+        l_pen = self.l_pen
+        eta_elastic_net = self.eta_elastic_net
+        fit_intercept = self.fit_intercept
+        pen = _elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept)
         return -log_lik + pen
 
     def get_proba(self, X, xi_ext):
@@ -323,9 +233,10 @@ class QNMCEM(Learner):
             Returns the probability of the sample for being on the high-risk
             group given time-independent features
         """
-        xi_0, xi = self._get_xi_from_xi_ext(xi_ext)
+        fit_intercept = self.fit_intercept
+        xi_0, xi = _get_xi_from_xi_ext(xi_ext, fit_intercept)
         u = xi_0 + X.dot(xi)
-        return QNMCEM.logistic_grad(u)
+        return logistic_grad(u)
 
     def get_post_proba(self, pi_xi, Lambda_1):
         """Posterior probability estimates for being on the high-risk group
@@ -380,11 +291,11 @@ class QNMCEM(Learner):
         """
         for key, value in kwargs.items():
             if key in ["beta_0", "beta_1", "gamma_0", "gamma_1"]:
-                self.theta[key] = self.get_vect_from_ext(value)
+                self.theta[key] = get_vect_from_ext(value)
             elif key in ["long_cov", "phi", "baseline_hazard"]:
                 self.theta[key] = value
             elif key in ["xi"]:
-                self.theta[key] = self._get_xi_from_xi_ext(value)[1]
+                self.theta[key] = _get_xi_from_xi_ext(value, self.fit_intercept)[1]
             else:
                 raise NameError('Parameter {} has not defined'.format(key))
 
@@ -491,9 +402,9 @@ class QNMCEM(Learner):
                           gamma_1=gamma_1_ext, long_cov=D, phi=phi,
                           baseline_hazard=baseline_hazard)
         func_obj = self._func_obj
-        P_func, grad_P = self._P_func, self._grad_P
-        R_func, grad_R = self._R_func, self._grad_R
-        Q_func, grad_Q = self._Q_func, self._grad_Q
+        P_func, grad_P = _P_func, _grad_P
+        R_func, grad_R = _R_func, _grad_R
+        Q_func, grad_Q = _Q_func, _grad_Q
 
         obj = func_obj(X, Y, T, delta, xi_ext)
         # store init values
@@ -511,43 +422,43 @@ class QNMCEM(Learner):
         for n_iter in range(1, max_iter + 1):
 
             pi_xi = self.get_proba(X, xi_ext)
-
+            theta = self.theta
             # E-Step
-            S = self.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, extracted_features, T, delta, S)
-            Lambda_1 = self._Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+            S = construct_MC_samples(theta, N)
+            f = f_data_given_latent(X, extracted_features, T, delta, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            Lambda_1 = _Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            g0 = self._g0(S)
+            g0 = _g0(S)
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
-            Lambda_g0 = self._Lambda_g(g0, f)
-            E_g0 = self._Eg(pi_xi, Lambda_1, Lambda_g0)
+            Lambda_g0 = _Lambda_g(g0, f)
+            E_g0 = _Eg(pi_xi, Lambda_1, Lambda_g0)
 
-            g1 = self._g1(X, T, S)
+            g1 = _g1(X, T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
-            Lambda_g1 = self._Lambda_g(g1, f).swapaxes(1, 3)
-            E_g1 = self._Eg(pi_xi, Lambda_1, Lambda_g1)
+            Lambda_g1 = _Lambda_g(g1, f).swapaxes(1, 3)
+            E_g1 = _Eg(pi_xi, Lambda_1, Lambda_g1)
 
-            g2 = self._g2(T, S).swapaxes(0, 1)
+            g2 = _g2(T, S, theta, n_time_indep_features, asso_functions, n_long_features, fixed_effect_time_order).swapaxes(0, 1)
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
-            Lambda_g2 = self._Lambda_g(g2, f).swapaxes(1, 2)
-            E_g2 = self._Eg(pi_xi, Lambda_1, Lambda_g2)
+            Lambda_g2 = _Lambda_g(g2, f).swapaxes(1, 2)
+            E_g2 = _Eg(pi_xi, Lambda_1, Lambda_g2)
 
-            g5 = self._g5(T, S)
+            g5 = _g5(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5)
-            Lambda_g5 = self._Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
+            Lambda_g5 = _Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
                                        f).swapaxes(1, 4)
-            E_g5 = self._Eg(pi_xi, Lambda_1, Lambda_g5)
+            E_g5 = _Eg(pi_xi, Lambda_1, Lambda_g5)
 
-            g6 = self._g6(X, T, S)
+            g6 = _g6(X, T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
-            Lambda_g6 = self._Lambda_g(g6, f).swapaxes(1, 5)
-            E_g6 = self._Eg(pi_xi, Lambda_1, Lambda_g6)
+            Lambda_g6 = _Lambda_g(g6, f).swapaxes(1, 5)
+            E_g6 = _Eg(pi_xi, Lambda_1, Lambda_g6)
 
-            g8 = self._g8(extracted_features, S)
+            g8 = _g8(extracted_features, S, theta, n_long_features, n_samples)
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
-            Lambda_g8 = self._Lambda_g(g8, f).swapaxes(1, 2)
-            E_g8 = self._Eg(pi_xi, Lambda_1, Lambda_g8)
+            Lambda_g8 = _Lambda_g(g8, f).swapaxes(1, 2)
+            E_g8 = _Eg(pi_xi, Lambda_1, Lambda_g8)
 
             # if False: # to be defined
             #     N *= 10
@@ -603,9 +514,9 @@ class QNMCEM(Learner):
             #             indicator_1 * 1).T).sum(axis=1).T
 
             # TODO
-            g1 = self._g1(X, T, S)
-            E_g1 = self._Eg(g1)
-            E_log_g1 = self._Eg(np.log(g1))
+            g1 = _g1(X, T, S)
+            E_g1 = _Eg(g1)
+            E_log_g1 = _Eg(np.log(g1))
 
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
@@ -624,8 +535,8 @@ class QNMCEM(Learner):
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
-            g1 = self._g1(X, T, S)
-            E_g1 = self._Eg(g1)
+            g1 = _g1(X, T, S)
+            E_g1 = _Eg(g1)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
                                indicator_1].sum(axis=0)
