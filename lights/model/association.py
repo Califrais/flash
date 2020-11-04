@@ -1,15 +1,38 @@
 import numpy as np
 
-def get_asso_func(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order, derivative=False):
+
+def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
+                  fixed_effect_time_order, derivative=False):
     """Computes association functions or derivatives association ones
 
     Parameters
     ----------
-    T : `np.ndarray`, shape=(J,)
+    T_u : `np.ndarray`, shape=(J,)
         The J unique censored times of the event of interest
 
     S : `np.ndarray`, shape=(2*N, r)
         Set of constructed Monte Carlo samples
+
+    theta : `dict`
+        Vector that concatenates all parameters to be inferred in the lights
+        model
+
+    asso_functions : `list` or `str`='all'
+        List of association functions wanted or string 'all' to select all
+        defined association functions. The available functions are :
+            - 'lp' : linear predictor
+            - 're' : random effects
+            - 'tps' : time dependent slope
+            - 'ce' : cumulative effects
+
+    n_long_features : `int`
+        Number of longitudinal features
+
+    fixed_effect_time_order :
+        Order of the higher time monomial considered for the representations of
+        the time-varying features corresponding to the fixed effect. The
+        dimension of the corresponding design matrix is then equal to
+        fixed_effect_time_order + 1
 
     derivative : `bool`, default=False
     If `False`, returns the association functions, otherwise returns the
@@ -24,11 +47,11 @@ def get_asso_func(T, S, theta, asso_functions, n_long_features, fixed_effect_tim
     """
     fixed_effect_coeffs = np.array([theta["beta_0"],
                                     theta["beta_1"]])
-    J = T.shape[0]
+    J = T_u.shape[0]
     q_l = fixed_effect_time_order + 1
 
     N = S.shape[0] // 2
-    asso_func = AssociationFunctions(T, S, fixed_effect_coeffs,
+    asso_func = AssociationFunctions(T_u, S, fixed_effect_coeffs,
                                      fixed_effect_time_order,
                                      n_long_features)
 
@@ -51,6 +74,7 @@ def get_asso_func(T, S, theta, asso_functions, n_long_features, fixed_effect_tim
         asso_func_stack = np.concatenate((asso_func_stack, func_r), axis=-1)
 
     return asso_func_stack
+
 
 class AssociationFunctions:
     """A class to define all the association functions

@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-from lights.base.base import Learner, extract_features, normalize, get_vect_from_ext,_get_xi_from_xi_ext, _clean_xi_ext, logistic_grad
-from lights.init.mlmm import MLMM
 import numpy as np
+import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
+from lights.base.base import Learner, extract_features, normalize, \
+    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad
+from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
-import pandas as pd
-from lights.model.e_step_functions import _Lambda_g, _Eg, _g0, _g1, _g2, _g5, _g6, _g8, construct_MC_samples, f_data_given_latent
-from lights.model.m_step_functions import _P_func, _grad_P, _R_func, _grad_R, _Q_func, _grad_Q, _elastic_net_pen
-
+from lights.model.e_step_functions import Lambda_g, Eg, g0, g1, g2, g5, g6, \
+    g8, construct_MC_samples, f_data_given_latent
+from lights.model.m_step_functions import P_func, grad_P, R_func, grad_R, \
+    Q_func, grad_Q, elastic_net_pen
 
 
 class QNMCEM(Learner):
@@ -72,7 +74,6 @@ class QNMCEM(Learner):
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization
     """
-
     def __init__(self, fit_intercept=False, l_pen=0., eta_elastic_net=.1,
                  eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,
@@ -211,7 +212,7 @@ class QNMCEM(Learner):
         l_pen = self.l_pen
         eta_elastic_net = self.eta_elastic_net
         fit_intercept = self.fit_intercept
-        pen = _elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept)
+        pen = elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept)
         return -log_lik + pen
 
     def get_proba(self, X, xi_ext):
@@ -234,7 +235,7 @@ class QNMCEM(Learner):
             group given time-independent features
         """
         fit_intercept = self.fit_intercept
-        xi_0, xi = _get_xi_from_xi_ext(xi_ext, fit_intercept)
+        xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
         u = xi_0 + X.dot(xi)
         return logistic_grad(u)
 
@@ -295,7 +296,7 @@ class QNMCEM(Learner):
             elif key in ["long_cov", "phi", "baseline_hazard"]:
                 self.theta[key] = value
             elif key in ["xi"]:
-                self.theta[key] = _get_xi_from_xi_ext(value, self.fit_intercept)[1]
+                self.theta[key] = get_xi_from_xi_ext(value, self.fit_intercept)[1]
             else:
                 raise NameError('Parameter {} has not defined'.format(key))
 
@@ -402,9 +403,6 @@ class QNMCEM(Learner):
                           gamma_1=gamma_1_ext, long_cov=D, phi=phi,
                           baseline_hazard=baseline_hazard)
         func_obj = self._func_obj
-        P_func, grad_P = _P_func, _grad_P
-        R_func, grad_R = _R_func, _grad_R
-        Q_func, grad_Q = _Q_func, _grad_Q
 
         obj = func_obj(X, Y, T, delta, xi_ext)
         # store init values
@@ -426,39 +424,39 @@ class QNMCEM(Learner):
             # E-Step
             S = construct_MC_samples(theta, N)
             f = f_data_given_latent(X, extracted_features, T, delta, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
-            Lambda_1 = _Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+            Lambda_1 = Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            g0 = _g0(S)
+            g0 = g0(S)
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
-            Lambda_g0 = _Lambda_g(g0, f)
-            E_g0 = _Eg(pi_xi, Lambda_1, Lambda_g0)
+            Lambda_g0 = Lambda_g(g0, f)
+            E_g0 = Eg(pi_xi, Lambda_1, Lambda_g0)
 
-            g1 = _g1(X, T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            g1 = g1(X, T_u, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
-            Lambda_g1 = _Lambda_g(g1, f).swapaxes(1, 3)
-            E_g1 = _Eg(pi_xi, Lambda_1, Lambda_g1)
+            Lambda_g1 = Lambda_g(g1, f).swapaxes(1, 3)
+            E_g1 = Eg(pi_xi, Lambda_1, Lambda_g1)
 
-            g2 = _g2(T, S, theta, n_time_indep_features, asso_functions, n_long_features, fixed_effect_time_order).swapaxes(0, 1)
+            g2 = g2(T, S, theta, n_time_indep_features, asso_functions, n_long_features, fixed_effect_time_order).swapaxes(0, 1)
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
-            Lambda_g2 = _Lambda_g(g2, f).swapaxes(1, 2)
-            E_g2 = _Eg(pi_xi, Lambda_1, Lambda_g2)
+            Lambda_g2 = Lambda_g(g2, f).swapaxes(1, 2)
+            E_g2 = Eg(pi_xi, Lambda_1, Lambda_g2)
 
-            g5 = _g5(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            g5 = g5(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5)
-            Lambda_g5 = _Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
+            Lambda_g5 = Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
                                        f).swapaxes(1, 4)
-            E_g5 = _Eg(pi_xi, Lambda_1, Lambda_g5)
+            E_g5 = Eg(pi_xi, Lambda_1, Lambda_g5)
 
-            g6 = _g6(X, T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            g6 = g6(X, T_u, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
             g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
-            Lambda_g6 = _Lambda_g(g6, f).swapaxes(1, 5)
-            E_g6 = _Eg(pi_xi, Lambda_1, Lambda_g6)
+            Lambda_g6 = Lambda_g(g6, f).swapaxes(1, 5)
+            E_g6 = Eg(pi_xi, Lambda_1, Lambda_g6)
 
-            g8 = _g8(extracted_features, S, theta, n_long_features, n_samples)
+            g8 = g8(extracted_features, S, theta, n_long_features, n_samples)
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
-            Lambda_g8 = _Lambda_g(g8, f).swapaxes(1, 2)
-            E_g8 = _Eg(pi_xi, Lambda_1, Lambda_g8)
+            Lambda_g8 = Lambda_g(g8, f).swapaxes(1, 2)
+            E_g8 = Eg(pi_xi, Lambda_1, Lambda_g8)
 
             # if False: # to be defined
             #     N *= 10
@@ -503,7 +501,7 @@ class QNMCEM(Learner):
 
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
 
-            # g1_Q = self._g1(X, T, S)
+            # g1_Q = self._g1(X, T_u, S)
             # g1_Q = np.broadcast_to(g1_Q[..., None], g1_Q.shape + (2,)).swapaxes(1, 4)
             # Lambda_g1_Q = self._Lambda_g(g1_Q, f).swapaxes(1, 3)
             # E_g1_Q = self._Eg(pi_xi, Lambda_1, Lambda_g1_Q)
@@ -514,9 +512,9 @@ class QNMCEM(Learner):
             #             indicator_1 * 1).T).sum(axis=1).T
 
             # TODO
-            g1 = _g1(X, T, S)
-            E_g1 = _Eg(g1)
-            E_log_g1 = _Eg(np.log(g1))
+            g1 = g1(X, T_u, S)
+            E_g1 = Eg(g1)
+            E_log_g1 = Eg(np.log(g1))
 
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
@@ -535,8 +533,8 @@ class QNMCEM(Learner):
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
-            g1 = _g1(X, T, S)
-            E_g1 = _Eg(g1)
+            g1 = g1(X, T_u, S)
+            E_g1 = Eg(g1)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
                                indicator_1].sum(axis=0)

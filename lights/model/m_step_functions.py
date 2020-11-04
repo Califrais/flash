@@ -1,7 +1,9 @@
 import numpy as np
-from lights.base.base import get_vect_from_ext, _get_xi_from_xi_ext, logistic_loss, logistic_grad, _clean_xi_ext
+from lights.base.base import get_vect_from_ext, logistic_loss, logistic_grad, \
+    get_xi_from_xi_ext, clean_xi_ext
 
-def _P_func(X, pi_est, xi_ext):
+
+def P_func_(X, pi_est, xi_ext, fit_intercept):
     """Computes the sub objective function denoted P in the lights paper,
     to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -23,14 +25,14 @@ def _P_func(X, pi_est, xi_ext):
     output : `float`
         The value of the P sub objective to be minimized at each QNMCEM step
     """
-    xi_0, xi = _get_xi_from_xi_ext(xi_ext)
-    pen = _elastic_net_pen(xi_ext)
+    xi_0, xi = get_xi_from_xi_ext(xi_ext)
+    pen = elastic_net_pen(xi_ext)
     u = xi_0 + X.dot(xi)
     sub_obj = (pi_est * u + logistic_loss(u)).mean()
     return sub_obj + pen
 
 
-def _grad_P(X, pi_est, xi_ext, n_time_indep_features, n_samples, fit_intercept):
+def grad_P_(X, pi_est, xi_ext, n_time_indep_features, n_samples, fit_intercept):
     """Computes the gradient of the sub objective P
 
     Parameters
@@ -51,7 +53,7 @@ def _grad_P(X, pi_est, xi_ext, n_time_indep_features, n_samples, fit_intercept):
     output : `float`
         The value of the P sub objective gradient
     """
-    xi_0, xi = _get_xi_from_xi_ext(xi_ext)
+    xi_0, xi = get_xi_from_xi_ext(xi_ext)
     grad_pen = _grad_elastic_net_pen(xi)
     u = xi_0 + X.dot(xi)
     if fit_intercept:
@@ -137,7 +139,7 @@ def _grad_R(beta_ext, E_g5, E_g6, delta, baseline_hazard, indicator):
     return grad_sub_obj + grad_pen
 
 
-def _Q_func(gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta,
+def Q_func_(gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta,
             indicator):
     """Computes the sub objective function denoted Q in the lights paper,
     to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
@@ -184,7 +186,7 @@ def _Q_func(gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard, delta,
     return -sub_obj / n_samples + pen
 
 
-def _grad_Q(gamma_ext):
+def grad_Q_(gamma_ext):
     """Computes the gradient of the sub objective Q
 
     Parameters
@@ -203,7 +205,8 @@ def _grad_Q(gamma_ext):
     grad_sub_obj = np.concatenate([grad, -grad])
     return grad_sub_obj + grad_pen
 
-def _elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept):
+
+def elastic_net_pen(xi_ext, l_pen, eta, fit_intercept):
     """Computes the elasticNet penalization of vector xi
 
     Parameters
@@ -217,13 +220,13 @@ def _elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept):
     output : `float`
         The value of the elasticNet penalization part of vector xi
     """
-    eta = eta_elastic_net
-    xi = _get_xi_from_xi_ext(xi_ext, fit_intercept)[1]
-    xi_ext = _clean_xi_ext(xi_ext, fit_intercept)
+    xi = get_xi_from_xi_ext(xi_ext, fit_intercept)[1]
+    xi_ext = clean_xi_ext(xi_ext, fit_intercept)
     return l_pen * ((1. - eta) * xi_ext.sum() +
                     0.5 * eta * np.linalg.norm(xi) ** 2)
 
-def _grad_elastic_net_pen(xi, l_pen, eta_elastic_net, n_time_indep_features):
+
+def _grad_elastic_net_pen(xi, l_pen, eta, n_time_indep_features):
     """Computes the gradient of the elasticNet penalization of vector xi
 
     Parameters
@@ -236,7 +239,6 @@ def _grad_elastic_net_pen(xi, l_pen, eta_elastic_net, n_time_indep_features):
     output : `float`
         The gradient of the elasticNet penalization part of vector xi
     """
-    eta = eta_elastic_net
     grad = np.zeros(2 * n_time_indep_features)
     # Gradient of lasso penalization
     grad += l_pen * (1 - eta)
@@ -246,7 +248,8 @@ def _grad_elastic_net_pen(xi, l_pen, eta_elastic_net, n_time_indep_features):
     grad[n_time_indep_features:] -= grad_pos
     return grad
 
-def _sparse_group_l1_pen(v_ext, l_pen, eta_sp_gp_l1):
+
+def _sparse_group_l1_pen(v_ext, l_pen, eta):
     """Computes the sparse group l1 penalization of vector v
 
     Parameters
@@ -259,11 +262,11 @@ def _sparse_group_l1_pen(v_ext, l_pen, eta_sp_gp_l1):
     output : `float`
         The value of the sparse group l1 penalization of vector v
     """
-    eta = eta_sp_gp_l1
     v = get_vect_from_ext(v_ext)
     return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
 
-def _grad_sparse_group_l1_pen(v, l_pen, eta_sp_gp_l1, n_long_features):
+
+def _grad_sparse_group_l1_pen(v, l_pen, eta, n_long_features):
     """Computes the gradient of the sparse group l1 penalization of a
     vector v
 
@@ -272,22 +275,21 @@ def _grad_sparse_group_l1_pen(v, l_pen, eta_sp_gp_l1, n_long_features):
     v : `np.ndarray`
         A coefficient vector
 
+    n_long_features : `int`
+        Number of longitudinal features
+
     Returns
     -------
     output : `float`
         The gradient of the sparse group l1 penalization of vector v
     """
-    l_pen = l_pen
-    eta = eta_sp_gp_l1
-    L = n_long_features
     dim = len(v)
     grad = np.zeros(2 * dim)
     # Gradient of lasso penalization
     grad += l_pen * (1 - eta)
     # Gradient of sparse group l1 penalization
-    # TODO Van Tuan : to be verified
-    tmp = np.array([np.repeat(np.linalg.norm(v_l), dim // L)
-                    for v_l in np.array_split(v, L)]).flatten()
+    tmp = np.array([np.repeat(np.linalg.norm(v_l), dim // n_long_features)
+                    for v_l in np.array_split(v, n_long_features)]).flatten()
     grad_pos = (l_pen * eta) * v / tmp
     grad[:dim] += grad_pos
     grad[dim:] -= grad_pos

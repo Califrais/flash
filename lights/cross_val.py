@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.model_selection import KFold
 from lights.inference import QNMCEM
 
-def cross_validate(self, X, Y, T, delta, n_folds=10, eta=0.1,
+
+def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
                    adaptative_grid_el=True, grid_size=30,
                    grid_elastic_net=np.array([0]), shuffle=True,
                    verbose=True, metric='C-index'):

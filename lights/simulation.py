@@ -240,7 +240,6 @@ class SimuJointLongitudinalSurvival(Simulation):
     -----
     There is no intercept in this model
     """
-
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
                  sparsity: float = .7, coeff_val_time_indep: float = 1.,
