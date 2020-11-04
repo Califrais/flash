@@ -379,7 +379,7 @@ class QNMCEM(Learner):
         # Instanciates the E-step and M-step functions
         E_func = EstepFunctions(X, T, delta, extracted_features,
                                 n_long_features, n_time_indep_features,
-                                fixed_effect_time_order, N, asso_functions)
+                                fixed_effect_time_order, asso_functions)
         F_func = MstepFunctions(fit_intercept, X, T, delta, n_long_features,
                                 n_time_indep_features, self.l_pen,
                                 self.eta_elastic_net, self.eta_sp_gp_l1)
@@ -390,7 +390,7 @@ class QNMCEM(Learner):
 
             # E-Step
             E_func.theta = self.theta
-            S = E_func.construct_MC_samples()
+            S = E_func.construct_MC_samples(N)
             f = E_func.f_data_given_latent(S)
             Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)

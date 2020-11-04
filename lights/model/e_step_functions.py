@@ -37,9 +37,6 @@ class EstepFunctions:
             dimension of the corresponding design matrix is then equal to
             fixed_effect_time_order + 1
 
-    N : `int`
-        Number of Monte Carlo samples
-
     asso_functions : `list` or `str`='all'
             List of association functions wanted or string 'all' to select all
             defined association functions. The available functions are :
@@ -54,7 +51,7 @@ class EstepFunctions:
     """
 
     def __init__(self, X, T, delta, extracted_features, n_long_features,
-                 n_time_indep_features, fixed_effect_time_order, N,
+                 n_time_indep_features, fixed_effect_time_order,
                  asso_functions, theta=None):
         self.X = X
         self.T = T
@@ -67,10 +64,9 @@ class EstepFunctions:
         self.fixed_effect_time_order = fixed_effect_time_order
         n_samples = len(T)
         self.n_samples = n_samples
-        self.N = N
         self.asso_functions = asso_functions
 
-    def construct_MC_samples(self):
+    def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
 
         Returns
@@ -78,7 +74,6 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(2*N, r)
             Set of constructed Monte Carlo samples
         """
-        N = self.N
         D = self.theta["long_cov"]
         C = np.linalg.cholesky(D)
         r = D.shape[0]
@@ -166,10 +161,11 @@ class EstepFunctions:
         g1 : `np.ndarray`, shape=(n_samples, 2, 2*N, J)
             The values of g1 function
         """
-        n_samples, N = self.n_samples, self.N
+        n_samples = self.n_samples
         n_time_indep_features = self.n_time_indep_features
         theta = self.theta
         X, T_u = self.X, self.T_u
+        N = S.shape[0] // 2
         J = T_u.shape[0]
         p = n_time_indep_features
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
@@ -194,8 +190,9 @@ class EstepFunctions:
         g2 : `np.ndarray`, shape=(2, J, 2*N)
             The values of g2 function
         """
-        T_u, N, theta = self.T_u, self.N, self.theta
+        T_u, theta = self.T_u, self.theta
         p = self.n_time_indep_features
+        N = S.shape[0] // 2
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         asso_func = get_asso_func(T_u, S, theta, self.asso_functions,
                                   self.n_long_features,
