@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
+# Author: Simon Bussy <simon.bussy@gmail.com>
+
 import numpy as np
-from lights.model.association import get_asso_func
+from lights.model.associations import get_asso_func
 
 
 class EstepFunctions:
@@ -22,19 +25,15 @@ class EstepFunctions:
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-    theta : `dict`
-        Vector that concatenates all parameters to be inferred in the lights
-        model
-
     n_time_indep_features : `int`
         Number of time-independent features
 
     n_long_features : `int`
         Number of longitudinal features
 
-    fixed_effect_time_order :
-            Order of the higher time monomial considered for the representations of
-            the time-varying features corresponding to the fixed effect. The
+    fixed_effect_time_order : `int`
+            Order of the higher time monomial considered for the representations
+             of the time-varying features corresponding to the fixed effect. The
             dimension of the corresponding design matrix is then equal to
             fixed_effect_time_order + 1
 
@@ -48,11 +47,15 @@ class EstepFunctions:
                 - 're' : random effects
                 - 'tps' : time dependent slope
                 - 'ce' : cumulative effects
+
+    theta : `dict`, default=None
+        Vector that concatenates all parameters to be inferred in the lights
+        model
     """
 
-    def __init__(self, X, T, delta, extracted_features, theta, n_long_features,
+    def __init__(self, X, T, delta, extracted_features, n_long_features,
                  n_time_indep_features, fixed_effect_time_order, N,
-                 asso_functions):
+                 asso_functions, theta=None):
         self.X = X
         self.T = T
         self.T_u = np.unique(T)
@@ -133,7 +136,8 @@ class EstepFunctions:
 
         return f
 
-    def _g0(self, S):
+    @staticmethod
+    def _g0(S):
         """Computes g0
 
         Parameters
@@ -274,7 +278,7 @@ class EstepFunctions:
         return g8
 
     @staticmethod
-    def _Lambda_g(g, f):
+    def Lambda_g(g, f):
         """Approximated integral (see (15) in the lights paper)
 
         Parameters
@@ -322,6 +326,6 @@ class EstepFunctions:
         Eg : `np.ndarray`, shape=(n_samples,)
             The approximated expectations for g
         """
-        Eg = ((Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi)
-               / (Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)).T
-        return Eg
+        Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
+                    Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
+        return Eg.T

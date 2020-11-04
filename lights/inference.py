@@ -9,10 +9,9 @@ from lights.base.base import Learner, extract_features, normalize, \
     get_vect_from_ext, get_xi_from_xi_ext, logistic_grad
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
-from lights.model.e_step_functions import Lambda_g, Eg, g0, g1, g2, g5, g6, \
-    g8, construct_MC_samples, f_data_given_latent
-from lights.model.m_step_functions import P_func, grad_P, R_func, grad_R, \
-    Q_func, grad_Q, elastic_net_pen
+from lights.model.e_step_functions import EstepFunctions
+from lights.model.m_step_functions import MstepFunctions
+from lights.model.regularizations import Penalties
 
 
 class QNMCEM(Learner):
@@ -79,9 +78,6 @@ class QNMCEM(Learner):
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
-        self.l_pen = l_pen
-        self.eta_elastic_net = eta_elastic_net
-        self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.max_iter = max_iter
         self.tol = tol
         self.warm_start = warm_start
@@ -89,10 +85,15 @@ class QNMCEM(Learner):
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
         self.initialize = initialize
+        self.l_pen = l_pen
+        self.eta_elastic_net = eta_elastic_net
+        self.eta_sp_gp_l1 = eta_sp_gp_l1
+        self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
+                             eta_sp_gp_l1)
 
         # Attributes that will be instantiated afterwards
-        self.n_time_indep_features = None
         self.n_samples = None
+        self.n_time_indep_features = None
         self.n_long_features = None
         self.theta = {
             "beta_0": None,
@@ -104,43 +105,6 @@ class QNMCEM(Learner):
             "gamma_0": None,
             "gamma_1": None
         }
-        self.avg_scores = None
-        self.scores = None
-        self.l_pen_best = None
-        self.l_pen_chosen = None
-        self.grid_elastic_net = None
-        self.adaptative_grid_el = None
-        self.grid_size = None
-
-    @property
-    def l_pen(self):
-        return self._l_pen
-
-    @l_pen.setter
-    def l_pen(self, val):
-        if not val >= 0:
-            raise ValueError("``l_pen`` must be non negative")
-        self._l_pen = val
-
-    @property
-    def eta_elastic_net(self):
-        return self._eta_elastic_net
-
-    @eta_elastic_net.setter
-    def eta_elastic_net(self, val):
-        if not 0 <= val <= 1:
-            raise ValueError("``eta_elastic_net`` must be in (0, 1)")
-        self._eta_elastic_net = val
-
-    @property
-    def eta_sp_gp_l1(self):
-        return self._eta_sp_gp_l1
-
-    @eta_sp_gp_l1.setter
-    def eta_sp_gp_l1(self, val):
-        if not 0 <= val <= 1:
-            raise ValueError("``eta_sp_gp_l1`` must be in (0, 1)")
-        self._eta_sp_gp_l1 = val
 
     @property
     def asso_functions(self):
@@ -209,10 +173,8 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         log_lik = self._log_lik(X, Y, T, delta)
-        l_pen = self.l_pen
-        eta_elastic_net = self.eta_elastic_net
-        fit_intercept = self.fit_intercept
-        pen = elastic_net_pen(xi_ext, l_pen, eta_elastic_net, fit_intercept)
+        pen = self.pen.elastic_net(xi_ext)
+        # TODO : add sparse group l1 penalties
         return -log_lik + pen
 
     def get_proba(self, X, xi_ext):
@@ -285,10 +247,6 @@ class QNMCEM(Learner):
 
     def update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
-
-        Parameters
-        ----------
-
         """
         for key, value in kwargs.items():
             if key in ["beta_0", "beta_1", "gamma_0", "gamma_1"]:
@@ -296,7 +254,8 @@ class QNMCEM(Learner):
             elif key in ["long_cov", "phi", "baseline_hazard"]:
                 self.theta[key] = value
             elif key in ["xi"]:
-                self.theta[key] = get_xi_from_xi_ext(value, self.fit_intercept)[1]
+                _, self.theta[key] = get_xi_from_xi_ext(value,
+                                                        self.fit_intercept)
             else:
                 raise NameError('Parameter {} has not defined'.format(key))
 
@@ -334,7 +293,7 @@ class QNMCEM(Learner):
         self.n_time_indep_features = n_time_indep_features
         self.n_long_features = n_long_features
         q_l = fixed_effect_time_order + 1
-        r_l = 2  # linear time-varying features, so all r_l=2
+        r_l = 2  # Linear time-varying features, so all r_l=2
         if fit_intercept:
             n_time_indep_features += 1
 
@@ -345,29 +304,29 @@ class QNMCEM(Learner):
         if 're' in asso_functions:
             nb_asso_param += 1
         nb_asso_features = n_long_features * nb_asso_param + n_time_indep_features
-        N = 5  # number of initial Monte Carlo sample for S
+        N = 5  # Number of initial Monte Carlo sample for S
 
-        # normalize time-independent features
+        # Normalize time-independent features
         X = normalize(X)
 
-        # features extraction
+        # Features extraction
         extracted_features = extract_features(Y, fixed_effect_time_order)
 
-        # initialization
+        # Initialization
         xi_ext = np.zeros(2 * n_time_indep_features)
 
-        # the J unique censored times of the event of interest
+        # The J unique censored times of the event of interest
         T_u = np.unique(T)
         J = T_u.shape[0]
 
-        # create indicator matrices to compare event times
+        # Create indicator matrices to compare event times
         # TODO: use indicator to update f_data_given_latent
         tmp = np.broadcast_to(T, (n_samples, n_samples))
         indicator = (tmp < tmp.T) * 1 + np.eye(n_samples)
         indicator_1 = T.reshape(-1, 1) == T_u
         indicator_2 = T.reshape(-1, 1) >= T_u
 
-        # initialize longitudinal submodels
+        # Initialize longitudinal submodels
         if self.initialize:
             mlmm = MLMM(max_iter=max_iter, verbose=verbose,
                         print_every=print_every, tol=tol,
@@ -379,7 +338,7 @@ class QNMCEM(Learner):
             est = initialize_asso_params(X, T, delta)
             time_indep_cox_coeffs, baseline_hazard = est
         else:
-            # fixed initialization
+            # Fixed initialization
             q = q_l * n_long_features
             r = r_l * n_long_features
             beta = np.zeros((q, 1))
@@ -405,26 +364,35 @@ class QNMCEM(Learner):
         func_obj = self._func_obj
 
         obj = func_obj(X, Y, T, delta, xi_ext)
-        # store init values
+        # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
         if verbose:
             self.history.print_history()
 
-        # stopping criteria and bounds vector for the L-BGFS-B algorithms
+        # Stopping criteria and bounds vector for the L-BGFS-B algorithms
         maxiter, pgtol = 60, 1e-5
         bounds_xi = [(0, None)] * 2 * n_time_indep_features
         bounds_beta = [(0, None)] * 2 * n_long_features * \
                       (fixed_effect_time_order + 1)
         bounds_gamma = [(0, None)] * 2 * nb_asso_features
 
+        # Instanciates the E-step and M-step functions
+        E_func = EstepFunctions(X, T, delta, extracted_features,
+                                n_long_features, n_time_indep_features,
+                                fixed_effect_time_order, N, asso_functions)
+        F_func = MstepFunctions(fit_intercept, X, T, delta, n_long_features,
+                                n_time_indep_features, self.l_pen,
+                                self.eta_elastic_net, self.eta_sp_gp_l1)
+
         for n_iter in range(1, max_iter + 1):
 
             pi_xi = self.get_proba(X, xi_ext)
-            theta = self.theta
+
             # E-Step
-            S = construct_MC_samples(theta, N)
-            f = f_data_given_latent(X, extracted_features, T, delta, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
-            Lambda_1 = Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+            E_func.theta = self.theta
+            S = E_func.construct_MC_samples()
+            f = E_func.f_data_given_latent(S)
+            Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
             g0 = g0(S)
@@ -481,22 +449,22 @@ class QNMCEM(Learner):
 
             # Update xi
             xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: P_func(X, pi_est, xi_ext_), x0=xi_0,
-                fprime=lambda xi_ext_: grad_P(X, pi_est, xi_ext_),
+                func=lambda xi_ext_: F_func.P_func(X, pi_est, xi_ext_), x0=xi_0,
+                fprime=lambda xi_ext_: F_func.grad_P(X, pi_est, xi_ext_),
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_0
             beta_0_ext = fmin_l_bfgs_b(
-                func=lambda beta_ext_: R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
+                func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
                             baseline_hazard, delta, indicator_2), x0=beta_0_0,
-                fprime=lambda beta_ext_: grad_R(beta_ext_), disp=False,
+                fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_1
             beta_1_ext = fmin_l_bfgs_b(
-                func=lambda beta_ext_: R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
+                func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
                             baseline_hazard, delta, indicator_2), x0=beta_1_0,
-                fprime=lambda beta_ext_: grad_R(beta_ext_), disp=False,
+                fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
