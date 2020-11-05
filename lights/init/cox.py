@@ -32,7 +32,8 @@ def initialize_asso_params(X, T, delta):
     n_time_indep_features = X.shape[1]
     X_columns = ['X' + str(j + 1) for j in range(n_time_indep_features)]
     survival_labels = ['T', 'delta']
-    data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1), delta.reshape(-1, 1))),
+    data = pd.DataFrame(data=np.hstack((X, T.reshape(-1, 1),
+                                        delta.reshape(-1, 1))),
                         columns=X_columns + survival_labels)
 
     cox = CoxPHFitter()

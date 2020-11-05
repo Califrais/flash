@@ -38,6 +38,7 @@ class MLMM(Learner):
         If `True`, we initialize the parameters using ULMM model, otherwise we
         use arbitrarily chosen fixed initialization
     """
+
     def __init__(self, max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  fixed_effect_time_order=5, initialize=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
@@ -81,7 +82,7 @@ class MLMM(Learner):
             y_i = y_list[i]
             diag = []
             for l in range(n_long_features):
-                diag += [phi[l, 0]]* N[i][l]
+                diag += [phi[l, 0]] * N[i][l]
             Sigma_i = np.diag(diag)
             tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
@@ -104,9 +105,9 @@ class MLMM(Learner):
             Fixed effect coefficient vectors
 
         long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
-        Variance-covariance matrix that accounts for dependence between the
-        different longitudinal outcome. Here r = 2*n_long_features since
-        one choose linear time-varying features, so all r_l=2
+            Variance-covariance matrix that accounts for dependence between the
+            different longitudinal outcome. Here r = 2*n_long_features since
+            one choose linear time-varying features, so all r_l=2
 
         phi : `np.ndarray`, shape=(n_long_features,)
             Variance vector for the error term of the longitudinal processes
@@ -157,9 +158,8 @@ class MLMM(Learner):
         self.update_theta(beta, D, phi)
         obj = -self.log_lik(extracted_features)
         # store init values
-        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf,
-                            fixed_effect_coeffs=beta.ravel(), long_cov=D,
-                            phi=phi)
+        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, phi=phi,
+                            fixed_effect_coeffs=beta.ravel(), long_cov=D)
         if verbose:
             self.history.print_history()
 
@@ -199,7 +199,8 @@ class MLMM(Learner):
                         mu[r_l * l: r_l * (l + 1), i]
                     )
                     Omega_L[l][i * r_l: (i + 1) * r_l, i * r_l: (i + 1) * r_l] \
-                        = Omega_i[r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)]
+                        = Omega_i[
+                          r_l * l: r_l * (l + 1), r_l * l: r_l * (l + 1)]
 
             mu_flat = mu.T.flatten().reshape(-1, 1)
 
@@ -235,8 +236,8 @@ class MLMM(Learner):
 
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    fixed_effect_coeffs=beta.ravel(), long_cov=D,
-                                    phi=phi)
+                                    fixed_effect_coeffs=beta.ravel(), phi=phi,
+                                    long_cov=D)
                 if verbose:
                     self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):

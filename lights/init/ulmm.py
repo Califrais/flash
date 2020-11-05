@@ -26,6 +26,7 @@ class ULMM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
     """
+
     def __init__(self, verbose=True, print_every=10, fixed_effect_time_order=5):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.fixed_effect_time_order = fixed_effect_time_order
@@ -50,11 +51,11 @@ class ULMM(Learner):
         self._start_solve()
         fixed_effect_time_order = self.fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
-        r_l = 2  # linear time-varying features, so all r_l=2
+        r_l = 2  # Linear time-varying features, so all r_l=2
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
 
-        # fixed initialization
+        # Fixed initialization
         q = q_l * n_long_features
         r = r_l * n_long_features
         beta = np.zeros((q, 1))

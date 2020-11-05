@@ -73,6 +73,7 @@ class QNMCEM(Learner):
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization
     """
+
     def __init__(self, fit_intercept=False, l_pen=0., eta_elastic_net=.1,
                  eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,

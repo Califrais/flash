@@ -44,6 +44,7 @@ class MstepFunctions:
     eta_sp_gp_l1: `float`, default=0.1
         The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
     """
+
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
                  n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1):
         self.fit_intercept = fit_intercept
@@ -119,7 +120,7 @@ class MstepFunctions:
         return grad_sub_obj + grad_pen
 
     def R_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard,
-                indicator):
+               indicator):
         """Computes the sub objective function denoted R in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -186,7 +187,7 @@ class MstepFunctions:
         return grad_sub_obj + grad_pen
 
     def Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard,
-                indicator):
+               indicator):
         """Computes the sub objective function denoted Q in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
 

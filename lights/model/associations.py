@@ -220,20 +220,6 @@ class AssociationFunctions:
         phi = self._linear_association(iU_l, iV_l)
         return phi
 
-    def derivative_linear_predictor(self):
-        """Computes the derivative of the linear predictor function
-
-        Returns
-        -------
-        d_phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
-            The value of derivative of the linear predictor function
-        """
-        n_long_features = self.n_long_features
-        N, q_l, U_l = self.N, self.q_l, self.U_l
-        U = np.broadcast_to(U_l, (n_long_features,) + U_l.shape).swapaxes(0, 1)
-        d_phi = np.broadcast_to(U, (2, 2 * N) + U.shape)
-        return d_phi
-
     def derivative_random_effects(self):
         """ Computes the derivative of the random effects function
 
@@ -248,32 +234,51 @@ class AssociationFunctions:
         d_phi = np.zeros(shape=(2, 2 * N, n_samples, n_long_features, q_l))
         return d_phi
 
+    def _get_derivative(self, val):
+        """Formats the derivative based on its value
+
+        Parameters
+        ----------
+        val : `np.ndarray`
+            Value of the derivative
+
+        Returns
+        -------
+        d_phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The derivative broadcasted to the right shape
+        """
+        n_long_features = self.n_long_features
+        N, q_l = self.N, self.q_l
+        U = np.broadcast_to(val, (n_long_features,) + val.shape).swapaxes(0, 1)
+        d_phi = np.broadcast_to(U, (2, 2 * N) + U.shape)
+        return d_phi
+
+    def derivative_linear_predictor(self):
+        """Computes the derivative of the linear predictor function
+
+        Returns
+        -------
+        output : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+            The value of derivative of the linear predictor function
+        """
+        return self._get_derivative(self.U_l)
+
     def derivative_time_dependent_slope(self):
         """Computes the derivative of the time-dependent slope function
 
         Returns
         -------
-        d_phi : `np.ndarray`, shape= (2, 2*N, n_samples, n_l, q_l)
+        output : `np.ndarray`, shape= (2, 2*N, n_samples, n_l, q_l)
             The value of the derivative of the time-dependent slope function
         """
-        n_long_features = self.n_long_features
-        N, q_l, dU_l = self.N, self.q_l, self.dU_l
-        dU = np.broadcast_to(dU_l,
-                             (n_long_features,) + dU_l.shape).swapaxes(0, 1)
-        d_phi = np.broadcast_to(dU, (2, 2 * N) + dU.shape)
-        return d_phi
+        return self._get_derivative(self.dU_l)
 
     def derivative_cumulative_effects(self):
         """Computes the derivative of the cumulative effects function
 
         Returns
         -------
-        d_phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+        output : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
             The value of the derivative of the cumulative effects function
         """
-        n_long_features = self.n_long_features
-        N, q_l, iU_l = self.N, self.q_l, self.iU_l
-        iU = np.broadcast_to(iU_l,
-                             (n_long_features,) + iU_l.shape).swapaxes(0, 1)
-        d_phi = np.broadcast_to(iU, (2, 2 * N) + iU.shape)
-        return d_phi
+        return self._get_derivative(self.iU_l)

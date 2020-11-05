@@ -39,7 +39,7 @@ def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
     cov : `np.ndarray`, shape=(n_features, n_features)
         The simulated variance-covariance matrix
     """
-    cov = (cst**2)*toeplitz(rho ** np.arange(0, n_features))
+    cov = (cst ** 2) * toeplitz(rho ** np.arange(0, n_features))
     features = np.random.multivariate_normal(
         np.zeros(n_features), cov, size=n_samples)
     return features, cov
@@ -61,7 +61,7 @@ def simulation_method(simulate_method):
 
 
 class Simulation:
-    """This is an abstract simulation class that inherits form BaseClass
+    """This is an abstract simulation class that inherits from BaseClass
     It does nothing besides printing stuff and verbosing
     """
 
@@ -240,6 +240,7 @@ class SimuJointLongitudinalSurvival(Simulation):
     -----
     There is no intercept in this model
     """
+
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
                  sparsity: float = .7, coeff_val_time_indep: float = 1.,
@@ -335,7 +336,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         delta : `np.ndarray`, shape=(n_samples,)
             The simulated censoring indicator
         """
-        verbose = self.verbose
         seed = self.seed
         n_samples = self.n_samples
         n_time_indep_features = self.n_time_indep_features
@@ -423,7 +423,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of true times
         idx_2 = np.arange(0, nb_asso_features, 2)
         idx_4 = np.arange(0, nb_asso_features, 4)
-        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:], [nb_asso_features - 1]))
+        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:],
+                                 [nb_asso_features - 1]))
         idx_34.sort()
         idx_3 = np.arange(0, 2 * n_long_features, 2) + 1
 
