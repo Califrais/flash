@@ -153,7 +153,6 @@ class AssociationFunctions:
         -------
         phi : `np.ndarray`, shape=(n_samples, 2, n_long_features, 2*N)
             The value of linear association function
-
         """
         beta = self.fixed_effect_coeffs
         n_samples = self.n_samples

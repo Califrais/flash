@@ -16,6 +16,26 @@ class Test(unittest.TestCase):
     @staticmethod
     def get_train_data(n_samples: int = 100):
         """Simulate data with specific seed
+
+        Parameters
+        ----------
+        n_samples : `int`, default=100
+            Desired number of samples
+
+        Returns
+        -------
+        X : `numpy.ndarray`, shape=(n_samples, n_time_indep_features)
+            The simulated time-independent features matrix
+
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
+
+        T : `np.ndarray`, shape=(n_samples,)
+            The simulated censored times of the event of interest
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            The simulated censoring indicator
         """
         simu = SimuJointLongitudinalSurvival(n_samples=n_samples,
                                              n_time_indep_features=5,
@@ -26,6 +46,23 @@ class Test(unittest.TestCase):
     @staticmethod
     def get_Y_without_subgroups():
         """Simulate longitudinal data with no latent subgroups
+
+        Returns
+        -------
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The simulated longitudinal data. Each element of the dataframe is
+            a pandas.Series
+
+        beta : `np.ndarray`, shape=(q,)
+            Simulated fixed effect coefficient vector
+
+        D : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
+            Variance-covariance matrix that accounts for dependence between the
+            different longitudinal outcome. Here r = 2*n_long_features since
+            one choose linear time-varying features, so all r_l=2
+
+        phi : `np.ndarray`, shape=(n_long_features,)
+            Variance vector for the error term of the longitudinal processes
         """
         simu = SimuJointLongitudinalSurvival(n_samples=100,
                                              n_time_indep_features=5,
@@ -40,7 +77,7 @@ class Test(unittest.TestCase):
         return Y, beta, D, phi
 
     def test_SimuJointLongitudinalSurvival(self):
-        """Test simulation of joint longitudinal and survival data
+        """Tests simulation of joint longitudinal and survival data
         """
         # Simulate data with specific seed
         X_, Y_, T_, delta_ = self.get_train_data(3)
@@ -75,7 +112,7 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(delta, delta_)
 
     def _test_initializer(self, initializer):
-        """Test an initialization algorithm estimation
+        """Tests an initialization algorithm estimation
         """
         Y, beta_, D_, phi_ = self.get_Y_without_subgroups()
         fixed_effect_time_order = initializer.fixed_effect_time_order
@@ -90,14 +127,14 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(phi, phi_, decimal=decimal)
 
     def test_ULMM(self):
-        """Test ULMM estimation
+        """Tests ULMM estimation
         """
         fixed_effect_time_order = 1  # q_l=2 in the simulations
         ulmm = ULMM(fixed_effect_time_order=fixed_effect_time_order)
         self._test_initializer(ulmm)
 
     def test_MLMM(self):
-        """Test MLMM estimation
+        """Tests MLMM estimation
         """
         fixed_effect_time_order = 1  # q_l=2 in the simulations
         mlmm = MLMM(fixed_effect_time_order=fixed_effect_time_order,
@@ -105,7 +142,7 @@ class Test(unittest.TestCase):
         self._test_initializer(mlmm)
 
     def test_QNMCEM(self):
-        """Test QNMCEM Algorithm
+        """Tests QNMCEM Algorithm
         """
         X, Y, T, delta = self.get_train_data()
         qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3, initialize=False)
