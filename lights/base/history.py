@@ -19,7 +19,7 @@ class History:
         number, current objective function value, and current relative objective
         to monitor convergence
     """
-    
+
     def __init__(self, minimum_col_width=8, print_order=None):
         if print_order is None:
             print_order = ["n_iter", "obj", "rel_obj"]

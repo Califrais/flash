@@ -244,7 +244,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        d_phi : `np.ndarray`, shape=(n_long_features, 2, 2*N, n_samples, q_l)
+        d_phi : `np.ndarray`
             The derivative broadcasted to the right shape
         """
         n_long_features = self.n_long_features
