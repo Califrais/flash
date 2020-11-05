@@ -396,36 +396,32 @@ class QNMCEM(Learner):
             Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
-            g0 = g0(S)
+            g0 = E_func._g0(S)
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
-            Lambda_g0 = Lambda_g(g0, f)
-            E_g0 = Eg(pi_xi, Lambda_1, Lambda_g0)
+            E_g0 = E_func._Eg(g0, Lambda_1, pi_xi, f)
 
-            g1 = g1(X, T_u, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            g1 = E_func._g1(S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
-            Lambda_g1 = Lambda_g(g1, f).swapaxes(1, 3)
-            E_g1 = Eg(pi_xi, Lambda_1, Lambda_g1)
+            E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
 
-            g2 = g2(T, S, theta, n_time_indep_features, asso_functions, n_long_features, fixed_effect_time_order).swapaxes(0, 1)
+            g2 = E_func._g2(S).swapaxes(0, 1)
+            # TODO: optimize later
+            g2 = np.sum(np.broadcast_to(g2, (n_samples, ) + g2.shape).T * (indicator_1 * 1).T, axis = 2).T
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
-            Lambda_g2 = Lambda_g(g2, f).swapaxes(1, 2)
-            E_g2 = Eg(pi_xi, Lambda_1, Lambda_g2)
+            E_g2 = E_func._Eg(g2, Lambda_1, pi_xi, f)
 
-            g5 = g5(T, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
-            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5)
-            Lambda_g5 = Lambda_g(g5.swapaxes(0, 2).swapaxes(1, 2),
-                                       f).swapaxes(1, 4)
-            E_g5 = Eg(pi_xi, Lambda_1, Lambda_g5)
+            # TODO: update later
+            g5 = E_func._g5(S)
+            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5).swapaxes(0, 2).swapaxes(1, 2)
+            # E_g5 = E_func._Eg(g5, Lambda_1, pi_xi, f)
 
-            g6 = g6(X, T_u, S, theta, asso_functions, n_long_features, fixed_effect_time_order)
+            g6 = E_func._g6(S)
             g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
-            Lambda_g6 = Lambda_g(g6, f).swapaxes(1, 5)
-            E_g6 = Eg(pi_xi, Lambda_1, Lambda_g6)
+            # E_g6 = E_func._Eg(g6, Lambda_1, pi_xi, f)
 
-            g8 = g8(extracted_features, S, theta, n_long_features, n_samples)
+            g8 = E_func._g8(S)
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
-            Lambda_g8 = Lambda_g(g8, f).swapaxes(1, 2)
-            E_g8 = Eg(pi_xi, Lambda_1, Lambda_g8)
+            E_g8 = E_func._Eg(g8, Lambda_1, pi_xi, f)
 
             # if False: # to be defined
             #     N *= 10
@@ -450,21 +446,21 @@ class QNMCEM(Learner):
 
             # Update xi
             xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: F_func.P_func(X, pi_est, xi_ext_), x0=xi_0,
-                fprime=lambda xi_ext_: F_func.grad_P(X, pi_est, xi_ext_),
+                func=lambda xi_ext_: F_func.P_func(pi_est, xi_ext_), x0=xi_0,
+                fprime=lambda xi_ext_: F_func.grad_P(pi_est, xi_ext_),
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_0
             beta_0_ext = fmin_l_bfgs_b(
                 func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
-                            baseline_hazard, delta, indicator_2), x0=beta_0_0,
+                            baseline_hazard, indicator_2), x0=beta_0_0,
                 fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_1
             beta_1_ext = fmin_l_bfgs_b(
                 func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
-                            baseline_hazard, delta, indicator_2), x0=beta_1_0,
+                            baseline_hazard, indicator_2), x0=beta_1_0,
                 fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
@@ -487,23 +483,24 @@ class QNMCEM(Learner):
 
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
-                func=lambda gamma_ext_: Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, delta, indicator_2), x0=gamma_0_0,
-                fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
+                func=lambda gamma_ext_: F_func.Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
+                            baseline_hazard, indicator_2), x0=gamma_0_0,
+                fprime=lambda gamma_ext_: F_func.grad_Q(gamma_ext_), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update gamma_1
             gamma_1_ext = fmin_l_bfgs_b(
-                func=lambda gamma_ext_: Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, delta, indicator_2), x0=gamma_1_0,
-                fprime=lambda gamma_ext_: grad_Q(gamma_ext_), disp=False,
+                func=lambda gamma_ext_: F_func.Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
+                            baseline_hazard, indicator_2), x0=gamma_1_0,
+                fprime=lambda gamma_ext_: F_func.grad_Q(gamma_ext_), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
-            g1 = g1(X, T_u, S)
-            E_g1 = Eg(g1)
+            g1 = E_func._g1(S)
+            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
+            E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
                                indicator_1].sum(axis=0)

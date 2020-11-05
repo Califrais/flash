@@ -96,7 +96,7 @@ class EstepFunctions:
             The value of the f(Y, T, delta| S, G, theta)
         """
         X, extracted_features = self.X, self.extracted_features
-        T, T_u, delta = self.T, self.delta, self.T_u
+        T, T_u, delta = self.T, self.T_u, self.delta
         theta = self.theta
         n_samples, n_long_features = self.n_samples, self.n_long_features
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
@@ -300,8 +300,7 @@ class EstepFunctions:
         Lambda_g = np.mean((g.T * f.T).T, axis=2)
         return Lambda_g
 
-    @staticmethod
-    def _Eg(pi_xi, Lambda_1, Lambda_g):
+    def _Eg(self, g, Lambda_1, pi_xi, f):
         """Computes approximated expectations of different functions g taking
         random effects as input, conditional on the observed data and the
         current estimate of the parameters. See (14) in the lights paper
@@ -315,14 +314,16 @@ class EstepFunctions:
             Approximated integral (see (15) in the lights paper) with
             \tilde(g)=1
 
-        Lambda_g: `np.ndarray`, shape=(n_samples, 2)
-             Approximated integral (see (15) in the lights paper)
+        pi_xi:
+
+        f:
 
         Returns
         -------
         Eg : `np.ndarray`, shape=(n_samples,)
             The approximated expectations for g
         """
+        Lambda_g = self.Lambda_g(g, f)
         Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
                     Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
         return Eg.T
