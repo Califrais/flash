@@ -411,13 +411,15 @@ class QNMCEM(Learner):
             E_g2 = E_func._Eg(g2, Lambda_1, pi_xi, f)
 
             # TODO: update later
-            g5 = E_func._g5(S)
-            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(0, 5).swapaxes(0, 2).swapaxes(1, 2)
-            # E_g5 = E_func._Eg(g5, Lambda_1, pi_xi, f)
+            g5 = E_func._g5(S).swapaxes(0, 2)
+            g5 = np.sum(np.broadcast_to(g5, (n_samples,) + g5.shape).T * (
+                        indicator_1 * 1).T, axis=-2).T
+            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(2, 5).swapaxes(1, 2)
+            E_g5 = E_func._Eg(g5, Lambda_1, pi_xi, f)
 
             g6 = E_func._g6(S)
             g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
-            # E_g6 = E_func._Eg(g6, Lambda_1, pi_xi, f)
+            E_g6 = E_func._Eg(g6, Lambda_1, pi_xi, f)
 
             g8 = E_func._g8(S)
             g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 3)
@@ -466,20 +468,10 @@ class QNMCEM(Learner):
 
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
 
-            # g1_Q = self._g1(X, T_u, S)
-            # g1_Q = np.broadcast_to(g1_Q[..., None], g1_Q.shape + (2,)).swapaxes(1, 4)
-            # Lambda_g1_Q = self._Lambda_g(g1_Q, f).swapaxes(1, 3)
-            # E_g1_Q = self._Eg(pi_xi, Lambda_1, Lambda_g1_Q)
-            #
-            # log_g1_Q = np.log(g1_Q)
-            # Lambda_log_g1_Q = self._Lambda_g(log_g1_Q, f).swapaxes(1, 3)
-            # E_log_g1_Q = (self._Eg(pi_xi, Lambda_1, Lambda_log_g1_Q).T * (
-            #             indicator_1 * 1).T).sum(axis=1).T
-
             # TODO
-            g1 = g1(X, T_u, S)
-            E_g1 = Eg(g1)
-            E_log_g1 = Eg(np.log(g1))
+            g1 = E_func._g1(S)
+            E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
+            E_log_g1 = E_func._Eg(np.log(g1), Lambda_1, pi_xi, f)
 
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
