@@ -512,6 +512,20 @@ class QNMCEM(Learner):
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
 
+            # Update phi
+            (U_L, V_L, y_L, N_L) = extracted_features[1]
+            # TODO: Update later
+            for l in range(n_long_features):
+                N_l = sum(N_L[l])
+                y_l = y_L[l]
+                U_l = U_L[l]
+                V_l = V_L[l]
+                beta_l = beta[q_l * l: q_l * (l + 1)]
+                E_mu_l = 0
+                tmp = y_l - U_l.dot(beta_l)
+                phi[l] = (tmp.T.dot(tmp - 2 * V_l.dot(E_mu_l)) + np.trace(
+                    V_l.T.dot(V_l).dot( E_mu_l.dot(E_mu_l.T)))) / N_l
+
         self._end_solve()
 
     def score(self, X, Y, T, delta, metric):
