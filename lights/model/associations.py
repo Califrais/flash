@@ -63,7 +63,10 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     for func_name in asso_functions:
         if derivative:
             func = asso_func.assoc_func_dict["d_" + func_name]
-            func_r = func.reshape(2, 2 * N, J, n_long_features, q_l)
+            if func_name == 're':
+                func_r = func.reshape(2, 2 * N, J, n_long_features, 2 * q_l)
+            else:
+                func_r = func.reshape(2, 2 * N, J, n_long_features, q_l)
         else:
             func = asso_func.assoc_func_dict[func_name]
             dim = n_long_features
@@ -164,8 +167,8 @@ class AssociationFunctions:
             tmp = V.dot(S[:, r_l * l: r_l * (l + 1)].T)
             beta_0l = beta[0, q_l * l: q_l * (l + 1)]
             beta_1l = beta[1, q_l * l: q_l * (l + 1)]
-            phi[:, 0, l, :] = U.dot(beta_0l) + tmp
-            phi[:, 1, l, :] = U.dot(beta_1l) + tmp
+            phi[:, 0, l, :] = U.dot(beta_0l).reshape(-1, 1) + tmp
+            phi[:, 1, l, :] = U.dot(beta_1l).reshape(-1, 1) + tmp
 
         return phi
 
@@ -230,7 +233,7 @@ class AssociationFunctions:
         n_samples = self.n_samples
         n_long_features = self.n_long_features
         N, q_l = self.N, self.q_l
-        d_phi = np.zeros(shape=(2, 2 * N, n_samples, n_long_features, q_l))
+        d_phi = np.zeros(shape=(2, 2 * N, n_samples, n_long_features, 2 * q_l))
         return d_phi
 
     def _get_derivative(self, val):

@@ -38,7 +38,7 @@ class Test(unittest.TestCase):
             The simulated censoring indicator
         """
         simu = SimuJointLongitudinalSurvival(n_samples=n_samples,
-                                             n_time_indep_features=5,
+                                             n_time_indep_features=1,
                                              n_long_features=3, seed=123)
         X, Y, T, delta = simu.simulate()
         return X, Y, T, delta

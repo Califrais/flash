@@ -383,7 +383,8 @@ class QNMCEM(Learner):
                                 fixed_effect_time_order, asso_functions)
         F_func = MstepFunctions(fit_intercept, X, T, delta, n_long_features,
                                 n_time_indep_features, self.l_pen,
-                                self.eta_elastic_net, self.eta_sp_gp_l1)
+                                self.eta_elastic_net, self.eta_sp_gp_l1, nb_asso_features,
+                                fixed_effect_time_order)
 
         for n_iter in range(1, max_iter + 1):
 
@@ -400,6 +401,9 @@ class QNMCEM(Learner):
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
             E_g0 = E_func._Eg(g0, Lambda_1, pi_xi, f)
 
+            gS = np.broadcast_to(S, (n_samples, 2) + S.shape)
+            E_gS = E_func._Eg(gS, Lambda_1, pi_xi, f)
+
             g1 = E_func._g1(S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
@@ -410,7 +414,6 @@ class QNMCEM(Learner):
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
             E_g2 = E_func._Eg(g2, Lambda_1, pi_xi, f)
 
-            # TODO: update later
             g5 = E_func._g5(S).swapaxes(0, 2)
             g5 = np.sum(np.broadcast_to(g5, (n_samples,) + g5.shape).T * (
                         indicator_1 * 1).T, axis=-2).T
@@ -454,36 +457,42 @@ class QNMCEM(Learner):
 
             # Update beta_0
             beta_0_ext = fmin_l_bfgs_b(
-                func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
+                func=lambda beta_ext_: F_func.R_func(beta_0_ext, pi_est, E_g1, E_g2, E_g8,
                             baseline_hazard, indicator_2), x0=beta_0_0,
-                fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
+                fprime=lambda beta_ext_: F_func.grad_R(beta_0_ext, gamma_0_ext, pi_est[:, 0], E_g5, E_g6, E_gS, baseline_hazard,
+               indicator_2, extracted_features, phi), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_1
             beta_1_ext = fmin_l_bfgs_b(
-                func=lambda beta_ext_: F_func.R_func(beta_ext_, pi_est, E_g1, E_g2, E_g8,
+                func=lambda beta_ext_: F_func.R_func(beta_1_ext, pi_est, E_g1, E_g2, E_g8,
                             baseline_hazard, indicator_2), x0=beta_1_0,
-                fprime=lambda beta_ext_: F_func.grad_R(beta_ext_), disp=False,
+                fprime=lambda beta_ext_: F_func.grad_R(beta_1_ext, gamma_1_ext, pi_est[:, 1], E_g5, E_g6, E_gS, baseline_hazard,
+               indicator_2, extracted_features, phi), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
 
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
 
-            # TODO
             g1 = E_func._g1(S)
+            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
+            # g1 = E_func._g1(S)
+            # E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
             E_log_g1 = E_func._Eg(np.log(g1), Lambda_1, pi_xi, f)
 
             # Update gamma_0
+            E_g7 = 0
             gamma_0_ext = fmin_l_bfgs_b(
                 func=lambda gamma_ext_: F_func.Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_2), x0=gamma_0_0,
-                fprime=lambda gamma_ext_: F_func.grad_Q(gamma_ext_), disp=False,
+                            baseline_hazard, indicator_1, indicator_2), x0=gamma_0_0,
+                fprime=lambda gamma_ext_: F_func.grad_Q(gamma_0_ext, pi_est, E_g1, E_g7, E_g8,
+                                        baseline_hazard, indicator_2), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update gamma_1
             gamma_1_ext = fmin_l_bfgs_b(
                 func=lambda gamma_ext_: F_func.Q_func(gamma_ext_, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_2), x0=gamma_1_0,
+                            baseline_hazard, indicator_1, indicator_2), x0=gamma_1_0,
                 fprime=lambda gamma_ext_: F_func.grad_Q(gamma_ext_), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
 

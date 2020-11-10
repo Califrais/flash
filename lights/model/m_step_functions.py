@@ -46,7 +46,8 @@ class MstepFunctions:
     """
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
-                 n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1, nb_asso_features):
+                 n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1, nb_asso_features,
+                 fixed_effect_time_order):
         self.fit_intercept = fit_intercept
         self.X = X
         self.T = T
@@ -56,6 +57,7 @@ class MstepFunctions:
         n_samples = len(T)
         self.n_samples = n_samples
         self.nb_asso_features = nb_asso_features
+        self.fixed_effect_time_order = fixed_effect_time_order
         self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
                              eta_sp_gp_l1)
 
@@ -83,7 +85,7 @@ class MstepFunctions:
         xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
         pen = self.pen.elastic_net(xi_ext)
         u = xi_0 + self.X.dot(xi)
-        sub_obj = (pi_est * u + logistic_loss(u)).mean()
+        sub_obj = (pi_est[:,1] * logistic_loss(u)).mean()
         return sub_obj + pen
 
     def grad_P(self, pi_est, xi_ext):
@@ -115,8 +117,8 @@ class MstepFunctions:
                                axis=1)
             grad_pen = np.concatenate([[0], grad_pen[:n_time_indep_features],
                                        [0], grad_pen[n_time_indep_features:]])
-        grad = (X * (pi_est - logistic_grad(-u)).reshape(
-            n_samples, 1)).mean(axis=0)
+
+        grad = (X * (pi_est[:,1] * np.exp(-logistic_loss(-u))).reshape(-1, 1)).mean(axis=0)
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
@@ -165,7 +167,7 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
-    def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, baseline_hazard,
+    def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS, baseline_hazard,
                indicator, extracted_features, phi):
         """Computes the gradient of the sub objective R
 
@@ -208,37 +210,40 @@ class MstepFunctions:
         output : `float`
             The value of the R sub objective gradient
         """
-        # TODO: Not yet verified
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
         n_samples = self.n_samples
+        q_l =  self.fixed_effect_time_order + 1
 
         beta = get_vect_from_ext(beta_ext)
         gamma = get_vect_from_ext(gamma_ext)
-        gamma_ = gamma[n_time_indep_features:].reshape(n_long_features, -1)
+        gamma_ = np.repeat(gamma[n_time_indep_features:].reshape(n_long_features, -1), 2, axis=1)
         grad_pen = self.pen.grad_sparse_group_l1(beta, self.n_long_features)
 
         tmp1 = (E_g5.T * self.delta).T - np.sum(
-            (E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1)
-        tmp1 *= gamma_
+            (E_g6.T * ((indicator * 1) * baseline_hazard.values).T).T, axis=1)
+        # TODO: Add index
+        tmp1[:,:,:,0] *= gamma_
+        tmp1 = tmp1.reshape(n_samples, n_long_features, -1, q_l).sum(axis=2)
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-        tmp2 = np.zeros()
+        tmp2 = np.zeros((n_samples, n_long_features * q_l))
         for i in range(n_samples):
             # Compute f(y|b)
             U_i = U_list[i]
             V_i = V_list[i]
-            n_i = sum(N_list[i])
+            n_i = N_list[i]
             y_i = y_list[i]
-            Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
-            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i) - Phi_i.dot(U_i.dot(beta)))
-        grad = (pi_est * (tmp1 + tmp2)).sum()
+            Phi_i = [[phi[l, 0]] * n_i[l] for l in range(n_long_features)]
+            Phi_i = np.diag(np.concatenate(Phi_i))
+            tmp2[i] = (U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) - V_i.dot(E_gS[i]).reshape(-1, 1)))).flatten()
+
+        grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples + grad_pen
 
     def Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard,
-               indicator):
+               indicator_1, indicator_2):
         """Computes the sub objective function denoted Q in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
 
@@ -273,13 +278,14 @@ class MstepFunctions:
         pen = self.pen.sparse_group_l1(gamma_ext)
         E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
         baseline_val = baseline_hazard.values.flatten()
-        ind_ = indicator * 1
-        sub_obj = E_log_g1 * delta.reshape(-1, 1) - np.sum(
-            E_g1_ * baseline_val * ind_, axis=2).T
+        ind_1 = indicator_1 * 1
+        ind_2 = indicator_2 * 1
+        sub_obj = ((E_log_g1.T * ind_1.T).sum(axis=1) * delta).T - np.sum(
+            (E_g1_ * ind_2 * baseline_val), axis=2).T
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
-    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, baseline_hazard, indicator):
+    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard, indicator):
         """Computes the gradient of the sub objective Q
 
         Parameters
@@ -297,6 +303,9 @@ class MstepFunctions:
 
         E_g7 : `np.ndarray`, shape=()
             The approximated expectations of function g7
+
+        E_g8 : `np.ndarray`, shape=()
+            The approximated expectations of function g8
 
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
             The baseline hazard function evaluated at each censored time
@@ -319,7 +328,7 @@ class MstepFunctions:
         grad_sub_obj = np.zeros(nb_asso_features)
         grad_sub_obj[:n_time_indep_features] = delta.reshape(-1, 1) - np.sum(
             E_g1 * baseline_val * ind_, axis=2).T #TODO x missing
-        grad_sub_obj[n_time_indep_features:] = E_g1 * delta.reshape(-1, 1) - np.sum(
-            E_g7 * baseline_val * ind_, axis=2).T
+        grad_sub_obj[n_time_indep_features:] = E_g7 * delta.reshape(-1, 1) - np.sum(
+            E_g8 * baseline_val * ind_, axis=2).T
         grad_sub_obj = (pi_est * grad_sub_obj).sum()
         return -grad_sub_obj / n_samples + grad_pen

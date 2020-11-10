@@ -151,7 +151,7 @@ class Penalties:
         tmp = np.array(
             [np.repeat(np.linalg.norm(v_l), dim // n_long_features)
              for v_l in np.array_split(v, n_long_features)]).flatten()
-        grad_pos = (l_pen * eta) * v / tmp
+        grad_pos = (l_pen * eta) * v.flatten() / tmp
         grad[:dim] += grad_pos
         grad[dim:] -= grad_pos
         return grad
