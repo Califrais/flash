@@ -166,7 +166,7 @@ class MstepFunctions:
         return -sub_obj / n_samples + pen
 
     def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, baseline_hazard,
-               indicator, extracted_features):
+               indicator, extracted_features, phi):
         """Computes the gradient of the sub objective R
 
         Parameters
@@ -201,24 +201,26 @@ class MstepFunctions:
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
+        phi : #TODO update
+
         Returns
         -------
         output : `float`
             The value of the R sub objective gradient
         """
         # TODO: Not yet verified
-        beta = get_vect_from_ext(beta_ext)
-        gamma = get_vect_from_ext(gamma_ext)
-        phi = self.theta["phi"]
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
         n_samples = self.n_samples
-        gamma_ = gamma[n_time_indep_features:].reshape(n_long_features, -1)
 
+        beta = get_vect_from_ext(beta_ext)
+        gamma = get_vect_from_ext(gamma_ext)
+        gamma_ = gamma[n_time_indep_features:].reshape(n_long_features, -1)
         grad_pen = self.pen.grad_sparse_group_l1(beta, self.n_long_features)
 
         tmp1 = (E_g5.T * self.delta).T - np.sum(
-            (E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1) * gamma_
+            (E_g6.T * baseline_hazard.values * (indicator * 1).T).T, axis=1)
+        tmp1 *= gamma_
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         tmp2 = np.zeros()
@@ -309,16 +311,14 @@ class MstepFunctions:
         # TODO: Not yet verified
         n_time_indep_features = self.n_time_indep_features
         nb_asso_features = self.nb_asso_features
-        grad_sub_obj = np.zeros(nb_asso_features)
+        n_samples, delta = self.n_samples, self.delta
         gamma = get_vect_from_ext(gamma_ext)
         grad_pen = self.pen.grad_sparse_group_l1(gamma, self.n_long_features)
-
-        n_samples, delta = self.n_samples, self.delta
-        pen = self.pen.sparse_group_l1(gamma_ext)
         baseline_val = baseline_hazard.values.flatten()
         ind_ = indicator * 1
+        grad_sub_obj = np.zeros(nb_asso_features)
         grad_sub_obj[:n_time_indep_features] = delta.reshape(-1, 1) - np.sum(
-            E_g1 * baseline_val * ind_, axis=2).T
+            E_g1 * baseline_val * ind_, axis=2).T #TODO x missing
         grad_sub_obj[n_time_indep_features:] = E_g1 * delta.reshape(-1, 1) - np.sum(
             E_g7 * baseline_val * ind_, axis=2).T
         grad_sub_obj = (pi_est * grad_sub_obj).sum()
