@@ -148,6 +148,28 @@ class EstepFunctions:
         g0 = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
         return g0
 
+    def _g0_t(self, S):
+        """Computes g0_tide
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g0 : `np.ndarray`, shape=(2*N, n_long_features, q_l, q_l)
+            The values of g0_t function
+        """
+        N = S.shape[0] // 2
+        n_long_features = self.n_long_features
+        S_ = S.reshape(2*N, n_long_features, -1)
+        g0_t = []
+        for s in S_:
+            g0_t.append(np.array([s_.reshape(-1, 1).dot(s_.reshape(-1, 1).T) for s_ in s]))
+        return np.array(g0_t)
+
+
     def _g1(self, S):
         """Computes g1
 

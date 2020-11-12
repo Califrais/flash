@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, \
-    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad
+    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad, block_diag
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
@@ -401,12 +401,17 @@ class QNMCEM(Learner):
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
             E_g0 = E_func._Eg(g0, Lambda_1, pi_xi, f)
 
+            g0_t = E_func._g0_t(S)
+            g0_t = np.broadcast_to(g0_t, (n_samples, 2) + g0_t.shape)
+            E_g0_t = E_func._Eg(g0_t, Lambda_1, pi_xi, f)
+
             gS = np.broadcast_to(S, (n_samples, 2) + S.shape)
             E_gS = E_func._Eg(gS, Lambda_1, pi_xi, f)
 
             g1 = E_func._g1(S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
+
 
             g2 = E_func._g2(S).swapaxes(0, 1)
             # TODO: optimize later
@@ -423,15 +428,6 @@ class QNMCEM(Learner):
             g6 = E_func._g6(S)
             g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, 6)
             E_g6 = E_func._Eg(g6, Lambda_1, pi_xi, f)
-
-            g7 = E_func._g7(S)
-            g7 = np.broadcast_to(g7, (n_samples,) + g7.shape)
-            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, 5)
-            E_g7 = E_func._Eg(g7, Lambda_1, pi_xi, f)
-
-            g8 = E_func._g8(S)
-            g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 5)
-            E_g8 = E_func._Eg(g8, Lambda_1, pi_xi, f)
 
             g9 = E_func._g9(S)
             g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, 3)
@@ -489,6 +485,15 @@ class QNMCEM(Learner):
             # E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
             E_log_g1 = E_func._Eg(np.log(g1), Lambda_1, pi_xi, f)
 
+            g7 = E_func._g7(S)
+            g7 = np.broadcast_to(g7, (n_samples,) + g7.shape)
+            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, 5)
+            E_g7 = E_func._Eg(g7, Lambda_1, pi_xi, f)
+
+            g8 = E_func._g8(S)
+            g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, 5)
+            E_g8 = E_func._Eg(g8, Lambda_1, pi_xi, f)
+
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
                 func=lambda gamma_0_ext: F_func.Q_func(gamma_0_ext, pi_est, E_log_g1, E_g1,
@@ -512,9 +517,7 @@ class QNMCEM(Learner):
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
             baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
-                              ((E_g1.T * pi_est.T).T.swapaxes(0, 1)[:,
-                               indicator_1].sum(axis=0)
-                               * (indicator_2 * 1).T).sum(axis=1)
+                              ((E_g1.T * (indicator_2 * 1).T).swapaxes(0, 1) * pi_est.T).sum(axis=2).sum(axis=1)
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D)
@@ -532,17 +535,22 @@ class QNMCEM(Learner):
 
             # Update phi
             (U_L, V_L, y_L, N_L) = extracted_features[1]
-            # TODO: Update later
+            E_gS_ = E_gS.reshape(n_samples, n_long_features, q_l)
             for l in range(n_long_features):
+                # K = 2
+                pi_est_ = np.empty(shape=(0, 2))
+                for i in range(n_samples):
+                    pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i], (N_L[l][i],) + pi_est[i].shape)))
                 N_l = sum(N_L[l])
                 y_l = y_L[l]
                 U_l = U_L[l]
                 V_l = V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
-                E_mu_l = 0
+                E_b_l = E_gS_[:,l].reshape(-1, 1)
+                E_bb_l = block_diag(E_g0_t[:,l])
                 tmp = y_l - U_l.dot(beta_l)
-                phi[l] = (tmp.T.dot(tmp - 2 * V_l.dot(E_mu_l)) + np.trace(
-                    V_l.T.dot(V_l).dot( E_mu_l.dot(E_mu_l.T)))) / N_l
+                phi[l] = (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) + np.trace(
+                    (V_l.T.dot(V_l).dot(E_bb_l)))).sum(axis=0) / N_l
 
         self._end_solve()
 
