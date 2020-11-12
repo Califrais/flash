@@ -241,7 +241,56 @@ class EstepFunctions:
         g6 = (g1.T * g5.T).T
         return g6
 
+    def _g7(self, S):
+        """Computes g2
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g7 : `np.ndarray`, shape=(2, 2*N, J, dim)
+            The values of g7 function
+        """
+        T_u, theta = self.T_u, self.theta
+        J = T_u.shape[0]
+        N = S.shape[0] // 2
+        g7 = get_asso_func(T_u, S, theta, self.asso_functions,
+                                  self.n_long_features,
+                                  self.fixed_effect_time_order)\
+            .reshape(2, J, 2 * N, -1).swapaxes(1, 2)
+        return g7
+
+
     def _g8(self, S):
+        """Computes g2
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(2*N, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g8 : `np.ndarray`, shape=(n_samples, 2, 2*N, J, dim)
+            The values of g8 function
+        """
+        T_u, theta = self.T_u, self.theta
+        J = T_u.shape[0]
+        N = S.shape[0] // 2
+        asso_func = get_asso_func(T_u, S, theta, self.asso_functions,
+                                  self.n_long_features,
+                                  self.fixed_effect_time_order)\
+            .reshape(2, J, 2 * N, -1).swapaxes(1, 2)
+
+        g7 = self._g7(S)
+        g1 = self._g1(S)
+        g8 = g1.reshape(g1.shape + (1,)) * g7
+        return g8
+
+    def _g9(self, S):
         """Computes g8
 
         Parameters
@@ -251,8 +300,8 @@ class EstepFunctions:
 
         Returns
         -------
-        g8 : `np.ndarray`, shape=(n_samples, 2, 2 * N)
-            The values of g8 function
+        g9 : `np.ndarray`, shape=(n_samples, 2, 2 * N)
+            The values of g9 function
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
         extracted_features = self.extracted_features
@@ -261,7 +310,7 @@ class EstepFunctions:
         phi = theta["phi"]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
 
-        g8 = np.zeros(shape=(n_samples, 2, S.shape[0]))
+        g9 = np.zeros(shape=(n_samples, 2, S.shape[0]))
         for i in range(n_samples):
             beta_stack = np.hstack((beta_0, beta_1))
             U_i = U_list[i]
@@ -270,9 +319,9 @@ class EstepFunctions:
             Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(2, -1, 1) + V_i.dot(S.T)
-            g8[i] = np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+            g9[i] = np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
 
-        return g8
+        return g9
 
     @staticmethod
     def Lambda_g(g, f):

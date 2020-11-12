@@ -158,7 +158,7 @@ class MstepFunctions:
             The value of the R sub objective to be minimized at each QNMCEM step
         """
         n_samples = self.n_samples
-        pen = self.pen.sparse_group_l1(beta_ext)
+        pen = self.pen.sparse_group_l1(beta_ext, 0)
         E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
         baseline_val = baseline_hazard.values.flatten()
         ind_ = indicator * 1
@@ -218,7 +218,7 @@ class MstepFunctions:
         beta = get_vect_from_ext(beta_ext)
         gamma = get_vect_from_ext(gamma_ext)
         gamma_ = np.repeat(gamma[n_time_indep_features:].reshape(n_long_features, -1), 2, axis=1)
-        grad_pen = self.pen.grad_sparse_group_l1(beta, self.n_long_features)
+        grad_pen = self.pen.grad_sparse_group_l1(beta, self.n_long_features, 0)
 
         tmp1 = (E_g5.T * self.delta).T - np.sum(
             (E_g6.T * ((indicator * 1) * baseline_hazard.values).T).T, axis=1)
@@ -275,7 +275,8 @@ class MstepFunctions:
             The value of the Q sub objective to be minimized at each QNMCEM step
         """
         n_samples, delta = self.n_samples, self.delta
-        pen = self.pen.sparse_group_l1(gamma_ext)
+        n_time_indep_features = self.n_time_indep_features
+        pen = self.pen.sparse_group_l1(gamma_ext, n_time_indep_features)
         E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
         baseline_val = baseline_hazard.values.flatten()
         ind_1 = indicator_1 * 1
@@ -285,7 +286,7 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
-    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard, indicator):
+    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard, indicator_1, indicator_2):
         """Computes the gradient of the sub objective Q
 
         Parameters
@@ -317,18 +318,21 @@ class MstepFunctions:
         output : `float`
             The value of the Q sub objective gradient
         """
-        # TODO: Not yet verified
         n_time_indep_features = self.n_time_indep_features
         nb_asso_features = self.nb_asso_features
         n_samples, delta = self.n_samples, self.delta
         gamma = get_vect_from_ext(gamma_ext)
-        grad_pen = self.pen.grad_sparse_group_l1(gamma, self.n_long_features)
+        grad_pen = self.pen.grad_sparse_group_l1(gamma, self.n_long_features, n_time_indep_features)
         baseline_val = baseline_hazard.values.flatten()
-        ind_ = indicator * 1
-        grad_sub_obj = np.zeros(nb_asso_features)
-        grad_sub_obj[:n_time_indep_features] = delta.reshape(-1, 1) - np.sum(
-            E_g1 * baseline_val * ind_, axis=2).T #TODO x missing
-        grad_sub_obj[n_time_indep_features:] = E_g7 * delta.reshape(-1, 1) - np.sum(
-            E_g8 * baseline_val * ind_, axis=2).T
-        grad_sub_obj = (pi_est * grad_sub_obj).sum()
-        return -grad_sub_obj / n_samples + grad_pen
+        ind_1 = indicator_1 * 1
+        ind_2 = indicator_2 * 1
+        grad_sub_obj = np.zeros((nb_asso_features, 2))
+        E_g1_ = E_g1.swapaxes(0, 1)
+        grad_sub_obj[n_time_indep_features, :] = (pi_est * ((delta.reshape(-1, 1) - np.sum(
+            E_g1_.T * baseline_val * ind_2, axis=-1).T).T * self.X.flatten()).T).sum(axis=0)
+        E_g8_ = E_g8.swapaxes(0,1)
+        tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - np.sum(
+            E_g8_.T * baseline_val * ind_2, axis=-1).T
+        grad_sub_obj[n_time_indep_features:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
+        # grad_sub_obj =  grad_sub_obj).sum()
+        return -grad_sub_obj.flatten() / n_samples + grad_pen
