@@ -466,7 +466,7 @@ class QNMCEM(Learner):
                 func=lambda beta_0_ext: F_func.R_func(beta_0_ext, pi_est, E_g1, E_g2, E_g9,
                             baseline_hazard, indicator_2), x0=beta_0_0,
                 fprime=lambda beta_ext_: F_func.grad_R(beta_0_ext, gamma_0_ext, pi_est[:, 0], E_g5, E_g6, E_gS, baseline_hazard,
-               indicator_2, extracted_features, phi), disp=False,
+               indicator_2, extracted_features, phi, 0), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
             beta_0_ext = beta_0_ext.reshape(-1, 1)
 
@@ -475,7 +475,7 @@ class QNMCEM(Learner):
                 func=lambda beta_1_ext: F_func.R_func(beta_1_ext, pi_est, E_g1, E_g2, E_g9,
                             baseline_hazard, indicator_2), x0=beta_1_0,
                 fprime=lambda beta_ext_: F_func.grad_R(beta_1_ext, gamma_1_ext, pi_est[:, 1], E_g5, E_g6, E_gS, baseline_hazard,
-               indicator_2, extracted_features, phi), disp=False,
+               indicator_2, extracted_features, phi, 1), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
             beta_1_ext = beta_1_ext.reshape(-1, 1)
 

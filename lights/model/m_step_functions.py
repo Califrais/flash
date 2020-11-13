@@ -168,7 +168,7 @@ class MstepFunctions:
         return -sub_obj / n_samples + pen
 
     def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS, baseline_hazard,
-               indicator, extracted_features, phi):
+               indicator, extracted_features, phi, idx):
         """Computes the gradient of the sub objective R
 
         Parameters
@@ -203,7 +203,11 @@ class MstepFunctions:
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-        phi : #TODO update
+        phi : `np.ndarray`, shape=(n_long_features,)
+            Variance vector for the error term of the longitudinal processes
+
+        idx: `int`
+            Index of latent groups
 
         Returns
         -------
@@ -222,8 +226,7 @@ class MstepFunctions:
 
         tmp1 = (E_g5.T * self.delta).T - np.sum(
             (E_g6.T * ((indicator * 1) * baseline_hazard.values).T).T, axis=1)
-        # TODO: Add index
-        tmp1[:,:,:,0] *= gamma_
+        tmp1[:,:,:,idx] *= gamma_
         tmp1 = tmp1.reshape(n_samples, n_long_features, -1, q_l).sum(axis=2)
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
