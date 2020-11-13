@@ -13,7 +13,7 @@ class MstepFunctions:
     Parameters
     ----------
     fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independant
+        If `True`, include an intercept in the model for the time independent
         features
 
     X : `np.ndarray`, shape=(n_samples, n_time_indep_features)

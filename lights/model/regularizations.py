@@ -11,7 +11,7 @@ class Penalties:
     Parameters
     ----------
     fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independant
+        If `True`, include an intercept in the model for the time independent
         features
 
     l_pen : `float`, default=0
@@ -108,14 +108,12 @@ class Penalties:
         grad[n_time_indep_features:] -= grad_pos
         return grad
 
-    def sparse_group_l1(self, v_ext, n_time_indep_features):
+    def sparse_group_l1(self, v_ext):
         """Computes the sparse group l1 penalization of vector v
-
         Parameters
         ----------
         v_ext: `np.ndarray`
             A vector decomposed on positive and negative parts
-
         Returns
         -------
         output : `float`
@@ -123,20 +121,17 @@ class Penalties:
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
         v = get_vect_from_ext(v_ext)
-        return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v[n_time_indep_features:]))
+        return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
 
-    def grad_sparse_group_l1(self, v, n_long_features, n_time_indep_features):
+    def grad_sparse_group_l1(self, v, n_long_features):
         """Computes the gradient of the sparse group l1 penalization of a
         vector v
-
         Parameters
         ----------
         v : `np.ndarray`
             A coefficient vector
-
         n_long_features : `int`
         Number of longitudinal features
-
         Returns
         -------
         output : `float`
@@ -149,9 +144,9 @@ class Penalties:
         grad += l_pen * (1 - eta)
         # Gradient of sparse group l1 penalization
         tmp = np.array(
-            [np.repeat(np.linalg.norm(v_l), (dim - n_time_indep_features) // n_long_features)
-             for v_l in np.array_split(v[n_time_indep_features:], n_long_features)]).flatten()
-        grad_pos = (l_pen * eta) * v[n_time_indep_features:].flatten() / tmp
-        grad[n_time_indep_features : dim] += grad_pos
-        grad[dim + n_time_indep_features :] -= grad_pos
+            [np.repeat(np.linalg.norm(v_l), dim // n_long_features)
+             for v_l in np.array_split(v, n_long_features)]).flatten()
+        grad_pos = (l_pen * eta) * v / tmp
+        grad[:dim] += grad_pos
+        grad[dim:] -= grad_pos
         return grad

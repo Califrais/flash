@@ -283,7 +283,7 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
         negative parts
 
     fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independant
+        If `True`, include an intercept in the model for the time independent
         features
 
     Returns
@@ -317,7 +317,7 @@ def clean_xi_ext(xi_ext, fit_intercept):
         negative parts
 
     fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independant
+        If `True`, include an intercept in the model for the time independent
         features
 
     Returns

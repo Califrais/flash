@@ -20,7 +20,7 @@ class QNMCEM(Learner):
     Parameters
     ----------
     fit_intercept : `bool`, default=True
-        If `True`, include an intercept in the model for the time independant
+        If `True`, include an intercept in the model for the time independent
         features
 
     l_pen : `float`, default=0
