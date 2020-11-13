@@ -220,9 +220,10 @@ class QNMCEM(Learner):
             Returns the posterior probability of the sample for being on the
             high-risk group given all observed data
         """
-        # TODO
-        n_samples = self.n_samples
-        return np.ones((n_samples, 2))
+        pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
+        tmp = Lambda_1 * pi_xi_
+        pi_est = (tmp.T / tmp.sum(axis=1)).T
+        return pi_est
 
     def predict_marker(self, X, Y):
         """Marker rule of the lights model for being on the high-risk group
