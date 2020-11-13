@@ -468,6 +468,7 @@ class QNMCEM(Learner):
                 fprime=lambda beta_ext_: F_func.grad_R(beta_0_ext, gamma_0_ext, pi_est[:, 0], E_g5, E_g6, E_gS, baseline_hazard,
                indicator_2, extracted_features, phi), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
+            beta_0_ext = beta_0_ext.reshape(-1, 1)
 
             # Update beta_1
             beta_1_ext = fmin_l_bfgs_b(
@@ -476,6 +477,7 @@ class QNMCEM(Learner):
                 fprime=lambda beta_ext_: F_func.grad_R(beta_1_ext, gamma_1_ext, pi_est[:, 1], E_g5, E_g6, E_gS, baseline_hazard,
                indicator_2, extracted_features, phi), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
+            beta_1_ext = beta_1_ext.reshape(-1, 1)
 
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
 
@@ -502,6 +504,7 @@ class QNMCEM(Learner):
                 fprime=lambda gamma_0_ext: F_func.grad_Q(gamma_0_ext, pi_est, E_g1, E_g7, E_g8,
                                         baseline_hazard, indicator_1, indicator_2), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
+            gamma_0_ext = gamma_0_ext.reshape(-1, 1)
 
             # Update gamma_1
             gamma_1_ext = fmin_l_bfgs_b(
@@ -510,6 +513,7 @@ class QNMCEM(Learner):
                 fprime=lambda gamma_1_ext: F_func.grad_Q(gamma_1_ext, pi_est, E_g1, E_g7, E_g8,
                             baseline_hazard, indicator_1, indicator_2), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
+            gamma_1_ext = gamma_1_ext.reshape(-1, 1)
 
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
@@ -517,8 +521,10 @@ class QNMCEM(Learner):
             g1 = E_func._g1(S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
-            baseline_hazard = ((indicator_1 * 1).T * delta).sum(axis=1) / \
+            tmp = ((indicator_1 * 1).T * delta).sum(axis=1) / \
                               ((E_g1.T * (indicator_2 * 1).T).swapaxes(0, 1) * pi_est.T).sum(axis=2).sum(axis=1)
+
+            baseline_hazard = pd.Series(data=tmp, index=T_u)
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D)
