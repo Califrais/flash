@@ -325,6 +325,7 @@ class MstepFunctions:
         nb_asso_features = self.nb_asso_features
         n_samples, delta = self.n_samples, self.delta
         gamma = get_vect_from_ext(gamma_ext)
+        #TODO : grad_sparse_group_l1 no need for passing n_time_indep_features
         grad_pen = self.pen.grad_sparse_group_l1(gamma, self.n_long_features, n_time_indep_features)
         baseline_val = baseline_hazard.values.flatten()
         ind_1 = indicator_1 * 1

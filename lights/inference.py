@@ -462,6 +462,7 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_0
+            #TODO  : strange that the 2 R_func are the same for the beta_0 and beta_1 updates
             beta_0_ext = fmin_l_bfgs_b(
                 func=lambda beta_0_ext: F_func.R_func(beta_0_ext, pi_est, E_g1, E_g2, E_g9,
                             baseline_hazard, indicator_2), x0=beta_0_0,
@@ -499,7 +500,7 @@ class QNMCEM(Learner):
 
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
-                func=lambda gamma_0_ext: F_func.Q_func(gamma_0_ext, pi_est, E_log_g1, E_g1,
+                func=lambda gamma_ext: F_func.Q_func(gamma_ext, pi_est, E_log_g1, E_g1,
                             baseline_hazard, indicator_1, indicator_2), x0=gamma_0_0,
                 fprime=lambda gamma_0_ext: F_func.grad_Q(gamma_0_ext, pi_est, E_g1, E_g7, E_g8,
                                         baseline_hazard, indicator_1, indicator_2), disp=False,
@@ -526,6 +527,28 @@ class QNMCEM(Learner):
 
             baseline_hazard = pd.Series(data=tmp, index=T_u)
 
+            # Update phi
+            (U_L, V_L, y_L, N_L) = extracted_features[1]
+            E_gS_ = E_gS.reshape(n_samples, n_long_features, q_l)
+            for l in range(n_long_features):
+                # K = 2
+                pi_est_ = np.empty(shape=(0, 2))
+                for i in range(n_samples):
+                    pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i],
+                                                                  (N_L[l][i],) +
+                                                                  pi_est[
+                                                                      i].shape)))
+                N_l = sum(N_L[l])
+                y_l = y_L[l]
+                U_l = U_L[l]
+                V_l = V_L[l]
+                beta_l = beta[q_l * l: q_l * (l + 1)]
+                E_b_l = E_gS_[:, l].reshape(-1, 1)
+                E_bb_l = block_diag(E_g0_t[:, l])
+                tmp = y_l - U_l.dot(beta_l)
+                phi[l] = (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) + np.trace(
+                    (V_l.T.dot(V_l).dot(E_bb_l)))).sum(axis=0) / N_l
+
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D)
             prev_obj = obj
@@ -539,25 +562,6 @@ class QNMCEM(Learner):
                     self.history.print_history()
             if (n_iter > max_iter) or (rel_obj < tol):
                 break
-
-            # Update phi
-            (U_L, V_L, y_L, N_L) = extracted_features[1]
-            E_gS_ = E_gS.reshape(n_samples, n_long_features, q_l)
-            for l in range(n_long_features):
-                # K = 2
-                pi_est_ = np.empty(shape=(0, 2))
-                for i in range(n_samples):
-                    pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i], (N_L[l][i],) + pi_est[i].shape)))
-                N_l = sum(N_L[l])
-                y_l = y_L[l]
-                U_l = U_L[l]
-                V_l = V_L[l]
-                beta_l = beta[q_l * l: q_l * (l + 1)]
-                E_b_l = E_gS_[:,l].reshape(-1, 1)
-                E_bb_l = block_diag(E_g0_t[:,l])
-                tmp = y_l - U_l.dot(beta_l)
-                phi[l] = (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) + np.trace(
-                    (V_l.T.dot(V_l).dot(E_bb_l)))).sum(axis=0) / N_l
 
         self._end_solve()
 
