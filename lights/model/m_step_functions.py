@@ -161,7 +161,9 @@ class MstepFunctions:
             The value of the R sub objective to be minimized at each QNMCEM step
         """
         n_samples = self.n_samples
-        pen = self.pen.sparse_group_l1(beta_ext)
+        n_long_features = self.n_long_features
+        beta = get_vect_from_ext(beta_ext)
+        pen = self.pen.sparse_group_l1(beta, n_long_features)
         E_g1_, E_g2_, E_g8_ = E_g1[:, :, idx], E_g2[:, idx], E_g8[:, idx]
         delta_ = self.delta
         baseline_val = baseline_hazard.values.flatten()
@@ -220,7 +222,7 @@ class MstepFunctions:
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
         n_samples = self.n_samples
-        q_l =  self.fixed_effect_time_order + 1
+        q_l = self.fixed_effect_time_order + 1
 
         beta = get_vect_from_ext(beta_ext)
         gamma = get_vect_from_ext(gamma_ext)[n_time_indep_features:].reshape(n_long_features, -1)
@@ -289,10 +291,10 @@ class MstepFunctions:
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
 
-        # split into 2 latent groups
-        gamma_ext_ = gamma_ext.reshape(-1, 2)
-        pen = self.pen.sparse_group_l1(gamma_ext_[n_time_indep_features:].flatten())\
-              + self.pen.lasso(gamma_ext_[:n_time_indep_features].flatten())
+        gamma = get_vect_from_ext(gamma_ext)
+        gamma_indep, gamma_dep = gamma[:n_time_indep_features], gamma[n_time_indep_features:]
+        pen = self.pen.lasso(gamma_indep) + \
+              self.pen.sparse_group_l1(gamma_dep, n_long_features)
         baseline_val = baseline_hazard.values.flatten()
         ind_1 = indicator_1 * 1
         ind_2 = indicator_2 * 1

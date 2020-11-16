@@ -108,13 +108,13 @@ class Penalties:
         grad[n_time_indep_features:] -= grad_pos
         return grad
 
-    def lasso(self, v_ext):
+    def lasso(self, v):
         """Computes the l1 penalization of vector v
 
         Parameters
         ----------
-        v_ext: `np.ndarray`
-            A vector decomposed on positive and negative parts
+        v: `np.ndarray`
+            A coefficient vector
 
         Returns
         -------
@@ -122,7 +122,7 @@ class Penalties:
             The value of the l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
-        return l_pen * (1. - eta) * v_ext.sum()
+        return l_pen * (1. - eta) * abs(v).sum()
 
     def grad_lasso(self, v):
         """Computes the gradient of the l1 penalization of a vector v
@@ -144,13 +144,13 @@ class Penalties:
         grad += l_pen * (1 - eta)
         return grad
 
-    def sparse_group_l1(self, v_ext):
+    def sparse_group_l1(self, v, n_long_features):
         """Computes the sparse group l1 penalization of vector v
 
         Parameters
         ----------
-        v_ext: `np.ndarray`
-            A vector decomposed on positive and negative parts
+        v: `np.ndarray`
+            A coefficient vector
 
         Returns
         -------
@@ -158,8 +158,8 @@ class Penalties:
             The value of the sparse group l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
-        v = get_vect_from_ext(v_ext)
-        return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
+        tmp = np.array([np.linalg.norm(v_l) for v_l in np.array_split(v, n_long_features)]).sum()
+        return l_pen * ((1. - eta) * abs(v).sum() + eta * tmp)
 
     def grad_sparse_group_l1(self, v, n_long_features):
         """Computes the gradient of the sparse group l1 penalization of a vector v
