@@ -254,7 +254,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g6 : `np.ndarray`, shape=(n_samples, n_long_features, 2, 2 * N * J, q_l)
+        g6 : `np.ndarray`, shape=(n_samples, 2, 2 * N, J, n_long_features, q_l)
             The values of g6 function
         """
         n_samples = self.n_samples

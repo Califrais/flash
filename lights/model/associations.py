@@ -40,7 +40,7 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
 
     Returns
     -------
-    asso_func_stack : `np.ndarray`, , shape=(2, n_samples*2*N, dim)
+    asso_func_stack : `np.ndarray`, shape=(2, n_samples*2*N, dim)
         Stack version of association functions or derivatives for all
         subjects, all groups and all Monte Carlo samples. `dim` is the
         total dimension of returned association functions.
