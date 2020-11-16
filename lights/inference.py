@@ -529,20 +529,16 @@ class QNMCEM(Learner):
             E_gS_ = E_gS.reshape(n_samples, n_long_features, q_l)
             for l in range(n_long_features):
                 # K = 2
-                pi_est_ = np.empty(shape=(0, 2))
-                for i in range(n_samples):
-                    pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i],
-                                            (N_L[l][i],) +pi_est[i].shape)))
-                N_l = sum(N_L[l])
-                y_l = y_L[l]
-                U_l = U_L[l]
-                V_l = V_L[l]
+                pi_est_ = np.concatenate([[pi_est[i]] * N_L[l][i] for i in range(n_samples)])
+                pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T
+
+                N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
                 E_b_l = E_gS_[:, l].reshape(-1, 1)
                 E_bb_l = block_diag(E_g0_t[:, l])
                 tmp = y_l - U_l.dot(beta_l)
-                phi[l] = (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) + np.trace(
-                    (V_l.T.dot(V_l).dot(E_bb_l)))).sum(axis=0) / N_l
+                phi[l] = (pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l)))+
+                    np.trace((V_l.T.dot(V_l).dot(E_bb_l))))).sum() / N_l
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D)
