@@ -226,7 +226,7 @@ class MstepFunctions:
         gamma = get_vect_from_ext(gamma_ext)[n_time_indep_features:].reshape(n_long_features, -1)
         # To match the derivative of association functions over the beta
         gamma_ = np.repeat(gamma, q_l, axis=1)
-        grad_pen = self.pen.grad_sparse_group_l1(beta, self.n_long_features)
+        grad_pen = self.pen.grad_sparse_group_l1(beta, n_long_features)
 
         E_g5_, E_g6_ = E_g5.T[idx].T, E_g6.T[idx].T
         ind_ = indicator * 1
@@ -248,7 +248,7 @@ class MstepFunctions:
         return -grad_sub_obj / n_samples + grad_pen
 
     def Q_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard,
-               indicator_1, indicator_2):
+               indicator_1, indicator_2, idx):
         """Computes the sub objective function denoted Q in the lights paper,
         to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
 
@@ -271,8 +271,14 @@ class MstepFunctions:
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
             The baseline hazard function evaluated at each censored time
 
-        indicator : `np.ndarray`, shape=(n_samples, J)
+        indicator_1 : `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times
+
+        indicator_2 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        idx: `int`
+            Index of latent groups
 
         Returns
         -------
@@ -281,17 +287,21 @@ class MstepFunctions:
         """
         n_samples, delta = self.n_samples, self.delta
         n_time_indep_features = self.n_time_indep_features
-        pen = self.pen.sparse_group_l1(gamma_ext, n_time_indep_features)
-        E_g1_ = E_g1.swapaxes(1, 2).swapaxes(0, 1)
+        n_long_features = self.n_long_features
+
+        # split into 2 latent groups
+        gamma_ext_ = gamma_ext.reshape(-1, 2)
+        pen = self.pen.sparse_group_l1(gamma_ext_[n_time_indep_features:].flatten())\
+              + self.pen.lasso(gamma_ext_[:n_time_indep_features].flatten())
         baseline_val = baseline_hazard.values.flatten()
         ind_1 = indicator_1 * 1
         ind_2 = indicator_2 * 1
-        sub_obj = ((E_log_g1.T * ind_1.T).sum(axis=1) * delta).T - np.sum(
-            (E_g1_ * ind_2 * baseline_val), axis=2).T
+        E_g1_, E_log_g1_ = E_g1[:, :, idx], E_log_g1[:, :, idx]
+        sub_obj = (E_log_g1_ * ind_1).sum(axis=1) * delta - (E_g1_ * ind_2 * baseline_val).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
-    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard, indicator_1, indicator_2):
+    def grad_Q(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard, indicator_1, indicator_2, idx):
         """Computes the gradient of the sub objective Q
 
         Parameters
@@ -307,17 +317,24 @@ class MstepFunctions:
         E_g1 : `np.ndarray`, shape=(n_samples, J, 2)
             The approximated expectations of function g1
 
-        E_g7 : `np.ndarray`, shape=()
+        E_g7 : `np.ndarray`, shape=(n_samples, J, dim, 2)
             The approximated expectations of function g7
 
-        E_g8 : `np.ndarray`, shape=()
+        E_g8 : `np.ndarray`, shape=(n_samples, J, dim, 2)
             The approximated expectations of function g8
 
         baseline_hazard : `np.ndarray`, shape=(n_samples,)
             The baseline hazard function evaluated at each censored time
 
-        indicator : `np.ndarray`, shape=(n_samples, J)
+        indicator_1 : `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times
+
+        indicator_2 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        idx: `int`
+            Index of latent groups
+
         Returns
         -------
         output : `float`
@@ -326,19 +343,20 @@ class MstepFunctions:
         n_time_indep_features = self.n_time_indep_features
         nb_asso_features = self.nb_asso_features
         n_samples, delta = self.n_samples, self.delta
+        n_long_features = self.n_long_features
         gamma = get_vect_from_ext(gamma_ext)
-        #TODO : grad_sparse_group_l1 no need for passing n_time_indep_features
-        grad_pen = self.pen.grad_sparse_group_l1(gamma, self.n_long_features, n_time_indep_features)
+        gamma_indep, gamma_dep = gamma[:n_time_indep_features], gamma[n_time_indep_features:]
         baseline_val = baseline_hazard.values.flatten()
-        ind_1 = indicator_1 * 1
-        ind_2 = indicator_2 * 1
-        grad_sub_obj = np.zeros((nb_asso_features, 2))
-        E_g1_ = E_g1.swapaxes(0, 1)
-        grad_sub_obj[n_time_indep_features, :] = (pi_est * ((delta.reshape(-1, 1) - np.sum(
-            E_g1_.T * baseline_val * ind_2, axis=-1).T).T * self.X.flatten()).T).sum(axis=0)
-        E_g8_ = E_g8.swapaxes(0,1)
-        tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - np.sum(
-            E_g8_.T * baseline_val * ind_2, axis=-1).T
-        grad_sub_obj[n_time_indep_features:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
-        # grad_sub_obj =  grad_sub_obj).sum()
-        return -grad_sub_obj.flatten() / n_samples + grad_pen
+        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
+        E_g1_, E_g7_, E_g8_ = E_g1.T[idx].T, E_g7.T[idx].T, E_g8.T[idx].T.swapaxes(0, 1)
+        X_ = self.X.flatten()
+
+        grad_pen_indep = self.pen.grad_lasso(gamma_indep).reshape(-1, 2)
+        grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, n_long_features).reshape(-1, 2)
+        grad_pen = np.vstack((grad_pen_indep, grad_pen_dep))
+        grad = np.zeros(nb_asso_features)
+        grad[:n_time_indep_features] = (pi_est * (delta - (E_g1_ * baseline_val * ind_2).sum(axis=1)) * X_).sum()
+        tmp = (E_g7_.T * delta * ind_1.T).T.sum(axis=1) - (E_g8_.T * baseline_val * ind_2).sum(axis=-1).T
+        grad[n_time_indep_features:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
+        grad_sub_obj = np.vstack((grad, -grad)).T
+        return (-grad_sub_obj / n_samples + grad_pen).flatten()

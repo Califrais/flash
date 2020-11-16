@@ -498,18 +498,18 @@ class QNMCEM(Learner):
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
                 func=lambda gamma_ext: F_func.Q_func(gamma_ext, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_1, indicator_2), x0=gamma_0_0,
-                fprime=lambda gamma_0_ext: F_func.grad_Q(gamma_0_ext, pi_est, E_g1, E_g7, E_g8,
-                                        baseline_hazard, indicator_1, indicator_2), disp=False,
+                            baseline_hazard, indicator_1, indicator_2, 0), x0=gamma_0_0,
+                fprime=lambda gamma_ext: F_func.grad_Q(gamma_ext, pi_est, E_g1, E_g7, E_g8,
+                                        baseline_hazard, indicator_1, indicator_2, 0), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
             gamma_0_ext = gamma_0_ext.reshape(-1, 1)
 
             # Update gamma_1
             gamma_1_ext = fmin_l_bfgs_b(
-                func=lambda gamma_1_ext: F_func.Q_func(gamma_1_ext, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_1, indicator_2), x0=gamma_1_0,
-                fprime=lambda gamma_1_ext: F_func.grad_Q(gamma_1_ext, pi_est, E_g1, E_g7, E_g8,
-                            baseline_hazard, indicator_1, indicator_2), disp=False,
+                func=lambda gamma_ext: F_func.Q_func(gamma_ext, 1 - pi_est, E_log_g1, E_g1,
+                            baseline_hazard, indicator_1, indicator_2, 1), x0=gamma_1_0,
+                fprime=lambda gamma_ext: F_func.grad_Q(gamma_ext, pi_est, E_g1, E_g7, E_g8,
+                            baseline_hazard, indicator_1, indicator_2, 1), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
             gamma_1_ext = gamma_1_ext.reshape(-1, 1)
 
@@ -532,9 +532,7 @@ class QNMCEM(Learner):
                 pi_est_ = np.empty(shape=(0, 2))
                 for i in range(n_samples):
                     pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i],
-                                                                  (N_L[l][i],) +
-                                                                  pi_est[
-                                                                      i].shape)))
+                                            (N_L[l][i],) +pi_est[i].shape)))
                 N_l = sum(N_L[l])
                 y_l = y_L[l]
                 U_l = U_L[l]

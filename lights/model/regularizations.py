@@ -108,15 +108,53 @@ class Penalties:
         grad[n_time_indep_features:] -= grad_pos
         return grad
 
-    def sparse_group_l1(self, v_ext):
-        """Computes the sparse group l1 penalization of vector v
+    def lasso(self, v_ext):
+        """Computes the l1 penalization of vector v
+
         Parameters
         ----------
         v_ext: `np.ndarray`
             A vector decomposed on positive and negative parts
+
         Returns
         -------
-        output : `float`
+        output : `np.array`
+            The value of the l1 penalization of vector v
+        """
+        l_pen, eta = self.l_pen, self.eta_sp_gp_l1
+        return l_pen * (1. - eta) * v_ext.sum()
+
+    def grad_lasso(self, v):
+        """Computes the gradient of the l1 penalization of a vector v
+
+        Parameters
+        ----------
+        v : `np.ndarray`
+            A coefficient vector
+
+        Returns
+        -------
+        output : `np.array`
+            The gradient of the l1 penalization of vector v
+        """
+        l_pen, eta = self.l_pen, self.eta_sp_gp_l1
+        dim = len(v)
+        grad = np.zeros(2 * dim)
+        # Gradient of lasso penalization
+        grad += l_pen * (1 - eta)
+        return grad
+
+    def sparse_group_l1(self, v_ext):
+        """Computes the sparse group l1 penalization of vector v
+
+        Parameters
+        ----------
+        v_ext: `np.ndarray`
+            A vector decomposed on positive and negative parts
+
+        Returns
+        -------
+        output : `np.array`
             The value of the sparse group l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
@@ -124,17 +162,19 @@ class Penalties:
         return l_pen * ((1. - eta) * v_ext.sum() + eta * np.linalg.norm(v))
 
     def grad_sparse_group_l1(self, v, n_long_features):
-        """Computes the gradient of the sparse group l1 penalization of a
-        vector v
+        """Computes the gradient of the sparse group l1 penalization of a vector v
+
         Parameters
         ----------
         v : `np.ndarray`
             A coefficient vector
+
         n_long_features : `int`
-        Number of longitudinal features
+            Number of longitudinal features
+
         Returns
         -------
-        output : `float`
+        output : `np.array`
             The gradient of the sparse group l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
