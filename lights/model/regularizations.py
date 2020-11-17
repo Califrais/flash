@@ -110,10 +110,12 @@ class Penalties:
 
     def sparse_group_l1(self, v_ext):
         """Computes the sparse group l1 penalization of vector v
+
         Parameters
         ----------
         v_ext: `np.ndarray`
             A vector decomposed on positive and negative parts
+
         Returns
         -------
         output : `float`
@@ -126,12 +128,15 @@ class Penalties:
     def grad_sparse_group_l1(self, v, n_long_features):
         """Computes the gradient of the sparse group l1 penalization of a
         vector v
+
         Parameters
         ----------
         v : `np.ndarray`
             A coefficient vector
+
         n_long_features : `int`
-        Number of longitudinal features
+            Number of longitudinal features
+
         Returns
         -------
         output : `float`
