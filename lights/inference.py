@@ -204,7 +204,8 @@ class QNMCEM(Learner):
         u = xi_0 + X.dot(xi)
         return logistic_grad(u)
 
-    def get_post_proba(self, pi_xi, Lambda_1):
+    @staticmethod
+    def get_post_proba(pi_xi, Lambda_1):
         """Posterior probability estimates for being on the high-risk group
         given all observed data
 
@@ -218,7 +219,7 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        output : `np.ndarray`, shape=(n_samples,)
+        pi_est : `np.ndarray`, shape=(n_samples,)
             Returns the posterior probability of the sample for being on the
             high-risk group given all observed data
         """
