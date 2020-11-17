@@ -145,7 +145,7 @@ class QNMCEM(Learner):
         # TODO
         return np.mean(np.log(prb))
 
-    def _func_obj(self, X, Y, T, delta, xi_ext):
+    def _func_obj(self, X, Y, T, delta, theta):
         """The global objective to be minimized by the QNMCEM algorithm
         (including penalization)
 
@@ -173,12 +173,28 @@ class QNMCEM(Learner):
         output : `float`
             The value of the global objective to be minimized
         """
+        n_time_indep_features = self.n_time_indep_features
+        n_long_features = self.n_long_features
         log_lik = self._log_lik(X, Y, T, delta)
-        fit_intercept = self.fit_intercept
-        _, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
-        pen = self.pen.elastic_net(xi)
-        # TODO : add sparse group l1 penalties
-        return -log_lik + pen
+
+        xi = theta["xi"]
+        xi_pen = self.pen.elastic_net(xi)
+
+        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
+        beta_pen = self.pen.sparse_group_l1(beta_0, n_long_features) + \
+                   self.pen.sparse_group_l1(beta_1, n_long_features)
+
+        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
+        gamma_0_indep = gamma_0[:n_time_indep_features]
+        gamma_0_dep = gamma_0[n_time_indep_features:]
+        gamma_1_indep = gamma_1[:n_time_indep_features]
+        gamma_1_dep = gamma_1[n_time_indep_features:]
+        gamma_pen = self.pen.elastic_net(gamma_0_indep) + \
+              self.pen.sparse_group_l1(gamma_0_dep, n_long_features) + \
+              self.pen.elastic_net(gamma_1_indep) + \
+              self.pen.sparse_group_l1(gamma_1_dep, n_long_features)
+
+        return -log_lik + xi_pen + beta_pen + gamma_pen
 
     def get_proba(self, X, xi_ext):
         """Probability estimates for being on the high-risk group given
@@ -367,7 +383,7 @@ class QNMCEM(Learner):
                           baseline_hazard=baseline_hazard)
         func_obj = self._func_obj
 
-        obj = func_obj(X, Y, T, delta, xi_ext)
+        obj = func_obj(X, Y, T, delta, self.theta)
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
         if verbose:
@@ -544,7 +560,7 @@ class QNMCEM(Learner):
                     np.trace((V_l.T.dot(V_l).dot(E_bb_l))))).sum() / N_l
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
-                              long_cov=D)
+                              long_cov=D, xi = xi_ext)
             prev_obj = obj
             obj = func_obj(X, Y, T, delta, xi_ext)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
