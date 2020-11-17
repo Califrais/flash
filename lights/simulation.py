@@ -217,7 +217,7 @@ class SimuJointLongitudinalSurvival(Simulation):
     long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
         Variance-covariance matrix that accounts for dependence between the
         different longitudinal outcome. Here r = 2*n_long_features since
-        one choose linear time-varying features, so all r_l=2
+        one choose affine random effects, so all r_l=2
 
     fixed_effect_coeffs : `list`, [beta_0, beta_1]
         Simulated fixed effect coefficient vectors per group
@@ -383,7 +383,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         X_dot_xi = X.dot(xi)
 
         # Simulation of the random effects components
-        r = 2 * n_long_features  # linear time-varying features, so all r_l=2
+        r_l = 2  # affine random effects
+        r = r_l * n_long_features
         b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
         self.long_cov = D
 

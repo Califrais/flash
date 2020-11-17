@@ -97,14 +97,14 @@ class QNMCEM(Learner):
         self.n_time_indep_features = None
         self.n_long_features = None
         self.theta = {
-            "beta_0": None,
-            "beta_1": None,
-            "long_cov": None,
-            "phi": None,
-            "xi": None,
-            "baseline_hazard": None,
-            "gamma_0": None,
-            "gamma_1": None
+            "beta_0": np.empty(1),
+            "beta_1": np.empty(1),
+            "long_cov": np.empty(1),
+            "phi": np.empty(1),
+            "xi": np.empty(1),
+            "baseline_hazard": np.empty(1),
+            "gamma_0": np.empty(1),
+            "gamma_1": np.empty(1)
         }
 
     @property
@@ -145,7 +145,7 @@ class QNMCEM(Learner):
         # TODO
         return np.mean(np.log(prb))
 
-    def _func_obj(self, X, Y, T, delta, theta):
+    def _func_obj(self, X, Y, T, delta):
         """The global objective to be minimized by the QNMCEM algorithm
         (including penalization)
 
@@ -164,10 +164,6 @@ class QNMCEM(Learner):
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
 
-        theta : `dict`, default=None
-            Vector that concatenates all parameters to be inferred in the lights
-            model
-
         Returns
         -------
         output : `float`
@@ -175,26 +171,30 @@ class QNMCEM(Learner):
         """
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
+        theta = self.theta
         log_lik = self._log_lik(X, Y, T, delta)
-
+        # xi elastic net penalty
         xi = theta["xi"]
         xi_pen = self.pen.elastic_net(xi)
-
+        # beta sparse group l1 penalty
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        beta_pen = self.pen.sparse_group_l1(beta_0, n_long_features) + \
-                   self.pen.sparse_group_l1(beta_1, n_long_features)
-
+        beta_0_pen = self.pen.sparse_group_l1(beta_0, n_long_features)
+        beta_1_pen = self.pen.sparse_group_l1(beta_1, n_long_features)
+        # gamma sparse group l1 penalty
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_0_indep = gamma_0[:n_time_indep_features]
         gamma_0_dep = gamma_0[n_time_indep_features:]
+        gamma_0_pen = self.pen.elastic_net(gamma_0_indep)
+        gamma_0_pen += self.pen.sparse_group_l1(gamma_0_dep, n_long_features)
+
         gamma_1_indep = gamma_1[:n_time_indep_features]
         gamma_1_dep = gamma_1[n_time_indep_features:]
-        gamma_pen = self.pen.elastic_net(gamma_0_indep) + \
-              self.pen.sparse_group_l1(gamma_0_dep, n_long_features) + \
-              self.pen.elastic_net(gamma_1_indep) + \
-              self.pen.sparse_group_l1(gamma_1_dep, n_long_features)
+        gamma_1_pen = self.pen.elastic_net(gamma_1_indep)
+        gamma_1_pen += self.pen.sparse_group_l1(gamma_1_dep, n_long_features)
 
-        return -log_lik + xi_pen + beta_pen + gamma_pen
+        pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
+
+        return -log_lik + pen
 
     def get_proba(self, X, xi_ext):
         """Probability estimates for being on the high-risk group given
@@ -231,7 +231,7 @@ class QNMCEM(Learner):
             Comes from get_proba function
 
         Lambda_1 : `np.ndarray`, shape=(n_samples, 2)
-            blabla
+            #TODO blabla
 
         Returns
         -------
@@ -313,7 +313,7 @@ class QNMCEM(Learner):
         self.n_time_indep_features = n_time_indep_features
         self.n_long_features = n_long_features
         q_l = fixed_effect_time_order + 1
-        r_l = 2  # Linear time-varying features, so all r_l=2
+        r_l = 2  # affine random effects
         if fit_intercept:
             n_time_indep_features += 1
 
@@ -379,8 +379,7 @@ class QNMCEM(Learner):
                           gamma_1=gamma_1_ext, long_cov=D, phi=phi,
                           baseline_hazard=baseline_hazard)
         func_obj = self._func_obj
-
-        obj = func_obj(X, Y, T, delta, self.theta)
+        obj = func_obj(X, Y, T, delta)
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
         if verbose:
@@ -414,6 +413,7 @@ class QNMCEM(Learner):
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
             g0 = E_func._g0(S)
+            # TODO: enter all the broadcast_to inside the functions g and update the shape of the output
             g0 = np.broadcast_to(g0, (n_samples, 2) + g0.shape)
             E_g0 = E_func._Eg(g0, Lambda_1, pi_xi, f)
 
@@ -430,7 +430,6 @@ class QNMCEM(Learner):
 
 
             g2 = E_func._g2(S).swapaxes(0, 1)
-            # TODO: optimize later
             g2 = np.sum(np.broadcast_to(g2, (n_samples, ) + g2.shape).T * (indicator_1 * 1).T, axis = 2).T
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
             E_g2 = E_func._Eg(g2, Lambda_1, pi_xi, f)
@@ -477,9 +476,10 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # Update beta_0
-            #TODO  : strange that the 2 R_func are the same for the beta_0 and beta_1 updates
+            k = 0  # Low-risk group updates
+            #TODO: use this k, no more latent_class in m_step_functions.py
             beta_0_ext = fmin_l_bfgs_b(
-                func=lambda beta_ext: F_func.R_func(beta_ext, 1 - pi_est, E_g1, E_g2, E_g9,
+                func=lambda beta_ext: F_func.R_func(beta_ext, 1 - pi_est, E_g1[:, :, G], E_g2, E_g9,
                             baseline_hazard, indicator_2, 0), x0=beta_0_0,
                 fprime=lambda beta_ext: F_func.grad_R(beta_ext, gamma_0_ext, 1 - pi_est, E_g5, E_g6, E_gS, baseline_hazard,
                indicator_2, extracted_features, phi, 0), disp=False,
@@ -495,6 +495,7 @@ class QNMCEM(Learner):
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
             beta_1_ext = beta_1_ext.reshape(-1, 1)
 
+            # beta needs to be updated before gamma
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
 
             g1 = E_func._g1(S)
@@ -529,6 +530,7 @@ class QNMCEM(Learner):
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
             gamma_1_ext = gamma_1_ext.reshape(-1, 1)
 
+            # gamma needs to be updated before the baseline
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
 
             # Update baseline hazard
@@ -557,9 +559,9 @@ class QNMCEM(Learner):
                     np.trace((V_l.T.dot(V_l).dot(E_bb_l))))).sum() / N_l
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
-                              long_cov=D, xi = xi_ext)
+                              long_cov=D, xi=xi_ext)
             prev_obj = obj
-            obj = func_obj(X, Y, T, delta, self.theta)
+            obj = func_obj(X, Y, T, delta)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:

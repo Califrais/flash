@@ -90,12 +90,11 @@ class AssociationFunctions:
     """
     def __init__(self, T_u, S, fixed_effect_coeffs, fixed_effect_time_order=5,
                  n_long_features=5):
+        self.K = 2  # 2 latent groups
         self.S, self.J = S, len(T_u)
         self.fixed_effect_coeffs = fixed_effect_coeffs
         self.n_long_features = n_long_features
         self.N_MC = len(S)
-        self.r_l = 2  # linear time-varying features, so all r_l=2
-        self.K = 2 # 2 latent groups
         self.q_l = fixed_effect_time_order + 1
         J = self.J
 
@@ -142,7 +141,8 @@ class AssociationFunctions:
         beta = self.fixed_effect_coeffs
         J = self.J
         n_long_features = self.n_long_features
-        S, N_MC, r_l, q_l, K = self.S, self.N_MC, self.r_l, self.q_l, self.K
+        S, N_MC, q_l, K = self.S, self.N_MC, self.q_l, self.K
+        r_l = 2  # affine random effects
         phi = np.zeros(shape=(K, J, n_long_features, N_MC))
 
         for l in range(n_long_features):

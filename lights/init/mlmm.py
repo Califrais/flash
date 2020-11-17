@@ -102,7 +102,7 @@ class MLMM(Learner):
         long_cov : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
             Variance-covariance matrix that accounts for dependence between the
             different longitudinal outcome. Here r = 2*n_long_features since
-            one choose linear time-varying features, so all r_l=2
+            one choose affine random effects, so all r_l=2
 
         phi : `np.ndarray`, shape=(n_long_features,)
             Variance vector for the error term of the longitudinal processes
@@ -132,7 +132,7 @@ class MLMM(Learner):
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
         q_l = fixed_effect_time_order + 1
-        r_l = 2  # linear time-varying features, so all r_l=2
+        r_l = 2  # affine random effects
 
         if self.initialize:
             # initialize parameters by fitting univariate linear mixed models

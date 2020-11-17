@@ -2,7 +2,6 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
-from lights.base.base import get_vect_from_ext, get_xi_from_xi_ext, clean_xi_ext
 
 
 class Penalties:
@@ -117,7 +116,7 @@ class Penalties:
 
         Returns
         -------
-        output : `np.array`
+        output : `float`
             The value of the sparse group l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1

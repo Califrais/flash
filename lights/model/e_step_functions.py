@@ -53,6 +53,7 @@ class EstepFunctions:
     def __init__(self, X, T, delta, extracted_features, n_long_features,
                  n_time_indep_features, fixed_effect_time_order,
                  asso_functions, theta=None):
+        self.K = 2  # 2 latent groups
         self.X, self.T, self.delta = X, T, delta
         self.T_u, self.n_samples = np.unique(T), len(T)
         self.extracted_features, self.theta = extracted_features, theta
@@ -60,7 +61,6 @@ class EstepFunctions:
         self.n_time_indep_features = n_time_indep_features
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
-        self.K = 2 # 2 latent groups
 
     def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -352,7 +352,7 @@ class EstepFunctions:
 
         Parameters
         ----------
-        g : `np.array`, shape=(n_samples, ...)
+        g : `np.array`, shape=(n_samples, g.shape)
             The value of g function for all samples
 
         Lambda_1: `np.ndarray`, shape=(n_samples, K)
@@ -368,7 +368,7 @@ class EstepFunctions:
 
         Returns
         -------
-        Eg : `np.ndarray`, shape=(n_samples, ...)
+        Eg : `np.ndarray`, shape=(n_samples, g.shape)
             The approximated expectations for g
         """
         Lambda_g = self.Lambda_g(g, f)

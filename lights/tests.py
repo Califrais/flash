@@ -59,7 +59,7 @@ class Test(unittest.TestCase):
         D : `np.ndarray`, shape=(2*n_long_features, 2*n_long_features)
             Variance-covariance matrix that accounts for dependence between the
             different longitudinal outcome. Here r = 2*n_long_features since
-            one choose linear time-varying features, so all r_l=2
+            one choose affine random effects, so all r_l=2
 
         phi : `np.ndarray`, shape=(n_long_features,)
             Variance vector for the error term of the longitudinal processes
