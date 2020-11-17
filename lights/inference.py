@@ -174,7 +174,9 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         log_lik = self._log_lik(X, Y, T, delta)
-        pen = self.pen.elastic_net(xi_ext)
+        fit_intercept = self.fit_intercept
+        _, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
+        pen = self.pen.elastic_net(xi)
         # TODO : add sparse group l1 penalties
         return -log_lik + pen
 
@@ -220,9 +222,8 @@ class QNMCEM(Learner):
             Returns the posterior probability of the sample for being on the
             high-risk group given all observed data
         """
-        pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
-        tmp = Lambda_1 * pi_xi_
-        pi_est = (tmp.T / tmp.sum(axis=1)).T
+        tmp = Lambda_1 * np.vstack((1 - pi_xi, pi_xi)).T
+        pi_est = tmp[:, 1] / tmp.sum(axis=1)
         return pi_est
 
     def predict_marker(self, X, Y):
@@ -464,18 +465,18 @@ class QNMCEM(Learner):
             # Update beta_0
             #TODO  : strange that the 2 R_func are the same for the beta_0 and beta_1 updates
             beta_0_ext = fmin_l_bfgs_b(
-                func=lambda beta_0_ext: F_func.R_func(beta_0_ext, pi_est, E_g1, E_g2, E_g9,
-                            baseline_hazard, indicator_2), x0=beta_0_0,
-                fprime=lambda beta_ext_: F_func.grad_R(beta_0_ext, gamma_0_ext, pi_est[:, 0], E_g5, E_g6, E_gS, baseline_hazard,
+                func=lambda beta_ext: F_func.R_func(beta_ext, 1 - pi_est, E_g1, E_g2, E_g9,
+                            baseline_hazard, indicator_2, 0), x0=beta_0_0,
+                fprime=lambda beta_ext: F_func.grad_R(beta_ext, gamma_0_ext, 1 - pi_est, E_g5, E_g6, E_gS, baseline_hazard,
                indicator_2, extracted_features, phi, 0), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
             beta_0_ext = beta_0_ext.reshape(-1, 1)
 
             # Update beta_1
             beta_1_ext = fmin_l_bfgs_b(
-                func=lambda beta_1_ext: F_func.R_func(beta_1_ext, pi_est, E_g1, E_g2, E_g9,
-                            baseline_hazard, indicator_2), x0=beta_1_0,
-                fprime=lambda beta_ext_: F_func.grad_R(beta_1_ext, gamma_1_ext, pi_est[:, 1], E_g5, E_g6, E_gS, baseline_hazard,
+                func=lambda beta_ext: F_func.R_func(beta_ext, pi_est, E_g1, E_g2, E_g9,
+                            baseline_hazard, indicator_2, 1), x0=beta_1_0,
+                fprime=lambda beta_ext: F_func.grad_R(beta_ext, gamma_1_ext, pi_est, E_g5, E_g6, E_gS, baseline_hazard,
                indicator_2, extracted_features, phi, 1), disp=False,
                 bounds=bounds_beta, maxiter=maxiter, pgtol=pgtol)[0]
             beta_1_ext = beta_1_ext.reshape(-1, 1)
@@ -485,8 +486,6 @@ class QNMCEM(Learner):
             g1 = E_func._g1(S)
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, 4)
             E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
-            # g1 = E_func._g1(S)
-            # E_g1 = E_func._Eg(g1, Lambda_1, pi_xi, f)
             E_log_g1 = E_func._Eg(np.log(g1), Lambda_1, pi_xi, f)
 
             g7 = E_func._g7(S)
@@ -501,18 +500,18 @@ class QNMCEM(Learner):
             # Update gamma_0
             gamma_0_ext = fmin_l_bfgs_b(
                 func=lambda gamma_ext: F_func.Q_func(gamma_ext, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_1, indicator_2), x0=gamma_0_0,
-                fprime=lambda gamma_0_ext: F_func.grad_Q(gamma_0_ext, pi_est, E_g1, E_g7, E_g8,
-                                        baseline_hazard, indicator_1, indicator_2), disp=False,
+                            baseline_hazard, indicator_1, indicator_2, 0), x0=gamma_0_0,
+                fprime=lambda gamma_ext: F_func.grad_Q(gamma_ext, pi_est, E_g1, E_g7, E_g8,
+                                        baseline_hazard, indicator_1, indicator_2, 0), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
             gamma_0_ext = gamma_0_ext.reshape(-1, 1)
 
             # Update gamma_1
             gamma_1_ext = fmin_l_bfgs_b(
-                func=lambda gamma_1_ext: F_func.Q_func(gamma_1_ext, pi_est, E_log_g1, E_g1,
-                            baseline_hazard, indicator_1, indicator_2), x0=gamma_1_0,
-                fprime=lambda gamma_1_ext: F_func.grad_Q(gamma_1_ext, pi_est, E_g1, E_g7, E_g8,
-                            baseline_hazard, indicator_1, indicator_2), disp=False,
+                func=lambda gamma_ext: F_func.Q_func(gamma_ext, 1 - pi_est, E_log_g1, E_g1,
+                            baseline_hazard, indicator_1, indicator_2, 1), x0=gamma_1_0,
+                fprime=lambda gamma_ext: F_func.grad_Q(gamma_ext, pi_est, E_g1, E_g7, E_g8,
+                            baseline_hazard, indicator_1, indicator_2, 1), disp=False,
                 bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[0]
             gamma_1_ext = gamma_1_ext.reshape(-1, 1)
 
@@ -532,22 +531,16 @@ class QNMCEM(Learner):
             E_gS_ = E_gS.reshape(n_samples, n_long_features, q_l)
             for l in range(n_long_features):
                 # K = 2
-                pi_est_ = np.empty(shape=(0, 2))
-                for i in range(n_samples):
-                    pi_est_ = np.vstack((pi_est_, np.broadcast_to(pi_est[i],
-                                                                  (N_L[l][i],) +
-                                                                  pi_est[
-                                                                      i].shape)))
-                N_l = sum(N_L[l])
-                y_l = y_L[l]
-                U_l = U_L[l]
-                V_l = V_L[l]
+                pi_est_ = np.concatenate([[pi_est[i]] * N_L[l][i] for i in range(n_samples)])
+                pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T
+
+                N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
                 E_b_l = E_gS_[:, l].reshape(-1, 1)
                 E_bb_l = block_diag(E_g0_t[:, l])
                 tmp = y_l - U_l.dot(beta_l)
-                phi[l] = (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) + np.trace(
-                    (V_l.T.dot(V_l).dot(E_bb_l)))).sum(axis=0) / N_l
+                phi[l] = (pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l)))+
+                    np.trace((V_l.T.dot(V_l).dot(E_bb_l))))).sum() / N_l
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D)
