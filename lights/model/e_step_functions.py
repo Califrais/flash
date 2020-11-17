@@ -78,13 +78,19 @@ class EstepFunctions:
         S = np.vstack((b, -b))
         return S
 
-    def f_data_given_latent(self, S):
+    def f_data_given_latent(self, S, indicator_1, indicator_2):
         """Computes f(Y, T, delta| S, G, theta)
 
         Parameters
         ----------
         S: `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        indicator_1 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        indicator_2 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
 
         Returns
         -------
@@ -99,27 +105,24 @@ class EstepFunctions:
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         N_MC = S.shape[0]
         g1 = self._g1(S)
+        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
 
-        f = np.ones(shape=(n_samples, K, N_MC))
-        # TODO LATER : to be optimized
+        baseline_val = baseline_hazard.values.flatten()
+        tmp = g1.swapaxes(0, 2) * baseline_val
+        op1 = (((tmp * ind_1).sum(axis=-1)) ** delta).T
+        op2 = (tmp * ind_2).sum(axis=-1).T
+        # Compute f(y|b)
+        f_y = np.ones(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
-            t_i = T[i]
-            baseline_hazard_t_i = baseline_hazard.loc[[t_i]].values
-            tmp = g1[i].swapaxes(2, 1).swapaxes(1, 0)
-            op1 = (baseline_hazard_t_i * tmp[T_u == t_i]) ** delta[i]
-            op2 = np.sum(tmp[T_u <= t_i] * baseline_hazard.loc[
-                T_u[T_u <= t_i]].values.reshape(-1, 1, 1), axis=0)
-
-            # Compute f(y|b)
             beta_stack = np.hstack((beta_0, beta_1))
             U_i, V_i, n_i, y_i = U_list[i], V_list[i], sum(N_list[i]), y_list[i]
             Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            f_y = 1 / np.sqrt((2 * np.pi) ** n_i * np.prod(Phi_i) * np.exp(
+            f_y[i] = 1 / np.sqrt((2 * np.pi) ** n_i * np.prod(Phi_i) * np.exp(
                 np.sum(((y_i - M_iS) ** 2) / Phi_i, axis=1)))
 
-            f[i] = op1 * np.exp(-op2) * f_y
+        f = op1 * np.exp(-op2) * f_y
 
         return f
 

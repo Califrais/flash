@@ -46,12 +46,10 @@ class MstepFunctions:
     """
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
-                 n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1, nb_asso_features,
-                 fixed_effect_time_order):
+                 n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1,
+                 nb_asso_features, fixed_effect_time_order):
         self.fit_intercept = fit_intercept
-        self.X = X
-        self.T = T
-        self.delta = delta
+        self.X, self.T, self.delta = X, T, delta
         self.n_long_features = n_long_features
         self.n_time_indep_features = n_time_indep_features
         n_samples = len(T)
@@ -103,7 +101,7 @@ class MstepFunctions:
 
         Returns
         -------
-        output : `float`
+        output : `np.ndarray`
             The value of the P sub objective gradient
         """
         fit_intercept = self.fit_intercept
@@ -216,7 +214,7 @@ class MstepFunctions:
 
         Returns
         -------
-        output : `float`
+        output : `np.ndarray`
             The value of the R sub objective gradient
         """
         n_time_indep_features = self.n_time_indep_features
@@ -297,8 +295,7 @@ class MstepFunctions:
         pen = self.pen.elastic_net(gamma_indep) + \
               self.pen.sparse_group_l1(gamma_dep, n_long_features)
         baseline_val = baseline_hazard.values.flatten()
-        ind_1 = indicator_1 * 1
-        ind_2 = indicator_2 * 1
+        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
         E_g1_, E_log_g1_ = E_g1[:, :, idx], E_log_g1[:, :, idx]
         sub_obj = (E_log_g1_ * ind_1).sum(axis=1) * delta - (E_g1_ * ind_2 * baseline_val).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
@@ -340,7 +337,7 @@ class MstepFunctions:
 
         Returns
         -------
-        output : `float`
+        output : `np.ndarray`
             The value of the Q sub objective gradient
         """
         n_time_indep_features = self.n_time_indep_features

@@ -340,9 +340,6 @@ class QNMCEM(Learner):
         J = T_u.shape[0]
 
         # Create indicator matrices to compare event times
-        # TODO: use indicator to update f_data_given_latent
-        tmp = np.broadcast_to(T, (n_samples, n_samples))
-        indicator = (tmp < tmp.T) * 1 + np.eye(n_samples)
         indicator_1 = T.reshape(-1, 1) == T_u
         indicator_2 = T.reshape(-1, 1) >= T_u
 
@@ -412,7 +409,7 @@ class QNMCEM(Learner):
             # E-Step
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = E_func.f_data_given_latent(S)
+            f = E_func.f_data_given_latent(S, indicator_1, indicator_2)
             Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 

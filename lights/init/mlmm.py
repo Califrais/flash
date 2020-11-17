@@ -76,14 +76,9 @@ class MLMM(Learner):
 
         log_lik = 0
         for i in range(n_samples):
-            U_i = U_list[i]
-            V_i = V_list[i]
-            n_i = sum(N[i])
-            y_i = y_list[i]
-            diag = []
-            for l in range(n_long_features):
-                diag += [phi[l, 0]] * N[i][l]
-            Sigma_i = np.diag(diag)
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
+            Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            Sigma_i = np.diag(np.concatenate(Phi_i))
             tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
 
@@ -176,11 +171,8 @@ class MLMM(Learner):
                 U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
 
                 # compute Sigma_i
-                Phi_i = []
-                for l in range(n_long_features):
-                    n_il = N_i[l]
-                    Phi_i += [1 / phi[l, 0]] * n_il
-                Sigma_i = np.diag(Phi_i)
+                Phi_i = [[phi[l, 0]] * N_i[l] for l in range(n_long_features)]
+                Sigma_i = np.diag(np.concatenate(Phi_i))
 
                 # compute Omega_i
                 D_inv = np.linalg.inv(D)
@@ -218,10 +210,7 @@ class MLMM(Learner):
 
             # Update phi
             for l in range(n_long_features):
-                N_l = sum(N_L[l])
-                y_l = y_L[l]
-                U_l = U_L[l]
-                V_l = V_L[l]
+                N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 Omega_l = Omega_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
                 mu_l = mu_tilde_L[l].reshape(-1, 1)
