@@ -164,9 +164,9 @@ class QNMCEM(Learner):
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
 
-        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
+        theta : `dict`, default=None
+            Vector that concatenates all parameters to be inferred in the lights
+            model
 
         Returns
         -------
@@ -562,7 +562,7 @@ class QNMCEM(Learner):
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D, xi = xi_ext)
             prev_obj = obj
-            obj = func_obj(X, Y, T, delta, xi_ext)
+            obj = func_obj(X, Y, T, delta, self.theta)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:

@@ -354,7 +354,7 @@ class MstepFunctions:
         E_g1_, E_g7_, E_g8_ = E_g1.T[idx].T, E_g7.T[idx].T, E_g8.T[idx].T.swapaxes(0, 1)
         X_ = self.X.flatten()
 
-        grad_pen_indep = self.pen.grad_lasso(gamma_indep).reshape(-1, 2)
+        grad_pen_indep = self.pen.grad_elastic_net(gamma_indep).reshape(-1, 2)
         grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, n_long_features).reshape(-1, 2)
         grad_pen = np.vstack((grad_pen_indep, grad_pen_dep))
         grad = np.zeros(nb_asso_features)

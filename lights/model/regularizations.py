@@ -90,7 +90,7 @@ class Penalties:
 
         Returns
         -------
-        output : `float`
+        grad : `np.array`
             The gradient of the elasticNet penalization part of vector v
         """
         l_pen, eta = self.l_pen, self.eta_elastic_net
@@ -139,7 +139,7 @@ class Penalties:
 
         Returns
         -------
-        output : `np.array`
+        grad : `np.array`
             The gradient of the sparse group l1 penalization of vector v
         """
         l_pen, eta = self.l_pen, self.eta_sp_gp_l1
