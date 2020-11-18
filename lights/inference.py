@@ -9,7 +9,7 @@ from lights.base.base import Learner, extract_features, normalize, \
     get_vect_from_ext, get_xi_from_xi_ext, logistic_grad, block_diag
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
-from lights.model.e_step_functions import EstepFunctions
+from lights.model.e_step_functions import EstepFunctions, E_step_construct
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import Penalties
 
@@ -118,51 +118,37 @@ class QNMCEM(Learner):
                              "`list` in ['lp', 're', 'tps', 'ce']")
         self._asso_functions = val
 
-    def _log_lik(self, X, Y, T, delta):
+    def _log_lik(self, pi_xi, f):
         """Computes the likelihood of the lights model
 
         Parameters
         ----------
-        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
+        pi_xi : `np.ndarray`, shape=(n_samples,)
+            Comes from get_proba function
 
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
-            a pandas.Series
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Censored times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
+        f : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the f(Y, T, delta| S, G, theta)
 
         Returns
         -------
-        output : `float`
-            The log-likelihood computed on the given data
+        prb : `float`
+            The approximated log-likelihood computed on the given data
         """
-        prb = 1
-        # TODO
-        return np.mean(np.log(prb))
+        pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
+        prb = np.log((pi_xi_ * f.mean(axis=-1)).sum(axis=-1)).mean()
+        return prb
 
-    def _func_obj(self, X, Y, T, delta):
+    def _func_obj(self, pi_xi, f):
         """The global objective to be minimized by the QNMCEM algorithm
         (including penalization)
 
         Parameters
         ----------
-        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
+        pi_xi : `np.ndarray`, shape=(n_samples,)
+            Comes from get_proba function
 
-        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
-            a pandas.Series
-
-        T : `np.ndarray`, shape=(n_samples,)
-            Censored times of the event of interest
-
-        delta : `np.ndarray`, shape=(n_samples,)
-            Censoring indicator
+        f : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the f(Y, T, delta| S, G, theta)
 
         Returns
         -------
@@ -172,7 +158,7 @@ class QNMCEM(Learner):
         n_time_indep_features = self.n_time_indep_features
         n_long_features = self.n_long_features
         theta = self.theta
-        log_lik = self._log_lik(X, Y, T, delta)
+        log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
         xi = theta["xi"]
         xi_pen = self.pen.elastic_net(xi)
@@ -230,8 +216,9 @@ class QNMCEM(Learner):
         pi_xi : `np.ndarray`, shape=(n_samples,)
             Comes from get_proba function
 
-        Lambda_1 : `np.ndarray`, shape=(n_samples, 2)
-            #TODO blabla
+        Lambda_1 : `np.ndarray`, shape=(n_samples, K)
+            Approximated integral (see (15) in the lights paper) with
+            \tilde(g)=1
 
         Returns
         -------
@@ -378,12 +365,6 @@ class QNMCEM(Learner):
                           xi=xi_ext, gamma_0=gamma_0_ext,
                           gamma_1=gamma_1_ext, long_cov=D, phi=phi,
                           baseline_hazard=baseline_hazard)
-        func_obj = self._func_obj
-        obj = func_obj(X, Y, T, delta)
-        # Store init values
-        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
-        if verbose:
-            self.history.print_history()
 
         # Stopping criteria and bounds vector for the L-BGFS-B algorithms
         maxiter, pgtol = 60, 1e-5
@@ -395,21 +376,24 @@ class QNMCEM(Learner):
         # Instanciates the E-step and M-step functions
         E_func = EstepFunctions(X, T, delta, extracted_features,
                                 n_long_features, n_time_indep_features,
-                                fixed_effect_time_order, asso_functions)
+                                fixed_effect_time_order, asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, n_long_features,
                                 n_time_indep_features, self.l_pen,
                                 self.eta_elastic_net, self.eta_sp_gp_l1, nb_asso_features,
                                 fixed_effect_time_order)
 
+        func_obj = self._func_obj
+        pi_xi = self.get_proba(X, xi_ext)
+        E_func, S, f, Lambda_1 = E_step_construct(E_func, self.theta, N, indicator_1, indicator_2)
+        obj = func_obj(pi_xi, f)
+        # Store init values
+        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
+        if verbose:
+            self.history.print_history()
+
         for n_iter in range(1, max_iter + 1):
 
-            pi_xi = self.get_proba(X, xi_ext)
-
             # E-Step
-            E_func.theta = self.theta
-            S = E_func.construct_MC_samples(N)
-            f = E_func.f_data_given_latent(S, indicator_1, indicator_2)
-            Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
             pi_est = self.get_post_proba(pi_xi, Lambda_1)
 
             g0 = E_func._g0(S)
@@ -561,7 +545,11 @@ class QNMCEM(Learner):
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D, xi=xi_ext)
             prev_obj = obj
-            obj = func_obj(X, Y, T, delta)
+            # Update for new E step
+            pi_xi = self.get_proba(X, xi_ext)
+            E_func, S, f, Lambda_1 = E_step_construct(E_func, self.theta, N,
+                                                 indicator_1, indicator_2)
+            obj = func_obj(pi_xi, f)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
 
             if n_iter % print_every == 0:
@@ -602,7 +590,10 @@ class QNMCEM(Learner):
             The score computed on the given data
         """
         if metric == 'log_lik':
-            return self._log_lik(X, Y, T, delta)
+            # TODO: Update later
+            pi_xi = 0
+            f = 0
+            return self._log_lik(pi_xi, f)
         elif metric == 'C-index':
             return c_index_score(T, self.predict_marker(X, Y), delta)
         else:

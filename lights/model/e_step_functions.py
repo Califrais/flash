@@ -4,6 +4,51 @@
 import numpy as np
 from lights.model.associations import get_asso_func
 
+def E_step_construct(E_func, theta, N, indicator_1, indicator_2, n_samples):
+    """
+    Construct some variables/values for E step
+
+        Parameters
+        ----------
+        E_func : `class`
+            E_step class
+
+        theta : `dict`, default=None
+            Vector that concatenates all parameters to be inferred in the lights
+            model
+
+        N : `int`
+            Number of Monte Carlo samples
+
+        indicator_1 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        indicator_2 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        Returns
+        -------
+        E_func : `class`
+            E_step class
+
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        f: `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the f(Y, T, delta| S, G, theta)
+
+        Lambda_1: `np.ndarray`, shape=(n_samples, K)
+            Approximated integral (see (15) in the lights paper) with
+            \tilde(g)=1
+    """
+    n_samples = indicator_1.shape[0]
+    E_func.theta = theta
+    S = E_func.construct_MC_samples(N)
+    f = E_func.f_data_given_latent(S, indicator_1, indicator_2)
+    Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+
+    return E_func, S, f, Lambda_1
+
 
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
