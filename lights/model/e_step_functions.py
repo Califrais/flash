@@ -4,7 +4,7 @@
 import numpy as np
 from lights.model.associations import get_asso_func
 
-def E_step_construct(E_func, theta, N, indicator_1, indicator_2, n_samples):
+def E_step_construct(E_func, theta, N, indicator_1, indicator_2):
     """
     Construct some variables/values for E step
 
@@ -149,7 +149,7 @@ class EstepFunctions:
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         N_MC = S.shape[0]
-        g1 = self._g1(S)
+        g1 = self._g1(S, False)
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
 
         baseline_val = baseline_hazard.values.flatten()
@@ -171,8 +171,7 @@ class EstepFunctions:
 
         return f
 
-    @staticmethod
-    def _g0(S):
+    def _g0(self, S):
         """Computes g0
 
         Parameters
@@ -182,13 +181,14 @@ class EstepFunctions:
 
         Returns
         -------
-        g0 : `np.ndarray`, shape=(N_MC,)
+        g0 : `np.ndarray`, shape=(n_samples, K, N_MC,)
             The values of g0 function
         """
-        g0 = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
+        tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
+        g0 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
         return g0
 
-    def _g0_t(self, S):
+    def _g0_l(self, S):
         """Computes g0_tide
 
         Parameters
@@ -198,19 +198,37 @@ class EstepFunctions:
 
         Returns
         -------
-        g0 : `np.ndarray`, shape=(N_MC, n_long_features, r_l, r_l)
-            The values of g0_t function
+        g0_l : `np.ndarray`, shape=(n_samples, K, N_MC, n_long_features, r_l, r_l)
+            The values of g0_l function
         """
         N_MC = S.shape[0]
         n_long_features = self.n_long_features
         S_ = S.reshape(N_MC, n_long_features, -1)
-        g0_t = []
+        tmp = []
         for s in S_:
-            g0_t.append(np.array([s_.reshape(-1, 1).dot(s_.reshape(-1, 1).T) for s_ in s]))
-        return np.array(g0_t)
+            tmp.append(np.array([s_.reshape(-1, 1).dot(s_.reshape(-1, 1).T) for s_ in s]))
+        tmp = np.array(tmp)
+        g0_l = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
+        return g0_l
+
+    def _gS(self, S):
+        """Computes gS
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        gS : `np.ndarray`, shape=(n_samples, K, N_MC, r)
+            The values of gS function
+        """
+        gS = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
+        return gS
 
 
-    def _g1(self, S):
+    def _g1(self, S, broadcast=True):
         """Computes g1
 
         Parameters
@@ -220,8 +238,11 @@ class EstepFunctions:
 
         Returns
         -------
-        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
+        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J, K)
             The values of g1 function
+
+        broadcast : `boolean`
+            Indicate to expand the dimension of g1 or not
         """
         n_samples, K, theta = self.n_samples, self.K, self.theta
         p = self.n_time_indep_features
@@ -229,18 +250,26 @@ class EstepFunctions:
         N_MC, J = S.shape[0], T_u.shape[0]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_indep = np.vstack((gamma_0[:p], gamma_1[:p])).T
-        g2_ = self._g2(S).reshape(K, 1, J, N_MC)
+        g2_ = self._g2(S, broadcast=False).reshape(K, 1, J, N_MC)
         tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
         g1 = np.exp(tmp + g2_).swapaxes(0, 1).swapaxes(2, 3)
+        if broadcast:
+            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
 
-    def _g2(self, S):
+    def _g2(self, S, indicator=None, broadcast=True):
         """Computes g2
 
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        indicator : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        broadcast : `boolean`
+            Indicate to expand the dimension of g1 or not
 
         Returns
         -------
@@ -255,15 +284,26 @@ class EstepFunctions:
         asso_func = get_asso_func(T_u, S, theta, asso_functions,
                                   n_long_features, fixed_effect_time_order)
         g2 = np.sum(asso_func * gamma_dep, axis=-1)
+        if broadcast:
+            g2 = g2.swapaxes(0, 1)
+            g2 = np.sum(np.broadcast_to(g2, (self.n_samples,) + g2.shape).T *
+                        (indicator * 1).T, axis=2).T
+            g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
-    def _g5(self, S):
+    def _g5(self, S, indicator=None, broadcast=True):
         """Computes g5
 
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        indicator : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times
+
+        broadcast : `boolean`
+            Indicate to expand the dimension of g1 or not
 
         Returns
         -------
@@ -273,6 +313,14 @@ class EstepFunctions:
         g5 = get_asso_func(self.T_u, S, self.theta, self.asso_functions,
                            self.n_long_features, self.fixed_effect_time_order,
                            derivative=True)
+
+        if broadcast:
+            g5 = g5.swapaxes(0, 2)
+            g5 = np.sum(np.broadcast_to(g5, (self.n_samples,) + g5.shape).T *
+                        (indicator * 1).T, axis=-2).T
+            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,))\
+                .swapaxes(2, 5).swapaxes(1, 2)
+
         return g5
 
     def _g6(self, S):
@@ -289,12 +337,13 @@ class EstepFunctions:
             The values of g6 function
         """
         n_samples = self.n_samples
-        g1, g5 = self._g1(S), self._g5(S)
+        g1, g5 = self._g1(S, False), self._g5(S, broadcast=False)
         g5 = np.broadcast_to(g5, (n_samples,) + g5.shape)
         g6 = (g1.T * g5.T).T
+        g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, -1)
         return g6
 
-    def _g7(self, S):
+    def _g7(self, S, broadcast=True):
         """Computes g2
 
         Parameters
@@ -302,9 +351,12 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        broadcast : `boolean`
+            Indicate to expand the dimension of g1 or not
+
         Returns
         -------
-        g7 : `np.ndarray`, shape=(K, N_MC, J, dim)
+        g7 : `np.ndarray`, shape=(K, N_MC, J, dim, K)
             The values of g7 function
         """
         T_u, theta = self.T_u, self.theta
@@ -312,6 +364,9 @@ class EstepFunctions:
         fixed_effect_time_order = self.fixed_effect_time_order
         g7 = get_asso_func(T_u, S, theta, asso_functions, n_long_features,
                            fixed_effect_time_order).swapaxes(1, 2)
+        if broadcast:
+            g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
+            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
         return g7
 
 
@@ -325,13 +380,14 @@ class EstepFunctions:
 
         Returns
         -------
-        g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim)
+        g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
             The values of g8 function
         """
 
-        g7 = self._g7(S)
-        g1 = self._g1(S)
+        g7 = self._g7(S, False)
+        g1 = self._g1(S, False)
         g8 = g1[..., np.newaxis] * g7
+        g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
 
     def _g9(self, S):
@@ -344,7 +400,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g9 : `np.ndarray`, shape=(n_samples, K, N_MC)
+        g9 : `np.ndarray`, shape=(n_samples, K, N_MC, K)
             The values of g9 function
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
@@ -361,6 +417,8 @@ class EstepFunctions:
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g9[i] = np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+
+        g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
 
         return g9
 
