@@ -77,7 +77,7 @@ class MLMM(Learner):
         log_lik = 0
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
-            Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            Phi_i = [[1 / phi[l, 0]] * N[i][l] for l in range(n_long_features)]
             Sigma_i = np.diag(np.concatenate(Phi_i))
             tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
@@ -171,7 +171,8 @@ class MLMM(Learner):
                 U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
 
                 # compute Sigma_i
-                Phi_i = [[phi[l, 0]] * N_i[l] for l in range(n_long_features)]
+                Phi_i = [[1 / phi[l, 0]] * N_i[l]
+                         for l in range(n_long_features)]
                 Sigma_i = np.diag(np.concatenate(Phi_i))
 
                 # compute Omega_i
