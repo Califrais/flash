@@ -266,7 +266,7 @@ class QNMCEM(Learner):
                 raise NameError('Parameter {} has not defined'.format(key))
 
     def fit(self, X, Y, T, delta):
-        """Fit the lights model
+        """Fits the lights model
 
         Parameters
         ----------
@@ -439,7 +439,7 @@ class QNMCEM(Learner):
 
             # beta needs to be updated before gamma
             self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
-
+            E_func.theta = self.theta
             g1 = E_func.g1(S)
             E_g1 = E_func.Eg(g1, Lambda_1, pi_xi, f)
             E_log_g1 = E_func.Eg(np.log(g1), Lambda_1, pi_xi, f)
@@ -461,9 +461,10 @@ class QNMCEM(Learner):
 
             # gamma needs to be updated before the baseline
             self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
+            E_func.theta = self.theta
+            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
 
             # baseline hazard update
-            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
             baseline_hazard = pd.Series(
                 data=((ind_1 * 1).T * delta).sum(axis=1) / (
                         (E_g1.T * (ind_2 * 1).T).swapaxes(0, 1)
@@ -488,10 +489,9 @@ class QNMCEM(Learner):
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D, xi=xi_ext)
-
             # Update for next iteration
             pi_xi = self.get_proba(X, xi_ext)
-            E_func.theta = theta
+            E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
             f = E_func.f_data_given_latent(S, ind_1, ind_2)
 
