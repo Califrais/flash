@@ -383,7 +383,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         X_dot_xi = X.dot(xi)
 
         # Simulation of the random effects components
-        r_l = 2  # affine random effects
+        r_l = 2  # Affine random effects
         r = r_l * n_long_features
         b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
         self.long_cov = D
@@ -432,11 +432,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         tmp_0 = np.add.reduceat(gamma_0, idx_2)
         tmp_1 = np.add.reduceat(gamma_1, idx_2)
 
-        iota_01 = X_dot_xi[G == 0] + b[G == 0].dot(tmp_0) \
-                  + gamma_0[idx_34].dot(beta_0)
+        iota_01 = X_dot_xi[G == 0] + b[G == 0].dot(tmp_0)
+        iota_01 += gamma_0[idx_34].dot(beta_0)
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(gamma_0[idx_4])
-        iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1) \
-                  + gamma_1[idx_34].dot(beta_1)
+        iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1)
+        iota_11 += gamma_1[idx_34].dot(beta_1)
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
         self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
 

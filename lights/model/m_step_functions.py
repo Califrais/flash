@@ -2,7 +2,7 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
-from lights.base.base import get_vect_from_ext, logistic_loss, logistic_grad, \
+from lights.base.base import get_vect_from_ext, logistic_loss, \
     get_xi_from_xi_ext
 from lights.model.regularizations import Penalties
 
@@ -17,7 +17,7 @@ class MstepFunctions:
         features
 
     X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
+        The time-independent features matrix
 
     T : `np.ndarray`, shape=(n_samples,)
         The censored times of the event of interest
@@ -58,8 +58,6 @@ class MstepFunctions:
         self.fixed_effect_time_order = fixed_effect_time_order
         self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
                              eta_sp_gp_l1)
-
-        # TODO: MstepFunctions class does not depend on theta : careful !
 
     def P_func(self, pi_est, xi_ext):
         """Computes the sub objective function denoted P in the lights paper,
@@ -115,8 +113,8 @@ class MstepFunctions:
                                axis=1)
             grad_pen = np.concatenate([[0], grad_pen[:n_time_indep_features],
                                        [0], grad_pen[n_time_indep_features:]])
-
-        grad = (X * (pi_est * np.exp(-logistic_loss(-u))).reshape(-1, 1)).mean(axis=0)
+        grad = X * (pi_est * np.exp(-logistic_loss(-u))).reshape(-1, 1)
+        grad = grad.mean(axis=0)
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj + grad_pen
 
@@ -159,10 +157,10 @@ class MstepFunctions:
         n_long_features = self.n_long_features
         beta = get_vect_from_ext(beta_ext)
         pen = self.pen.sparse_group_l1(beta, n_long_features)
-        delta_ = self.delta
+        delta = self.delta
         baseline_val = baseline_hazard.values.flatten()
         ind_ = indicator * 1
-        sub_obj = E_g2 * delta_ + E_g8 - (E_g1 * baseline_val * ind_).sum(axis=1)
+        sub_obj = E_g2 * delta + E_g8 - (E_g1 * baseline_val * ind_).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
@@ -185,7 +183,8 @@ class MstepFunctions:
             obtained by the E-step
 
         E_g5 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
-            The approximated expectations of function logarithm of g5 for each latent group
+            The approximated expectations of function logarithm of g5 for each
+            latent group
 
         E_g6 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
             The approximated expectations of function g6 for each latent group
@@ -213,30 +212,31 @@ class MstepFunctions:
         output : `np.ndarray`
             The value of the R sub objective gradient
         """
-        n_time_indep_features = self.n_time_indep_features
-        n_long_features = self.n_long_features
+        p, L = self.n_time_indep_features, self.n_long_features
         n_samples = self.n_samples
         q_l = self.fixed_effect_time_order + 1
-
         beta = get_vect_from_ext(beta_ext)
-        gamma = get_vect_from_ext(gamma_ext)[n_time_indep_features:].reshape(n_long_features, -1)
+        gamma = get_vect_from_ext(gamma_ext)[p:].reshape(L, -1)
         # To match the dimension of the association func derivative over beta
         gamma_ = np.repeat(gamma, q_l, axis=1)
-        grad_pen = self.pen.grad_sparse_group_l1(beta, n_long_features)
+        grad_pen = self.pen.grad_sparse_group_l1(beta, L)
 
         ind_ = indicator * 1
         baseline_val = baseline_hazard.values
-        tmp1 = (E_g5.T * self.delta).T - (E_g6.T * (ind_ * baseline_val).T).T.sum(axis=1)
+        tmp1 = (E_g5.T * self.delta).T - \
+               (E_g6.T * (ind_ * baseline_val).T).T.sum(axis=1)
         # split and sum over each l-th beta
-        tmp1 = (tmp1 * gamma_).reshape(n_samples, n_long_features, -1, q_l).sum(axis=2)
+        tmp1 = (tmp1 * gamma_).reshape(n_samples, L, -1, q_l).sum(axis=2)
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-        tmp2 = np.zeros((n_samples, n_long_features * q_l))
+        tmp2 = np.zeros((n_samples, L * q_l))
         for i in range(n_samples):
-            U_i, V_i, n_i, y_i = U_list[i], V_list[i], N_list[i], y_list[i].flatten()
-            Phi_i = [[phi[l, 0]] * n_i[l] for l in range(n_long_features)]
+            U_i, V_i, n_i, y_i = U_list[i], V_list[i], N_list[i], y_list[i]
+            y_i = y_i.flatten()
+            Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) - V_i.dot(E_gS[i])))
+            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) -
+                                          V_i.dot(E_gS[i])))
 
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
@@ -258,7 +258,8 @@ class MstepFunctions:
             obtained by the E-step
 
         E_log_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function logarithm of g1 for each latent group
+            The approximated expectations of function logarithm of g1 for each
+            latent group
 
         E_g1 : `np.ndarray`, shape=(n_samples, J)
             The approximated expectations of function g1 for each latent group
@@ -284,11 +285,12 @@ class MstepFunctions:
         gamma = get_vect_from_ext(gamma_ext)
         gamma_indep = gamma[:n_time_indep_features]
         gamma_dep = gamma[n_time_indep_features:]
-        pen = self.pen.elastic_net(gamma_indep) + \
-              self.pen.sparse_group_l1(gamma_dep, n_long_features)
+        pen = self.pen.elastic_net(gamma_indep) + self.pen.sparse_group_l1(
+            gamma_dep, n_long_features)
         baseline_val = baseline_hazard.values.flatten()
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
-        sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - (E_g1 * ind_2 * baseline_val).sum(axis=1)
+        sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
+                  (E_g1 * ind_2 * baseline_val).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples + pen
 
@@ -329,23 +331,24 @@ class MstepFunctions:
         output : `np.ndarray`
             The value of the Q sub objective gradient
         """
-        n_time_indep_features = self.n_time_indep_features
+        p, L = self.n_time_indep_features, self.n_long_features
         nb_asso_features = self.nb_asso_features
         n_samples, delta = self.n_samples, self.delta
-        n_long_features = self.n_long_features
         gamma = get_vect_from_ext(gamma_ext)
-        gamma_indep, gamma_dep = gamma[:n_time_indep_features], gamma[n_time_indep_features:]
+        gamma_indep, gamma_dep = gamma[:p], gamma[p:]
         baseline_val = baseline_hazard.values.flatten()
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
         E_g8 = E_g8.swapaxes(0, 1)
         X_ = self.X.flatten()
-
-        grad_pen_indep = self.pen.grad_elastic_net(gamma_indep).reshape(-1, 2)
-        grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, n_long_features).reshape(-1, 2)
-        grad_pen = np.vstack((grad_pen_indep, grad_pen_dep))
+        grad_pen_indep = self.pen.grad_elastic_net(gamma_indep)
+        grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, L)
+        grad_pen = np.vstack((grad_pen_indep.reshape(-1, 2),
+                              grad_pen_dep.reshape(-1, 2)))
         grad = np.zeros(nb_asso_features)
-        grad[:n_time_indep_features] = (pi_est * (delta - (E_g1 * baseline_val * ind_2).sum(axis=1)) * X_).sum()
-        tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - (E_g8.T * baseline_val * ind_2).sum(axis=-1).T
-        grad[n_time_indep_features:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
+        grad[:p] = (pi_est * (delta - (E_g1 * baseline_val * ind_2).sum(
+            axis=1)) * X_).sum()
+        tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - (
+                    E_g8.T * baseline_val * ind_2).sum(axis=-1).T
+        grad[p:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
         grad_sub_obj = np.vstack((grad, -grad)).T
         return (-grad_sub_obj / n_samples + grad_pen).flatten()

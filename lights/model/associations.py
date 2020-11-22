@@ -28,7 +28,7 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     n_long_features : `int`
         Number of longitudinal features
 
-    fixed_effect_time_order :
+    fixed_effect_time_order : `int`
         Order of the higher time monomial considered for the representations of
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
@@ -47,20 +47,19 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     """
     fixed_effect_coeffs = np.array([theta["beta_0"], theta["beta_1"]])
     J, N_MC = T_u.shape[0], S.shape[0]
-    K = 2 # 2 latent groups
+    K = 2  # 2 latent groups
     asso_func = AssociationFunctions(T_u, S, fixed_effect_coeffs,
                                      fixed_effect_time_order, n_long_features)
-
     if derivative:
         asso_func_stack = np.empty(shape=(K, N_MC, J, n_long_features, 0))
     else:
         asso_func_stack = np.empty(shape=(K, J, N_MC, 0))
 
     for func_name in asso_functions:
-        if derivative: func_name = "d_" + func_name
+        if derivative:
+            func_name = "d_" + func_name
         func = asso_func.assoc_func_dict[func_name]
         asso_func_stack = np.concatenate((asso_func_stack, func), axis=-1)
-
     return asso_func_stack
 
 
@@ -69,8 +68,8 @@ class AssociationFunctions:
 
     Parameters
     ----------
-    T : `np.ndarray`, shape=(n_samples,)
-        Censored times of the event of interest
+    T_u : `np.ndarray`, shape=(J,)
+        The J unique censored times of the event of interest
 
     S : `np.ndarray`, shape=(2*N, r)
         Set of samples used for Monte Carlo approximation
@@ -142,7 +141,7 @@ class AssociationFunctions:
         J = self.J
         n_long_features = self.n_long_features
         S, N_MC, q_l, K = self.S, self.N_MC, self.q_l, self.K
-        r_l = 2  # affine random effects
+        r_l = 2  # Affine random effects
         phi = np.zeros(shape=(K, J, n_long_features, N_MC))
 
         for l in range(n_long_features):

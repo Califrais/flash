@@ -51,7 +51,7 @@ class ULMM(Learner):
         self._start_solve()
         fixed_effect_time_order = self.fixed_effect_time_order
         q_l = fixed_effect_time_order + 1
-        r_l = 2  # affine random effects
+        r_l = 2  # Affine random effects
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
 
