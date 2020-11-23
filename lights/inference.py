@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
-from lights.base.base import Learner, extract_features, normalize, \
-    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad, block_diag
+from lights.base.base import Learner, extract_features, normalize, block_diag, \
+    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad, get_times_infos
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
@@ -91,6 +91,7 @@ class QNMCEM(Learner):
         self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
                              eta_sp_gp_l1)
+        self._fitted = False
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -117,6 +118,10 @@ class QNMCEM(Learner):
             raise ValueError("``asso_functions`` must be either 'all', or a "
                              "`list` in ['lp', 're', 'tps', 'ce']")
         self._asso_functions = val
+
+    @property
+    def fitted(self):
+        return self._fitted
 
     @staticmethod
     def _log_lik(pi_xi, f):
@@ -247,9 +252,11 @@ class QNMCEM(Learner):
             Returns the marker rule of the sample for being on the high-risk
             group
         """
-        marker = None
-        # TODO (only if self.fitted = True, else raise error)
-        return marker
+        if self._fitted:
+            marker = None
+            return marker
+        else:
+            raise RuntimeError('You must fit the model first')
 
     def update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
@@ -310,25 +317,15 @@ class QNMCEM(Learner):
         nb_asso_feat = L * nb_asso_param + p
         N = 5  # Number of initial Monte Carlo sample for S
 
-        # Normalize time-independent features
-        X = normalize(X)
-
-        # Features extraction
-        ext_feat = extract_features(Y, alpha)
-
-        # The J unique censored times of the event of interest
-        T_u = np.unique(T)
-        J = T_u.shape[0]
-
-        # Create indicator matrices to compare event times
-        ind_1 = T.reshape(-1, 1) == T_u
-        ind_2 = T.reshape(-1, 1) >= T_u
+        X = normalize(X)  # Normalize time-independent features
+        ext_feat = extract_features(Y, alpha)  # Features extraction
+        T_u, J, ind_1, ind_2 = get_times_infos(T)
 
         # Initialization
         xi_ext = np.zeros(2 * p)
 
-        # Initialize longitudinal submodels
         if self.initialize:
+            # Initialize longitudinal submodels
             mlmm = MLMM(max_iter=max_iter, verbose=verbose, tol=tol,
                         print_every=print_every, fixed_effect_time_order=alpha)
             mlmm.fit(ext_feat)
@@ -399,7 +396,7 @@ class QNMCEM(Learner):
             E_g9 = E_func.Eg(E_func.g9(S), Lambda_1, pi_xi, f)
 
             if False:  # TODO: condition to be defined
-                N *= 10
+                N *= 1.1
                 fctr *= .1
 
             # M-Step
@@ -489,7 +486,6 @@ class QNMCEM(Learner):
 
             self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D, xi=xi_ext)
-            # Update for next iteration
             pi_xi = self.get_proba(X, xi_ext)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
@@ -505,8 +501,10 @@ class QNMCEM(Learner):
                     self.history.print_history()
 
             if (n_iter > max_iter) or (rel_obj < tol):
+                self._fitted = True
                 break
             else:
+                # Update for next iteration
                 Lambda_1 = E_func.Lambda_g(np.ones((n_samples, 2, 2 * N)), f)
 
         self._end_solve()
@@ -538,13 +536,26 @@ class QNMCEM(Learner):
         output : `float`
             The score computed on the given data
         """
-        if metric == 'log_lik':
-            # TODO: Update later
-            pi_xi = 0
-            f = 0
-            return self._log_lik(pi_xi, f)
-        elif metric == 'C-index':
-            return c_index_score(T, self.predict_marker(X, Y), delta)
+        if self._fitted:
+            if metric == 'log_lik':
+                p, L = X.shape[1], Y.shape[1]
+                alpha = self.fixed_effect_time_order
+                ext_feat = extract_features(Y, alpha)
+                E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
+                                        self.asso_functions, self.theta)
+                xi_ext = self.theta["xi"]
+                pi_xi = self.get_proba(X, xi_ext)
+                E_func.theta = self.theta
+                N = 5000
+                S = E_func.construct_MC_samples(N)
+                _, _, ind_1, ind_2 = get_times_infos(T)
+                f = E_func.f_data_given_latent(S, ind_1, ind_2)
+                return self._log_lik(pi_xi, f)
+            elif metric == 'C-index':
+                return c_index_score(T, self.predict_marker(X, Y), delta)
+            else:
+                raise ValueError(
+                    "``metric`` must be 'log_lik' or 'C-index', got "
+                    "%s instead" % metric)
         else:
-            raise ValueError("``metric`` must be 'log_lik' or 'C-index', got "
-                             "%s instead" % metric)
+            raise RuntimeError('You must fit the model first')

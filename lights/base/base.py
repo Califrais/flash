@@ -261,6 +261,35 @@ def logistic_loss(z):
     return res
 
 
+def get_times_infos(T):
+    """Get censored times indicators
+
+    Parameters
+    ----------
+    T : `np.ndarray`, shape=(n_samples,)
+        Censored times of the event of interest
+
+    Returns
+    -------
+    T_u : `np.ndarray`, shape=(J,)
+        The J unique censored times of the event of interest
+
+    J : `int`
+        The J unique censored times of the event of interest
+
+    indicator_1 : `np.ndarray`, shape=(n_samples, J)
+        The indicator matrix for comparing event times
+
+    indicator_2 : `np.ndarray`, shape=(n_samples, J)
+        The indicator matrix for comparing event times
+    """
+    T_u = np.unique(T)
+    J = T_u.shape[0]
+    indicator_1 = T.reshape(-1, 1) == T_u
+    indicator_2 = T.reshape(-1, 1) >= T_u
+    return T_u, J, indicator_1, indicator_2
+
+
 def get_vect_from_ext(v_ext):
     """Obtain the signed coefficient vector from its extension on positive
     and negative parts

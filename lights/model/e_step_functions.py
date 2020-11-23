@@ -83,7 +83,7 @@ class EstepFunctions:
 
         Parameters
         ----------
-        S: `np.ndarray`, shape=(N_MC, r)
+        S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
         indicator_1 : `np.ndarray`, shape=(n_samples, J)
