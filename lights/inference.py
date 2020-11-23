@@ -537,25 +537,10 @@ class QNMCEM(Learner):
             The score computed on the given data
         """
         if self._fitted:
-            if metric == 'log_lik':
-                p, L = X.shape[1], Y.shape[1]
-                alpha = self.fixed_effect_time_order
-                ext_feat = extract_features(Y, alpha)
-                E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
-                                        self.asso_functions, self.theta)
-                xi_ext = self.theta["xi"]
-                pi_xi = self.get_proba(X, xi_ext)
-                E_func.theta = self.theta
-                N = 5000
-                S = E_func.construct_MC_samples(N)
-                _, _, ind_1, ind_2 = get_times_infos(T)
-                f = E_func.f_data_given_latent(S, ind_1, ind_2)
-                return self._log_lik(pi_xi, f)
-            elif metric == 'C-index':
+            if metric == 'C-index':
                 return c_index_score(T, self.predict_marker(X, Y), delta)
             else:
                 raise ValueError(
-                    "``metric`` must be 'log_lik' or 'C-index', got "
-                    "%s instead" % metric)
+                    "``metric`` must be 'C-index', got %s instead" % metric)
         else:
-            raise RuntimeError('You must fit the model first')
+            raise ValueError('You must fit the model first')
