@@ -346,11 +346,11 @@ class QNMCEM(Learner):
 
         gamma = np.zeros(nb_asso_feat)
         gamma[:p] = time_indep_cox_coeffs
-        gamma_0_ext = np.concatenate((gamma, -gamma))
+        gamma_0_ext = np.concatenate((gamma, -gamma)).reshape(-1, 1)
         gamma_0_ext[gamma_0_ext < 0] = 0
         gamma_1_ext = gamma_0_ext.copy()
 
-        beta_0_ext = np.concatenate((beta, -beta))
+        beta_0_ext = np.concatenate((beta, -beta)).reshape(-1, 1)
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
 
@@ -410,7 +410,7 @@ class QNMCEM(Learner):
                 xi_init = np.zeros(2 * p)
                 beta_init = np.zeros(2 * L * q_l)
                 beta_init = [beta_init, beta_init.copy()]
-                gamma_init = np.zeros(2 * nb_asso_feat)
+                gamma_init = np.zeros(2 * nb_asso_feat).reshape(-1, 1)
                 gamma_init = [gamma_init, gamma_init.copy()]
 
             # xi update
@@ -446,11 +446,11 @@ class QNMCEM(Learner):
             # gamma update
             [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
                 func=lambda gamma_ext:
-                F_func.Q_func(gamma_ext, pi_est, E_log_g1.T[k].T, E_g1.T[k].T,
+                F_func.Q_func(gamma_ext, pi_est[k], E_log_g1.T[k].T, E_g1.T[k].T,
                               baseline_hazard, ind_1, ind_2),
                 x0=gamma_init[k],
                 fprime=lambda gamma_ext:
-                F_func.grad_Q(gamma_ext, pi_est, E_g1.T[k].T, E_g7.T[k].T,
+                F_func.grad_Q(gamma_ext, pi_est[k], E_g1.T[k].T, E_g7.T[k].T,
                               E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
                 disp=False, bounds=bounds_gamma, maxiter=maxiter,
                 pgtol=pgtol)[0].reshape(-1, 1)

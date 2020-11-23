@@ -206,7 +206,7 @@ class EstepFunctions:
         X, T_u = self.X, self.T_u
         N_MC, J = S.shape[0], T_u.shape[0]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        gamma_indep = np.vstack((gamma_0[:p], gamma_1[:p])).T
+        gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
         g2_ = self.g2(S, broadcast=False).reshape(K, 1, J, N_MC)
         tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
         g1 = np.exp(tmp + g2_).swapaxes(0, 1).swapaxes(2, 3)

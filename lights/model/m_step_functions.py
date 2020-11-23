@@ -339,14 +339,13 @@ class MstepFunctions:
         baseline_val = baseline_hazard.values.flatten()
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
         E_g8 = E_g8.swapaxes(0, 1)
-        X_ = self.X.flatten()
         grad_pen_indep = self.pen.grad_elastic_net(gamma_indep)
         grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, L)
         grad_pen = np.vstack((grad_pen_indep.reshape(-1, 2),
                               grad_pen_dep.reshape(-1, 2)))
         grad = np.zeros(nb_asso_features)
-        grad[:p] = (pi_est * (delta - (E_g1 * baseline_val * ind_2).sum(
-            axis=1)) * X_).sum()
+        grad[:p] = (self.X.T * (pi_est * (delta - (E_g1 * baseline_val * ind_2)
+                                          .sum(axis=1)))).sum(axis=1)
         tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - (
                     E_g8.T * baseline_val * ind_2).sum(axis=-1).T
         grad[p:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
