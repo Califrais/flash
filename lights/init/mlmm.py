@@ -77,9 +77,9 @@ class MLMM(Learner):
         log_lik = 0
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
-            Phi_i = [[1 / phi[l, 0]] * N[i][l] for l in range(n_long_features)]
-            Sigma_i = np.diag(np.concatenate(Phi_i))
-            tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
+            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
+            tmp_1 = multi_dot([V_i, D, V_i.T]) + inv_Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
 
             op1 = n_i * np.log(2 * np.pi)
