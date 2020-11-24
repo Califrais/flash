@@ -186,7 +186,7 @@ class QNMCEM(Learner):
         pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
         return -log_lik + pen
 
-    def get_proba(self, X, xi_ext):
+    def _get_proba(self, X, xi_ext):
         """Probability estimates for being on the high-risk group given
         time-independent features
 
@@ -211,7 +211,7 @@ class QNMCEM(Learner):
         return logistic_grad(u)
 
     @staticmethod
-    def get_post_proba(pi_xi, Lambda_1):
+    def _get_post_proba(pi_xi, Lambda_1):
         """Posterior probability estimates for being on the high-risk group
         given all observed data
 
@@ -258,7 +258,7 @@ class QNMCEM(Learner):
         else:
             raise RuntimeError('You must fit the model first')
 
-    def update_theta(self, **kwargs):
+    def _update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
         """
         for key, value in kwargs.items():
@@ -354,7 +354,7 @@ class QNMCEM(Learner):
         beta_0_ext[beta_0_ext < 0] = 0
         beta_1_ext = beta_0_ext.copy()
 
-        self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext, xi=xi_ext,
+        self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext, xi=xi_ext,
                           gamma_0=gamma_0_ext, gamma_1=gamma_1_ext, long_cov=D,
                           phi=phi, baseline_hazard=baseline_hazard)
 
@@ -374,7 +374,7 @@ class QNMCEM(Learner):
         S = E_func.construct_MC_samples(N)
         f = E_func.f_data_given_latent(S, ind_1, ind_2)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
-        pi_xi = self.get_proba(X, xi_ext)
+        pi_xi = self._get_proba(X, xi_ext)
         obj = self._func_obj(pi_xi, f)
 
         # Store init values
@@ -385,7 +385,7 @@ class QNMCEM(Learner):
         for n_iter in range(1, max_iter + 1):
 
             # E-Step
-            pi_est = self.get_post_proba(pi_xi, Lambda_1)
+            pi_est = self._get_post_proba(pi_xi, Lambda_1)
             E_g0 = E_func.Eg(E_func.g0(S), Lambda_1, pi_xi, f)
             E_g0_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
             E_gS = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
@@ -435,7 +435,7 @@ class QNMCEM(Learner):
                                         for k in [0, 1]]
 
             # beta needs to be updated before gamma
-            self.update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
+            self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
             E_func.theta = self.theta
             g1 = E_func.g1(S)
             E_g1 = E_func.Eg(g1, Lambda_1, pi_xi, f)
@@ -457,7 +457,7 @@ class QNMCEM(Learner):
                                           for k in [0, 1]]
 
             # gamma needs to be updated before the baseline
-            self.update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
+            self._update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
             E_func.theta = self.theta
             E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
 
@@ -484,9 +484,9 @@ class QNMCEM(Learner):
                                    np.trace((V_l.T.dot(V_l).dot(E_bb_l))))
                 phi[l] = phi_l.sum() / N_l
 
-            self.update_theta(phi=phi, baseline_hazard=baseline_hazard,
+            self._update_theta(phi=phi, baseline_hazard=baseline_hazard,
                               long_cov=D, xi=xi_ext)
-            pi_xi = self.get_proba(X, xi_ext)
+            pi_xi = self._get_proba(X, xi_ext)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
             f = E_func.f_data_given_latent(S, ind_1, ind_2)
