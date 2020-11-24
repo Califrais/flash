@@ -286,7 +286,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.asso_coeffs = None
         self.iotas = None
         self.hawkes = []
-        self.theta = None
 
     @property
     def sparsity(self):
@@ -508,8 +507,5 @@ class SimuJointLongitudinalSurvival(Simulation):
             Y.loc[i] = y_i
 
         self.long_features = Y
-
-        # Store the theta parameter vector
-        self.theta =
 
         return X, Y, T.astype(int), delta
