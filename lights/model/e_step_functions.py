@@ -226,7 +226,7 @@ class EstepFunctions:
             The indicator matrix for comparing event times
 
         broadcast : `boolean`
-            Indicate to expand the dimension of g1 or not
+            Indicate to expand the dimension of g2 or not
 
         Returns
         -------
