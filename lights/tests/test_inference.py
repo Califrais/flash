@@ -3,7 +3,7 @@
 
 import unittest
 from lights.inference import QNMCEM
-from lights.tests.simu_tests import get_train_data
+from lights.tests.test_simu import get_train_data
 
 
 class Test(unittest.TestCase):
