@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 The library can be tested simply by running
 
-    python -m unittest discover -v . "*tests.py"
+    python -m unittest discover -v ./lights/tests "test_*.py"
 
 in terminal. This shall check that everything is working and in order.
 
