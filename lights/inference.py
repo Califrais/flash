@@ -509,9 +509,9 @@ class QNMCEM(Learner):
 
         self._end_solve()
 
-    def score(self, X, Y, T, delta, metric):
-        """Computes the score with the trained parameters on the given data,
-        either log-likelihood or C-index
+    def score(self, X, Y, T, delta):
+        """Computes the C-index score with the trained parameters on the given
+        data
 
         Parameters
         ----------
@@ -528,19 +528,12 @@ class QNMCEM(Learner):
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
 
-        metric : 'log_lik', 'C-index'
-            Either computes log-likelihood or C-index
-
         Returns
         -------
         output : `float`
-            The score computed on the given data
+            The C-index score computed on the given data
         """
         if self._fitted:
-            if metric == 'C-index':
-                return c_index_score(T, self.predict_marker(X, Y), delta)
-            else:
-                raise ValueError(
-                    "``metric`` must be 'C-index', got %s instead" % metric)
+            return c_index_score(T, self.predict_marker(X, Y), delta)
         else:
             raise ValueError('You must fit the model first')
