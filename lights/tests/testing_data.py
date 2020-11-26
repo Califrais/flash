@@ -30,7 +30,7 @@ class CreateTestingData:
         columns = ['long_feature_%s' % (l + 1) for l in
                    range(self.n_long_features)]
         self.Y = pd.DataFrame(data=data, columns=columns)
-        self.T = np.array([22, 19, 12])
+        self.T = np.array([2, 3, 1])
         self.delta = np.array([1, 0, 1], dtype=np.ushort)
         baseline_hazard = pd.Series(data=np.array([5, 8, 12]), index=self.T)
         beta_0 = np.array([1, 2, 3, -3, 2, 2, -1, 3, -1]).reshape(-1, 1)
@@ -63,3 +63,4 @@ class CreateTestingData:
                            [-1, 3, 2, 4, 5, 1],
                            [2, 3, -1, -2, 1, -3],
                            [-3, 2, 3, -3, 4, 1]])
+        self.asso_functions = ['lp', 're', 'tps', 'ce']

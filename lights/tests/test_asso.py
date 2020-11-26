@@ -25,12 +25,12 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.linear_predictor()
-        phi_0_1 = np.array([[482, 492, 495, 478],
-                            [1161, 1178, 1181, 1157],
-                            [1542, 1562, 1565, 1538]])
-        phi_1_3 = np.array([[-80, -102, -154, -103],
-                            [-262, -298, -378, -299],
-                            [-370, -412, -504, -413]])
+        phi_0_1 = np.array([[9,  8, 11,  5,],
+                            [22, 22, 25, 18],
+                            [41, 42, 45, 37]])
+        phi_1_3 = np.array([[8, 8, 0, 7],
+                            [10, 8, -4, 7],
+                            [10, 6, -10, 5]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
         np.testing.assert_almost_equal(phi[1, :, :, 2], phi_1_3)
 
@@ -50,12 +50,12 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.time_dependent_slope()
-        phi_0_1 = np.array([[76, 77, 77, 76],
-                            [118, 119, 119, 118],
-                            [136, 137, 137, 136]])
-        phi_1_3 = np.array([[-19, -21, -25, -21],
-                            [-33, -35, -39, -35],
-                            [-39, -41, -45, -41]])
+        phi_0_1 = np.array([[10, 11, 11, 10],
+                            [16, 17, 17, 16],
+                            [22, 23, 23, 22]])
+        phi_1_3 = np.array([[3, 1, -3, 1],
+                            [1, -1, -5, -1],
+                            [-1, -3, -7, -3]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
         np.testing.assert_almost_equal(phi[1, :, :, 2], phi_1_3)
 
@@ -64,9 +64,9 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.cumulative_effects()
-        phi_0_1 = np.array([[2040, 2088, 2124, 1992],
-                            [7619, 7761.5, 7818.5, 7543],
-                            [11660, 11858, 11924, 11572]])
+        phi_0_1 = np.array([[5, 3.5, 6.5, 1],
+                            [20, 18, 24, 12],
+                            [51, 49.5, 58.5, 39]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
 
     def test_dlp_asso(self):
@@ -74,9 +74,9 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_linear_predictor()
-        phi_0_1 = np.array([[1, 12, 144],
-                            [1, 19, 361],
-                            [1, 22, 484]])
+        phi_0_1 = np.array([[1, 1, 1],
+                            [1, 2, 4],
+                            [1, 3, 9]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
     def test_dre_asso(self):
@@ -92,9 +92,9 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_time_dependent_slope()
-        phi_0_1 = np.array([[0, 1, 24],
-                            [0, 1, 38],
-                            [0, 1, 44]])
+        phi_0_1 = np.array([[0, 1, 2],
+                            [0, 1, 4],
+                            [0, 1, 6]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
     def test_dce_asso(self):
@@ -102,9 +102,9 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_cumulative_effects()
-        phi_0_1 = np.array([[12, 72, 576],
-                            [19, 180.5, 6859 / 3],
-                            [22, 242, 10648 / 3]])
+        phi_0_1 = np.array([[1, 0.5, 1/3],
+                            [2, 2, 8/3],
+                            [3, 4.5, 9]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
 
