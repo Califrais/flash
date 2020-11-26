@@ -47,6 +47,58 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(g2[0, 0], g2_0_1)
         np.testing.assert_almost_equal(g2[1, 2], g2_1_3)
 
+    def test_g5(self):
+        """Tests the g5 function
+        """
+        self.setUp()
+        g5 = self.E_func.g5(self.S, broadcast=False)
+        g5_0_1 =  np.array([[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1/2, 1/3],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1/2, 1/3],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1/2, 1/3]])
+        g5_1_3 = np.array(
+            [[1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
+             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
+             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9]])
+        np.testing.assert_almost_equal(g5[0, 0, 0], g5_0_1)
+        np.testing.assert_almost_equal(g5[1, 0, 2], g5_1_3)
+
+    def test_g6(self):
+        """Tests the g6 function
+        """
+        self.setUp()
+        g6 = self.E_func.g6(self.S)
+        g6_0_1 = np.exp(130/3)* np.array(
+            [[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
+             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
+             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3]])
+        np.testing.assert_almost_equal(g6[0, 0, 0, 0, :, :, 0], g6_0_1)
+
+
+    def test_g7(self):
+        """Tests the g7 function
+        """
+        self.setUp()
+        g7 = self.E_func.g7(self.S, broadcast=False)
+        g7_0_1 = np.array([9, 6, 7, 1, 2, 3, 2, 3, 3, 10, 8, 4, 5, 8/3, 14/3])
+        np.testing.assert_almost_equal(g7[0, 0, 0], g7_0_1)
+
+    def test_g8(self):
+        """Tests the g8 function
+        """
+        self.setUp()
+        g8 = self.E_func.g8(self.S)
+        g8_0_1 = np.exp(130/3) * \
+                 np.array([9, 6, 7, 1, 2, 3, 2, 3, 3, 10, 8, 4, 5, 8/3, 14/3])
+        np.testing.assert_almost_equal(g8[0, 0, 0, 0, :, 0], g8_0_1)
+
+
+    def test_g9(self):
+        """Tests the g9 function
+        """
+        self.setUp()
+        g9 = self.E_func.g9(self.S)
+
+
 
 if __name__ == "main":
     unittest.main()

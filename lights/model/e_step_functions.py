@@ -264,7 +264,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g5 : `np.ndarray`, shape=(K, N_MC, J, n_long_features, r_l)
+        g5 : `np.ndarray`, shape=(K, N_MC, J, n_long_features, A*r_l)
             The values of g5 function
         """
         g5 = get_asso_func(self.T_u, S, self.theta, self.asso_functions,
@@ -290,7 +290,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g6 : `np.ndarray`, shape=(n_samples, K, N_MC, J, n_long_features, r_l)
+        g6 : `np.ndarray`, shape=(n_samples, K, N_MC, J, n_long_features, A*r_l)
             The values of g6 function
         """
         n_samples = self.n_samples
