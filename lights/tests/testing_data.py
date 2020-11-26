@@ -1,33 +1,34 @@
 # -*- coding: utf-8 -*-
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
-
 import numpy as np
 import pandas as pd
 from lights.base.base import extract_features
 
+
 class CreateTestingData:
     """A class to create testing data
-        """
+    """
 
     def __init__(self):
         self.n_long_features = 3
         self.n_samples = 3
         self.n_time_indep_features = 2
         self.fixed_effect_time_order = 2
-        self.N = 2 # number of Monte-Carlo samples
+        self.N = 2  # number of Monte-Carlo samples
 
         self.X = np.array([[-1, 2], [2, 1], [0, 3]])
-        data = [[pd.Series(np.array([2, 3, 5]),index=[1, 2, 3]),
-                pd.Series(np.array([3, 4]),index=[1, 3]),
-                pd.Series(np.array([1, 3]),index=[2, 4])],
+        data = [[pd.Series(np.array([2, 3, 5]), index=[1, 2, 3]),
+                 pd.Series(np.array([3, 4]), index=[1, 3]),
+                 pd.Series(np.array([1, 3]), index=[2, 4])],
                 [pd.Series(np.array([2, 3]), index=[2, 4]),
                  pd.Series(np.array([3, 4, 5]), index=[1, 3, 5]),
                  pd.Series(np.array([2, 3, 6]), index=[1, 3, 4])],
                 [pd.Series(np.array([3, 5]), index=[2, 3]),
                  pd.Series(np.array([1, 3, 4]), index=[1, 2, 5]),
                  pd.Series(np.array([2, 3]), index=[2, 4])]]
-        columns = ['long_feature_%s' % (l + 1) for l in range(self.n_long_features)]
+        columns = ['long_feature_%s' % (l + 1) for l in
+                   range(self.n_long_features)]
         self.Y = pd.DataFrame(data=data, columns=columns)
         self.T = np.array([22, 19, 12])
         self.delta = np.array([1, 0, 1], dtype=np.ushort)
@@ -59,6 +60,6 @@ class CreateTestingData:
         # Features extraction
         self.ext_feat = extract_features(self.Y, self.fixed_effect_time_order)
         self.S = np.array([[1, 2, 3, 2, 3, 3],
-                      [-1, 3, 2, 4, 5, 1],
-                      [2, 3, -1, -2, 1, -3],
-                      [-3, 2, 3, -3, 4, 1]])
+                           [-1, 3, 2, 4, 5, 1],
+                           [2, 3, -1, -2, 1, -3],
+                           [-3, 2, 3, -3, 4, 1]])
