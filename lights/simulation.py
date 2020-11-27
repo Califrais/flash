@@ -7,7 +7,7 @@ from scipy.linalg.special_matrices import toeplitz
 from tick.hawkes import SimuHawkesExpKernels
 from scipy.stats import uniform, beta
 from scipy.sparse import random
-from lights.base.base import normalize
+from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
 
@@ -358,11 +358,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         scale = self.scale
         censoring_factor = self.censoring_factor
 
-        # Simulation of latent variables
-        u = np.random.rand(n_samples)
-        G = (u < high_risk_rate).astype(int)
-        self.latent_class = G
-
         # Simulation of time-independent coefficient vector
         nb_active_time_indep_features = int(n_time_indep_features * sparsity)
         xi = np.zeros(n_time_indep_features)
@@ -373,14 +368,22 @@ class SimuJointLongitudinalSurvival(Simulation):
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
                                          cov_corr_time_indep)[0]
         # Add class relative information on the design matrix
-        X[G == 1, :nb_active_time_indep_features] += gap
-        X[G == 0, :nb_active_time_indep_features] -= gap
+        H = np.random.choice(range(n_samples), replace=False,
+                             size=int(high_risk_rate * n_samples))
+        H_ = np.delete(range(n_samples), H)
+        X[H, :nb_active_time_indep_features] += gap
+        X[H_, :nb_active_time_indep_features] -= gap
 
         # Normalize time-independent features
         X = normalize(X)
-
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
+
+        # Simulation of latent group
+        pi_xi = logistic_grad(X_dot_xi)
+        u = np.random.rand(n_samples)
+        G = (u < pi_xi).astype(int)
+        self.latent_class = G
 
         # Simulation of the random effects components
         r_l = 2  # Affine random effects

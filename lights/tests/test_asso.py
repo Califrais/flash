@@ -10,22 +10,20 @@ from lights.model.associations import AssociationFunctions
 class Test(unittest.TestCase):
     """A class to test association functions
     """
+
     def setUp(self):
         data = CreateTestingData()
-        X, Y, T, delta = data.X, data.Y, data.T, data.delta
-        T_u = np.unique(T)
-        alpha = data.fixed_effect_time_order
-        L, p = data.n_long_features, data.n_time_indep_features
+        alpha, L = data.fixed_effect_time_order, data.n_long_features
         theta = data.theta
         beta = np.array([theta["beta_0"], theta["beta_1"]])
-        self.asso_func = AssociationFunctions(T_u, data.S, beta, alpha, L)
+        self.asso_func = AssociationFunctions(data.T_u, data.S, beta, alpha, L)
 
     def test_lp_asso(self):
         """Tests the linear predictor association function
         """
         self.setUp()
         phi = self.asso_func.linear_predictor()
-        phi_0_1 = np.array([[9,  8, 11,  5,],
+        phi_0_1 = np.array([[9, 8, 11, 5, ],
                             [22, 22, 25, 18],
                             [41, 42, 45, 37]])
         phi_1_3 = np.array([[8, 8, 0, 7],
@@ -102,8 +100,8 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_cumulative_effects()
-        phi_0_1 = np.array([[1, 0.5, 1/3],
-                            [2, 2, 8/3],
+        phi_0_1 = np.array([[1, 0.5, 1 / 3],
+                            [2, 2, 8 / 3],
                             [3, 4.5, 9]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
