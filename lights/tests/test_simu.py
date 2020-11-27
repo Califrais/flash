@@ -37,33 +37,6 @@ def get_train_data(n_samples: int = 100):
     return X, Y, T, delta
 
 
-def get_testing_data():
-    """Simulate data with specific seed
-
-    Returns
-    -------
-    X : `numpy.ndarray`, shape=(n_samples, n_time_indep_features)
-        The simulated time-independent features matrix
-
-    Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-        The simulated longitudinal data. Each element of the dataframe is
-        a pandas.Series
-
-    T : `np.ndarray`, shape=(n_samples,)
-        The simulated censored times of the event of interest
-
-    delta : `np.ndarray`, shape=(n_samples,)
-        The simulated censoring indicator
-
-    simu : simulation object
-        The simulation object
-    """
-    simu = SimuJointLongitudinalSurvival(n_samples=3, n_long_features=2,
-                                         n_time_indep_features=2, seed=123)
-    X, Y, T, delta = simu.simulate()
-    return X, Y, T, delta, simu
-
-
 class Test(unittest.TestCase):
 
     def test_SimuJointLongitudinalSurvival(self):
