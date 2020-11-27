@@ -376,12 +376,11 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Normalize time-independent features
         X = normalize(X)
-
         self.time_indep_features = X
         X_dot_xi = X.dot(xi)
 
-        # Simulation of latent variables
-        pi_xi = logistic_grad(-X_dot_xi)
+        # Simulation of latent group
+        pi_xi = logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
         G = (u < pi_xi).astype(int)
         self.latent_class = G
