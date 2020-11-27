@@ -114,12 +114,11 @@ class EstepFunctions:
         op2 = (tmp * ind_2).sum(axis=-1).T
         # Compute f(y|b)
         f_y = np.ones(shape=(n_samples, K, N_MC))
+        g3 = self.g3(S)
         for i in range(n_samples):
-            beta_stack = np.hstack((beta_0, beta_1))
-            U_i, V_i, n_i, y_i = U_list[i], V_list[i], sum(N_list[i]), y_list[i]
+            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
             inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i))) *
                       np.exp(np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
 
@@ -248,6 +247,32 @@ class EstepFunctions:
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
+    def g3(self, S):
+        """Computes g3
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+                Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g3 : list, size=(n_samples, np.array)
+                The values of g3 function
+        """
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        extracted_features = self.extracted_features
+        beta_0, beta_1 = self.theta["beta_0"], self.theta["beta_1"]
+        phi, K, N_MC = self.theta["phi"], self.K, S.shape[0]
+        (U_list, V_list, y_list, N_list) = extracted_features[0]
+        g3 = []
+        beta_stack = np.hstack((beta_0, beta_1))
+        for i in range(n_samples):
+            U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
+            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
+            g3.append(M_iS)
+        return g3
+
     def g5(self, S, indicator=None, broadcast=True):
         """Computes g5
 
@@ -363,13 +388,12 @@ class EstepFunctions:
         phi, K, N_MC = self.theta["phi"], self.K, S.shape[0]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
 
+        g3 = self.g3(S)
         g9 = np.zeros(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
-            beta_stack = np.hstack((beta_0, beta_1))
-            U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
+            y_i, M_iS = y_list[i], g3[i]
             Phi_i = [[1 / phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g9[i] = np.sum(M_iS * y_i * Phi_i - .5 * (M_iS ** 2) * Phi_i, axis=1)
 
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
