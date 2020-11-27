@@ -100,6 +100,9 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g9 = self.E_func.g9(self.S)
+        # values of g2 at first group and first sample
+        g9_0_1 = np.array([-1019, -260])
+        np.testing.assert_almost_equal(g9[0, 0, 0], g9_0_1)
 
     def test_f(self):
         """Tests the g9 function

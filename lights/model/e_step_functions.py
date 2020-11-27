@@ -367,10 +367,10 @@ class EstepFunctions:
         for i in range(n_samples):
             beta_stack = np.hstack((beta_0, beta_1))
             U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
-            Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
+            Phi_i = [[1 / phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            g9[i] = np.sum(M_iS * y_i * Phi_i + (M_iS ** 2) * Phi_i, axis=1)
+            g9[i] = np.sum(M_iS * y_i * Phi_i - .5 * (M_iS ** 2) * Phi_i, axis=1)
 
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
 
