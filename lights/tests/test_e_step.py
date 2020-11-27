@@ -20,9 +20,14 @@ class Test(unittest.TestCase):
         theta = data.theta
         ext_feat = data.ext_feat
         asso_functions = data.asso_functions
+        self.n_samples = data.n_samples
         self.S = data.S
+        self.n_MC = self.S.shape[0]
         self.E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
                                 asso_functions, theta)
+        T_u = np.unique(T)
+        self.ind_1 = indicator_1 = T.reshape(-1, 1) == T_u
+        self.ind_2 = T.reshape(-1, 1) >= T_u
 
     def test_g1(self):
         """Tests the g1 function
@@ -33,7 +38,6 @@ class Test(unittest.TestCase):
         g1_1_3 = np.exp(np.array([147, 172.5, 145.5, 61.5]))
         np.testing.assert_almost_equal(g1[0, 0, :, 0], g1_0_1)
         np.testing.assert_almost_equal(g1[0, 1, :, 2], g1_1_3)
-
 
     def test_g2(self):
         """Tests the g2 function
@@ -73,7 +77,6 @@ class Test(unittest.TestCase):
              [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3]])
         np.testing.assert_almost_equal(g6[0, 0, 0, 0, :, :, 0], g6_0_1)
 
-
     def test_g7(self):
         """Tests the g7 function
         """
@@ -98,6 +101,30 @@ class Test(unittest.TestCase):
         self.setUp()
         g9 = self.E_func.g9(self.S)
 
+    def test_f(self):
+        """Tests the g9 function
+        """
+        self.setUp()
+        f = self.E_func.f_data_given_latent(self.S, self.ind_1, self.ind_2)
+
+    def test_Lambda_g(self):
+        """Tests the g9 function
+        """
+        self.setUp()
+        g8 = self.E_func.g8(self.S)
+        f = self.E_func.f_data_given_latent(self.S, self.ind_1, self.ind_2)
+        E_g8 = self.E_func.Lambda_g(g8, f)
+
+    def test_Eg(self):
+        """Tests the g9 function
+        """
+        self.setUp()
+        g8 = self.E_func.g8(self.S)
+        f = self.E_func.f_data_given_latent(self.S, self.ind_1, self.ind_2)
+        n_samples, n_MC, K = self.n_samples, self.n_MC, 2
+        Lambda_1 = self.E_func.Lambda_g(np.ones(shape=(n_samples, K, n_MC)), f)
+        pi_xi = 1 / (1 + np.exp(np.array([-3, -4, -6])))
+        Eg = self.E_func.Eg(g8, Lambda_1, pi_xi, f)
 
 
 if __name__ == "main":

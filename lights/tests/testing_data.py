@@ -45,7 +45,7 @@ class CreateTestingData:
                       [3, 4, 2, 2, 2, 2],
                       [2, 3, 1, 2, 2, 1],
                       [3, 1, 2, 2, 1, 1]])
-        phi = np.array([1, 2, 3])
+        phi = np.array([1, 2, 3]).reshape(-1, 1)
         xi = np.array([1, 2])
         self.theta = {
             "beta_0": beta_0,
