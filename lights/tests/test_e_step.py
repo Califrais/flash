@@ -100,21 +100,23 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(g9[0, 0, 0], g9_0_1)
 
     def test_f(self):
-        """Tests the g9 function
+        """Tests the f_data_given_latent
         """
         self.setUp()
         f = self.E_func.f_data_given_latent(self.S, self.ind_1, self.ind_2)
+        # TODO: Update later (after handling overflow problem)
 
     def test_Lambda_g(self):
-        """Tests the g9 function
+        """Tests the Lambda_g function
         """
         self.setUp()
         g8 = self.E_func.g8(self.S)
         f = self.E_func.f_data_given_latent(self.S, self.ind_1, self.ind_2)
         E_g8 = self.E_func.Lambda_g(g8, f)
+        # TODO: Update later
 
     def test_Eg(self):
-        """Tests the g9 function
+        """Tests the expection of g functions
         """
         self.setUp()
         g8 = self.E_func.g8(self.S)
@@ -123,6 +125,7 @@ class Test(unittest.TestCase):
         Lambda_1 = self.E_func.Lambda_g(np.ones(shape=(n_samples, K, n_MC)), f)
         pi_xi = 1 / (1 + np.exp(np.array([-3, -4, -6])))
         Eg = self.E_func.Eg(g8, Lambda_1, pi_xi, f)
+        # TODO: Update later
 
 
 if __name__ == "main":
