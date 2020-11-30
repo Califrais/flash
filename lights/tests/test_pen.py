@@ -9,12 +9,10 @@ from lights.model.regularizations import Penalties
 class Test(unittest.TestCase):
 
     def setUp(self):
-        fit_intercept = False #TODO; do not use in regularization
         l_pen = 2.
         eta_elastic_net = .2
         eta_sp_gp_l1 = .3
-        self.Penalties = Penalties(fit_intercept, l_pen, eta_elastic_net,
-                                   eta_sp_gp_l1)
+        self.Penalties = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
         self.v = np.array([-1, 0, 3, 4, -2, 5])
         self.n_long_features = 3
 

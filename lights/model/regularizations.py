@@ -9,9 +9,6 @@ class Penalties:
 
     Parameters
     ----------
-    fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independent
-        features
 
     l_pen : `float`, default=0
         Level of penalization for the ElasticNet and the Sparse Group l1
@@ -26,8 +23,7 @@ class Penalties:
     eta_sp_gp_l1: `float`, default=0.1
         The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
     """
-    def __init__(self, fit_intercept, l_pen, eta_elastic_net, eta_sp_gp_l1):
-        self.fit_intercept = fit_intercept
+    def __init__(self, l_pen, eta_elastic_net, eta_sp_gp_l1):
         self.l_pen = l_pen
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1

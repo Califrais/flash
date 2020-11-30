@@ -89,8 +89,7 @@ class QNMCEM(Learner):
         self.l_pen = l_pen
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
-        self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
-                             eta_sp_gp_l1)
+        self.pen = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
         self._fitted = False
 
         # Attributes that will be instantiated afterwards

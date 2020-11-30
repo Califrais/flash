@@ -56,8 +56,7 @@ class MstepFunctions:
         self.n_samples = n_samples
         self.nb_asso_features = nb_asso_features
         self.fixed_effect_time_order = fixed_effect_time_order
-        self.pen = Penalties(fit_intercept, l_pen, eta_elastic_net,
-                             eta_sp_gp_l1)
+        self.pen = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
 
     def P_func(self, pi_est, xi_ext):
         """Computes the sub objective function denoted P in the lights paper,
