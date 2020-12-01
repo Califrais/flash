@@ -121,13 +121,11 @@ class EstepFunctions:
         T, T_u, delta = self.T, self.T_u, self.delta
         theta, K = self.theta, self.K
         n_samples, n_long_features = self.n_samples, self.n_long_features
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         N_MC = S.shape[0]
         g1 = self.g1(S, False)
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
-
         baseline_val = baseline_hazard.values.flatten()
         tmp = g1.swapaxes(0, 2) * baseline_val
         op1 = (intensity() ** delta).T
@@ -207,7 +205,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J, K)
+        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
             The values of g1 function
         """
         n_samples, K, theta = self.n_samples, self.K, self.theta
