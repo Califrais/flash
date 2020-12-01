@@ -2,6 +2,7 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
+from scipy.stats import multivariate_normal
 from lights.model.associations import get_asso_func
 
 
@@ -97,6 +98,25 @@ class EstepFunctions:
         f : `np.ndarray`, shape=(n_samples, K, N_MC)
             The value of the f(Y, T, delta| S, G, theta)
         """
+        def intensity():
+            return (tmp * ind_1).sum(axis=-1)
+
+        def survival():
+            return np.exp(-(tmp * ind_2).sum(axis=-1).T)
+
+        def f_y_given_latent():
+            f_y = np.ones(shape=(n_samples, K, N_MC))
+            g3 = self.g3(S)
+            for i in range(n_samples):
+                n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
+                inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
+                             range(n_long_features)]
+                inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
+                f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) *
+                        np.prod(inv_Phi_i))) * np.exp(np.sum(-0.5 *
+                        ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
+            return f_y
+
         X, extracted_features = self.X, self.extracted_features
         T, T_u, delta = self.T, self.T_u, self.delta
         theta, K = self.theta, self.K
@@ -110,20 +130,10 @@ class EstepFunctions:
 
         baseline_val = baseline_hazard.values.flatten()
         tmp = g1.swapaxes(0, 2) * baseline_val
-        op1 = (((tmp * ind_1).sum(axis=-1)) ** delta).T
-        op2 = (tmp * ind_2).sum(axis=-1).T
-        # Compute f(y|b)
-        f_y = np.ones(shape=(n_samples, K, N_MC))
-        g3 = self.g3(S)
-        for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
-            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
-            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i))) *
-                      np.exp(np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
-
-        f = op1 * np.exp(-op2) * f_y
-
+        op1 = (intensity() ** delta).T
+        op2 = survival()
+        f_y = f_y_given_latent()
+        f = op1 * op2 * f_y
         return f
 
     def g0(self, S):
