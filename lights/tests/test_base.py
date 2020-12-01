@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 from lights.base.base import get_vect_from_ext, get_xi_from_xi_ext, \
-                            extract_features, block_diag
+    extract_features, block_diag
 
 
 class Test(unittest.TestCase):
@@ -19,7 +19,7 @@ class Test(unittest.TestCase):
                  pd.Series(np.array([3, 4, 5]), index=[1, 3, 5])]]
         columns = ['long_feature_%s' % (l + 1) for l in range(2)]
         Y = pd.DataFrame(data=data, columns=columns)
-        q_l = 2 # fixed_effect_time_order
+        q_l = 2  # fixed_effect_time_order
         (U, V, y, N), (U_L, V_L, y_L, N_L) = extract_features(Y, q_l)
         U_1 = np.array([[1, 1, 1, 0, 0, 0],
                         [1, 2, 4, 0, 0, 0],
@@ -58,12 +58,20 @@ class Test(unittest.TestCase):
     def test_get_xi_from_xi_ext(self):
         """Test get_xi_from_xi_ext function
         """
+        # Test with fit_intercept=True
         xi_ext = np.array([2, 1, 0, 3, 0, 0, 5, 0])
         xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept=True)
         xi_0_ = 2
         xi_ = np.array([1, -5, 3])
         np.testing.assert_almost_equal(xi_0, xi_0_)
         np.testing.assert_almost_equal(xi, xi_)
+        # Test with fit_intercept=False
+        xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept=False)
+        xi_0_ = 0
+        xi_ = np.array([2, 1, -5, 3])
+        np.testing.assert_almost_equal(xi_0, xi_0_)
+        np.testing.assert_almost_equal(xi, xi_)
+
 
 if __name__ == "main":
     unittest.main()
