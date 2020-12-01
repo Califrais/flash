@@ -145,7 +145,7 @@ class MstepFunctions:
             The baseline hazard function evaluated at each censored time
 
         indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T <= T_u)
 
         Returns
         -------
@@ -195,7 +195,7 @@ class MstepFunctions:
             The baseline hazard function evaluated at each censored time
 
         indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T <= T_u)
 
         extracted_features :  `tuple, tuple`,
             The extracted features from longitudinal data.
@@ -267,10 +267,10 @@ class MstepFunctions:
             The baseline hazard function evaluated at each censored time
 
         indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T == T_u)
 
         indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T <= T_u)
 
         Returns
         -------
@@ -320,10 +320,10 @@ class MstepFunctions:
             The baseline hazard function evaluated at each censored time
 
         indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T == T_u)
 
         indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T <= T_u)
 
         Returns
         -------

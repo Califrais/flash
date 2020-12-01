@@ -278,10 +278,10 @@ def get_times_infos(T):
         The J unique censored times of the event of interest
 
     indicator_1 : `np.ndarray`, shape=(n_samples, J)
-        The indicator matrix for comparing event times
+        The indicator matrix for comparing event times (T == T_u)
 
     indicator_2 : `np.ndarray`, shape=(n_samples, J)
-        The indicator matrix for comparing event times
+        The indicator matrix for comparing event times (T <= T_u)
     """
     T_u = np.unique(T)
     J = T_u.shape[0]

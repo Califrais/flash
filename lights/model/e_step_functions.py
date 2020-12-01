@@ -88,10 +88,10 @@ class EstepFunctions:
             Set of constructed Monte Carlo samples
 
         indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T == T_u)
 
         indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T <= T_u)
 
         Returns
         -------
