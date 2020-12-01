@@ -265,7 +265,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g3 : list, size=(n_samples, np.array)
+        g3 : list, size=(n_samples, array_shape(K, n_i, N_MC))
                 The values of g3 function
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
