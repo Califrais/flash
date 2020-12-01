@@ -341,7 +341,7 @@ class QNMCEM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((L, 1))
             time_indep_cox_coeffs = np.zeros(p)
-            baseline_hazard = pd.Series(data=np.zeros(J), index=T_u)
+            baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         gamma = np.zeros(nb_asso_feat)
         gamma[:p] = time_indep_cox_coeffs
