@@ -323,15 +323,13 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
     xi : `np.ndarray`, shape=(n_time_indep_features,)
         The time-independent coefficient vector
     """
-    n_time_indep_features = len(xi_ext) // 2
+    dim = len(xi_ext) // 2
+    xi = xi_ext[:dim] - xi_ext[dim:]
     if fit_intercept:
-        xi = xi_ext[:n_time_indep_features + 1] - \
-             xi_ext[n_time_indep_features + 1:]
         xi_0 = xi[0]
         xi = xi[1:]
     else:
         xi_0 = 0
-        xi = xi_ext[:n_time_indep_features] - xi_ext[n_time_indep_features:]
     return xi_0, xi
 
 
