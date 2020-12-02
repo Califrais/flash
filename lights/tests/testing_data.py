@@ -30,7 +30,7 @@ class CreateTestingData:
         columns = ['long_feature_%s' % (l + 1) for l in
                    range(self.n_long_features)]
         self.Y = pd.DataFrame(data=data, columns=columns)
-        self.T = np.array([2, 3, 1])
+        self.T = np.array([2, 3, 3])
         self.delta = np.array([1, 0, 1], dtype=np.ushort)
         times_infos = get_times_infos(self.T)
         self.T_u, self.J, self.ind_1, self.ind_2 = times_infos
