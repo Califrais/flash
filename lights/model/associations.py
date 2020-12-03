@@ -130,12 +130,12 @@ class AssociationFunctions:
         U : `np.ndarray`, shape=(J, q_l)
             Fixed-effect design features
 
-        V : `np.ndarray`, , shape=(J, r_l)
+        V : `np.ndarray`, , shape=(J, r_l, 1)
             Random-effect design features
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of linear association function
         """
         beta = self.fixed_effect_coeffs
@@ -171,7 +171,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, r)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, r_l)
             The value of random effects function
         """
         S, K, J = self.S, self.K, self.J
@@ -184,7 +184,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of time-dependent slope function
         """
         dU_l, dV_l = self.dU_l, self.dV_l
@@ -196,7 +196,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of cumulative effects function
         """
         iU_l, iV_l = self.iU_l, self.iV_l
