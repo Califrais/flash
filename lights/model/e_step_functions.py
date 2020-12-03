@@ -241,13 +241,15 @@ class EstepFunctions:
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
+        N_MC, J = S.shape[0], T_u.shape[0]
         asso_functions, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         theta = self.theta
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape((K, 1, 1, -1))
         asso_func = get_asso_func(T_u, S, theta, asso_functions, L, alpha)
-        g2 = np.sum(asso_func * gamma_dep, axis=-1)
+        asso_func_ = asso_func.reshape(K, J, N_MC, -1)
+        g2 = np.sum(asso_func_ * gamma_dep, axis=-1)
         if broadcast:
             g2 = g2.swapaxes(0, 1)
             g2 = np.sum(np.broadcast_to(g2, (self.n_samples,) + g2.shape).T *

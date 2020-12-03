@@ -38,11 +38,11 @@ class Test(unittest.TestCase):
         self.setUp()
         g2 = self.E_func.g2(self.S, broadcast=False)
         # values of g2 at first group and first sample
-        g2_0_1 = np.array([121 / 3, 203 / 6, 125 / 6, 133 / 3])
-        # values of g2 at second group and third sample
-        g2_1_3 = np.array([153, 178.5, 151.5, 67.5])
+        g2_0_1 = np.array([46, 53, 26, 1])
+        # values of g2 at second group and second sample
+        g2_1_3 = np.array([61, 52, 82, 31.5])
         np.testing.assert_almost_equal(g2[0, 0], g2_0_1)
-        np.testing.assert_almost_equal(g2[1, 2], g2_1_3)
+        np.testing.assert_almost_equal(g2[1, 1], g2_1_3)
 
     def test_g5(self):
         """Tests the g5 function
@@ -50,15 +50,15 @@ class Test(unittest.TestCase):
         self.setUp()
         g5 = self.E_func.g5(self.S, broadcast=False)
         g5_0_1 = np.array(
-            [[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
-             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
-             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3]])
+            [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3]])
         g5_1_3 = np.array(
             [[1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
              [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
              [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9]])
         np.testing.assert_almost_equal(g5[0, 0, 0], g5_0_1)
-        np.testing.assert_almost_equal(g5[1, 0, 2], g5_1_3)
+        np.testing.assert_almost_equal(g5[1, 0, 1], g5_1_3)
 
     def test_g6(self):
         """Tests the g6 function

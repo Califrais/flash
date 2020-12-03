@@ -23,6 +23,7 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.linear_predictor()
+        # values of g2 at first group and first feature
         phi_0_1 = np.array([[22, 22, 25, 18 ],
                             [41, 42, 45, 37]])
         phi_1_3 = np.array([[10, 8, -4, 7],
@@ -61,6 +62,8 @@ class Test(unittest.TestCase):
         phi_0_1 = np.array([[20, 18, 24, 12],
                             [51, 49.5, 58.5, 39]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
+        print(phi[0, :, :, 1])
+        print(phi[0, :, :, 2])
 
     def test_dlp_asso(self):
         """Tests the derivative linear predictor association function
