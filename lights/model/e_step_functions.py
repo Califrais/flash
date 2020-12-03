@@ -79,11 +79,90 @@ class EstepFunctions:
         S = np.vstack((b, -b))
         return S
 
-    def f_data_given_latent(self, S, indicator_1, indicator_2):
-        """Computes f(Y, T, delta| S, G, theta)
+    @staticmethod
+    def intensity(rel_risk, indicator):
+        """Compute the intensity of f_data_given_latent
 
         Parameters
         ----------
+
+        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+            The relative risk
+
+        indicator: `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times (T == T_u)
+
+        Returns
+        -------
+        intensity : `np.ndarray`, shape=(N_MC, K, n_samples)
+            The value of intensity
+        """
+        intensity = (rel_risk * indicator).sum(axis=-1)
+        return intensity
+
+    @staticmethod
+    def survival(rel_risk, indicator):
+        """Compute the survival of f_data_given_latent
+
+        Parameters
+        ----------
+
+        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+            The relative risk
+
+        indicator: `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times (T <= T_u)
+
+        Returns
+        -------
+        survival : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of survival
+        """
+        survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
+        return survival
+
+    def f_y_given_latent(self, S, extracted_features):
+        """Compute the density of outcome given latent variables
+
+        Parameters
+        ----------
+
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        Returns
+        -------
+        f_y : `np.ndarray`, shape=(n_samples, K, N_MC)
+-            The value of the f(Y | S, G, theta)
+        """
+        (U_list, V_list, y_list, N_list) = extracted_features[0]
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        phi, K = self.theta["phi"], self.K
+        N_MC = S.shape[0]
+
+        f_y = np.ones(shape=(n_samples, K, N_MC))
+        g3 = self.g3(S)
+        for i in range(n_samples):
+            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
+            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
+                         range(n_long_features)]
+            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
+            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i)))
+                * np.exp(np.sum(-0.5 *((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
+        return f_y
+
+    def f_data_given_latent(self, S, indicator_1, indicator_2):
+        """Compute the density of data given latent variables
+
+        Parameters
+        ----------
+
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
@@ -96,42 +175,20 @@ class EstepFunctions:
         Returns
         -------
         f : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y, T, delta| S, G, theta)
+-            The value of the f(Y, T, delta| S, G, theta)
         """
-        def intensity():
-            return (tmp * ind_1).sum(axis=-1)
-
-        def survival():
-            return np.exp(-(tmp * ind_2).sum(axis=-1).T)
-
-        def f_y_given_latent():
-            f_y = np.ones(shape=(n_samples, K, N_MC))
-            g3 = self.g3(S)
-            for i in range(n_samples):
-                n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
-                inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
-                             range(n_long_features)]
-                inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-                f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) *
-                        np.prod(inv_Phi_i))) * np.exp(np.sum(-0.5 *
-                        ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
-            return f_y
 
         X, extracted_features = self.X, self.extracted_features
-        T, T_u, delta = self.T, self.T_u, self.delta
-        theta, K = self.theta, self.K
-        n_samples, n_long_features = self.n_samples, self.n_long_features
+        T, T_u, delta, theta = self.T, self.T_u, self.delta, self.theta
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        (U_list, V_list, y_list, N_list) = extracted_features[0]
-        N_MC = S.shape[0]
         g1 = self.g1(S, False)
         ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
         baseline_val = baseline_hazard.values.flatten()
-        tmp = g1.swapaxes(0, 2) * baseline_val
-        op1 = (intensity() ** delta).T
-        op2 = survival()
-        f_y = f_y_given_latent()
-        f = op1 * op2 * f_y
+        rel_risk = g1.swapaxes(0, 2) * baseline_val
+        intensity = (self.intensity(rel_risk, ind_1) ** delta).T
+        survival = self.survival(rel_risk, ind_2)
+        f_y = self.f_y_given_latent(S, extracted_features)
+        f = intensity * survival * f_y
         return f
 
     def g0(self, S):
@@ -230,7 +287,7 @@ class EstepFunctions:
             Set of constructed Monte Carlo samples
 
         indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
+            The indicator matrix for comparing event times (T == T_u)
 
         broadcast : `boolean`
             Indicate to expand the dimension of g2 or not
