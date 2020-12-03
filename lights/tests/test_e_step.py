@@ -27,10 +27,10 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g1 = self.E_func.g1(self.S, broadcast=False)
-        g1_0_1 = np.exp(np.array([130 / 3, 221 / 6, 143 / 6, 142 / 3]))
-        g1_1_3 = np.exp(np.array([147, 172.5, 145.5, 61.5]))
+        g1_0_1 = np.exp(np.array([49, 56, 29, 4]))
+        g1_1_3 = np.exp(np.array([55, 46, 76, 25.5]))
         np.testing.assert_almost_equal(g1[0, 0, :, 0], g1_0_1)
-        np.testing.assert_almost_equal(g1[0, 1, :, 2], g1_1_3)
+        np.testing.assert_almost_equal(g1[0, 1, :, 1], g1_1_3)
 
     def test_g2(self):
         """Tests the g2 function
@@ -65,10 +65,10 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g6 = self.E_func.g6(self.S)
-        g6_0_1 = np.exp(130 / 3) * np.array(
-            [[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
-             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3],
-             [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1 / 2, 1 / 3]])
+        g6_0_1 = np.exp(49) * np.array(
+            [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3]])
         np.testing.assert_almost_equal(g6[0, 0, 0, 0, :, :, 0], g6_0_1)
 
     def test_g7(self):
@@ -77,7 +77,7 @@ class Test(unittest.TestCase):
         self.setUp()
         g7 = self.E_func.g7(self.S, broadcast=False)
         g7_0_1 = np.array(
-            [9, 6, 7, 1, 2, 3, 2, 3, 3, 10, 8, 4, 5, 8 / 3, 14 / 3])
+            [22, 1, 2, 16, 20, 16, 3, 2, 12, 40/3, 10, 3, 3, 2, 40/3])
         np.testing.assert_almost_equal(g7[0, 0, 0], g7_0_1)
 
     def test_g8(self):
@@ -85,9 +85,8 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g8 = self.E_func.g8(self.S)
-        g8_0_1 = np.exp(130 / 3) * \
-                 np.array(
-                     [9, 6, 7, 1, 2, 3, 2, 3, 3, 10, 8, 4, 5, 8 / 3, 14 / 3])
+        g8_0_1 = np.exp(49) * \
+            np.array([22, 1, 2, 16, 20, 16, 3, 2, 12, 40/3, 10, 3, 3, 2, 40/3])
         np.testing.assert_almost_equal(g8[0, 0, 0, 0, :, 0], g8_0_1)
 
     def test_g9(self):

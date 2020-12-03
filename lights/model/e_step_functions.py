@@ -351,10 +351,12 @@ class EstepFunctions:
         g7 : `np.ndarray`, shape=(K, N_MC, J, dim, K)
             The values of g7 function
         """
-        T_u, theta = self.T_u, self.theta
+        T_u, theta, K = self.T_u, self.theta, self.K
+        N_MC, J = S.shape[0], T_u.shape[0]
         asso_func, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         g7 = get_asso_func(T_u, S, theta, asso_func, L, alpha).swapaxes(1, 2)
+        g7 = g7.reshape(K, N_MC, J, -1)
         if broadcast:
             g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
             g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)

@@ -34,7 +34,7 @@ class CreateTestingData:
         self.delta = np.array([1, 0, 1], dtype=np.ushort)
         times_infos = get_times_infos(self.T)
         self.T_u, self.J, self.ind_1, self.ind_2 = times_infos
-        baseline_hazard = pd.Series(data=np.array([5, 8, 12]), index=self.T)
+        baseline_hazard = pd.Series(data=np.array([5, 8]), index=self.T_u)
         beta_0 = np.array([1, 2, 3, -3, 2, 2, -1, 3, -1]).reshape(-1, 1)
         beta_1 = np.array([-1, -2, 2, 2, 3, 1, 1, 2, -1]).reshape(-1, 1)
         gamma_0 = np.array([-1, 1, 1, 0, 2, -1, 1, 2, -2, 3, -1, 0,
