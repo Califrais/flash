@@ -79,8 +79,16 @@ class Test(unittest.TestCase):
                             -4514, -5677.2])
         np.testing.assert_almost_equal(grad_R, grad_R_, 3)
     def test_Q_func(self):
-        """TODO
+        """Tests the Q function
         """
+        self.setUp()
+        ind_1 = self.data.T.reshape(-1, 1) == np.unique(self.data.T)
+        ind_2 = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
+        baseline_hazard = self.data.theta["baseline_hazard"]
+        Q = self.M_func.Q_func(self.pi_est, np.log(self.E_g1), self.E_g1,
+                                baseline_hazard, ind_1, ind_2)
+        Q_ = 23.115
+        np.testing.assert_almost_equal(Q, Q_, 3)
 
     def test_grad_Q(self):
         """TODO
