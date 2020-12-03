@@ -2,7 +2,6 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
-from scipy.stats import multivariate_normal
 from lights.model.associations import get_asso_func
 
 

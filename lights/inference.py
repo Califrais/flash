@@ -252,7 +252,22 @@ class QNMCEM(Learner):
             group
         """
         if self._fitted:
-            marker = None
+            n_samples = X.shape[0]
+            delta = np.zeros(n_samples)
+            asso_functions = self.asso_functions
+            L, p = self.n_long_features, self.n_time_indep_features
+            # TODO: Verify later
+            T, ind_1, ind_2 = self.T, None, None
+            N_MC = 10
+            alpha = self.fixed_effect_time_order
+            ext_feat = extract_features(Y, alpha)
+            E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
+                                    asso_functions, self.theta)
+            S = E_func.construct_MC_samples(N_MC)
+            f = E_func.f_data_given_latent(S, ind_1, ind_2)
+            Lambda_1 = f.mean(axis=-1)
+            pi_xi = self._get_proba(X, self.theta["xi"])
+            marker = self._get_post_proba(pi_xi, Lambda_1)
             return marker
         else:
             raise RuntimeError('You must fit the model first')
@@ -304,6 +319,8 @@ class QNMCEM(Learner):
         self.n_long_features = L
         q_l = alpha + 1
         r_l = 2  # Affine random effects
+        # TODO: Verify later
+        self.T = T
         if fit_intercept:
             p += 1
 
