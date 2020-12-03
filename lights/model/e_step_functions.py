@@ -340,6 +340,39 @@ class EstepFunctions:
             g3.append(M_iS)
         return g3
 
+    def g4(self, g3, extracted_features):
+        """Computes g4
+
+        Parameters
+        ----------
+        g3 : `list, size=(n_samples, array_shape(K, n_i, N_MC))
+                The values of g3 function
+
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        Returns
+        -------
+        g4 : list, size=(n_samples, array_shape(K, n_i, N_MC))
+                The values of g4 function
+        """
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        (_, _, y_list, N_list) = extracted_features[0]
+        phi = self.theta["phi"]
+
+        g4 = []
+        for i in range(n_samples):
+            M_iS = g3[i]
+            Phi_i = [[1 / phi[l, 0]] * N_list[i][l]
+                     for l in range(n_long_features)]
+            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
+            g4.append(.5 * (M_iS ** 2) * Phi_i)
+
+        return g4
+
     def g5(self, S, indicator=None, broadcast=True):
         """Computes g5
 
@@ -458,12 +491,14 @@ class EstepFunctions:
         (U_list, V_list, y_list, N_list) = extracted_features[0]
 
         g3 = self.g3(S)
+        g4 = self.g4(g3, extracted_features)
         g9 = np.zeros(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
             y_i, M_iS = y_list[i], g3[i]
-            Phi_i = [[1 / phi[l, 0]] * N_list[i][l] for l in range(n_long_features)]
+            Phi_i = [[1 / phi[l, 0]] * N_list[i][l]
+                     for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            g9[i] = np.sum(M_iS * y_i * Phi_i - .5 * (M_iS ** 2) * Phi_i, axis=1)
+            g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
 
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
 
