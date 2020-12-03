@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 from lights.model.m_step_functions import MstepFunctions
 from lights.tests.testing_data import CreateTestingData
+from lights.base.base import get_ext_from_vec
 
 class Test(unittest.TestCase):
 
@@ -21,6 +22,13 @@ class Test(unittest.TestCase):
                                         data.nb_asso_feat, alpha)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([.2, .4, .7])
+        self.data = data
+
+        self.E_g1 = np.array([[1, 2],
+                              [3, 5],
+                              [4, 6]])
+        self.E_g2 = np.array([1, 4, 5])
+        self.E_g8 = np.array([1, 5, 2])
 
     def test_P_func(self):
         """Tests the P function
@@ -39,13 +47,37 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(grad_P, grad_P_, 3)
 
     def test_R_func(self):
-        """TODO
+        """Tests the R function
         """
+        self.setUp()
+        ind = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
+        R = self.M_func.R_func(self.pi_est, self.E_g1, self.E_g2, self.E_g8,
+                               self.data.theta["baseline_hazard"], ind)
+        R_ = 21.1
+        np.testing.assert_almost_equal(R, R_, 3)
 
     def test_grad_R(self):
-        """TODO
+        """Tests the gradient of R function
         """
+        self.setUp()
+        ind = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
+        theta = self.data.theta
+        beta_ext = get_ext_from_vec(theta["beta_0"])
+        gamma_ext = get_ext_from_vec(theta["gamma_0"])
+        baseline_hazard = theta["baseline_hazard"]
+        phi = theta["phi"]
+        ext_feat = self.data.ext_feat
+        E_g5 = np.arange(1, 136).reshape((3, 3, 15))
+        E_g6 = np.arange(1, 271).reshape((3, 2, 3, 15))
+        E_gS = np.arange(1, 19).reshape(3, 6)
 
+        grad_R = self.M_func.grad_R(beta_ext, gamma_ext, self.pi_est, E_g5, E_g6,
+                                    E_gS, baseline_hazard, ind, ext_feat, phi)
+        grad_R_ = np.array([2579.433, 2694.2, 3027.733, 1956.267, 2423.667,
+                            4571.267, 4180.3, 4514, 5677.2, -2579.433, -2694.2,
+                            -3027.733, -1956.267, -2423.667, -4571.267, -4180.3,
+                            -4514, -5677.2])
+        np.testing.assert_almost_equal(grad_R, grad_R_, 3)
     def test_Q_func(self):
         """TODO
         """

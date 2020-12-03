@@ -424,7 +424,7 @@ class QNMCEM(Learner):
                 gamma_init = [gamma_0_ext, gamma_1_ext]
             else:
                 xi_init = np.zeros(2 * p)
-                beta_init = np.zeros(2 * L * q_l)
+                beta_init = np.zeros(2 * L * q_l).reshape(-1, 1)
                 beta_init = [beta_init, beta_init.copy()]
                 gamma_init = np.zeros(2 * nb_asso_feat).reshape(-1, 1)
                 gamma_init = [gamma_init, gamma_init.copy()]

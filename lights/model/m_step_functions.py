@@ -296,7 +296,6 @@ class MstepFunctions:
         L = self.n_long_features
         beta = get_vect_from_ext(beta_ext)
         grad_pen = self.pen.grad_sparse_group_l1(beta, L)
-
         grad_R = self.grad_R(beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS,
                baseline_hazard, indicator, extracted_features, phi)
         return grad_R + grad_pen
@@ -352,7 +351,7 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         n_samples = self.n_samples
         q_l = self.fixed_effect_time_order + 1
-        beta = get_vect_from_ext(beta_ext)
+        beta = get_vect_from_ext(beta_ext).flatten()
         gamma = get_vect_from_ext(gamma_ext)[p:].reshape(L, -1)
         # To match the dimension of the association func derivative over beta
         gamma_ = np.repeat(gamma, q_l, axis=1)
@@ -371,8 +370,8 @@ class MstepFunctions:
             y_i = y_i.flatten()
             Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) -
-                                          V_i.dot(E_gS[i])))
+            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta)-
+                                          V_i.dot(E_gS[i]))).flatten()
 
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
