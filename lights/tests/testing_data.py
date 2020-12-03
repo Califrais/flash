@@ -66,3 +66,4 @@ class CreateTestingData:
                            [2, 3, -1, -2, 1, -3],
                            [-3, 2, 3, -3, 4, 1]])
         self.asso_functions = ['lp', 're', 'tps', 'ce']
+        self.nb_asso_feat = 17

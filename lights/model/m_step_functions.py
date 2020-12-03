@@ -133,7 +133,7 @@ class MstepFunctions:
             X = np.concatenate((np.ones(n_samples).reshape(1, n_samples).T, X),
                                axis=1)
         grad = X * (pi_est * np.exp(-logistic_loss(-u))).reshape(-1, 1)
-        grad = grad.mean(axis=0)
+        grad = - grad.mean(axis=0)
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj
 
