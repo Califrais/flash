@@ -25,50 +25,48 @@ class EstepFunctions:
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-    n_time_indep_features : `int`
-        Number of time-independent features
-
-    n_long_features : `int`
-        Number of longitudinal features
-
     fixed_effect_time_order : `int`
-            Order of the higher time monomial considered for the representations
-             of the time-varying features corresponding to the fixed effect. The
-            dimension of the corresponding design matrix is then equal to
-            fixed_effect_time_order + 1
+        Order of the higher time monomial considered for the representations
+        of the time-varying features corresponding to the fixed effect. The
+        dimension of the corresponding design matrix is then equal to
+        fixed_effect_time_order + 1
 
     asso_functions : `list` or `str`='all'
-            List of association functions wanted or string 'all' to select all
-            defined association functions. The available functions are :
-                - 'lp' : linear predictor
-                - 're' : random effects
-                - 'tps' : time dependent slope
-                - 'ce' : cumulative effects
+        List of association functions wanted or string 'all' to select all
+        defined association functions. The available functions are :
+            - 'lp' : linear predictor
+            - 're' : random effects
+            - 'tps' : time dependent slope
+            - 'ce' : cumulative effects
 
-    theta : `dict`, default=None
+    theta : `dict`
         Vector that concatenates all parameters to be inferred in the lights
         model
     """
 
-    def __init__(self, X, T, delta, extracted_features, n_long_features,
-                 n_time_indep_features, fixed_effect_time_order,
-                 asso_functions, theta=None):
+    def __init__(self, X, T, delta, extracted_features, fixed_effect_time_order,
+                 asso_functions, theta):
         self.K = 2  # 2 latent groups
         self.X, self.T, self.delta = X, T, delta
         self.T_u, self.n_samples = np.unique(T), len(T)
         self.extracted_features, self.theta = extracted_features, theta
-        self.n_long_features = n_long_features
-        self.n_time_indep_features = n_time_indep_features
+        self.n_long_features = len(extracted_features[1][0])
+        self.n_time_indep_features = X.shape[0]
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
 
     def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
 
+        Parameters
+        ----------
+        N : `int`
+            Number of Monte Carlo samples
+
         Returns
         -------
         S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
+            Set of constructed Monte Carlo samples, with N_MC = 2 * N
         """
         D = self.theta["long_cov"]
         C = np.linalg.cholesky(D)
@@ -77,118 +75,6 @@ class EstepFunctions:
         b = Omega.dot(C.T)
         S = np.vstack((b, -b))
         return S
-
-    @staticmethod
-    def intensity(rel_risk, indicator):
-        """Compute the intensity of f_data_given_latent
-
-        Parameters
-        ----------
-
-        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
-            The relative risk
-
-        indicator: `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        Returns
-        -------
-        intensity : `np.ndarray`, shape=(N_MC, K, n_samples)
-            The value of intensity
-        """
-        intensity = (rel_risk * indicator).sum(axis=-1)
-        return intensity
-
-    @staticmethod
-    def survival(rel_risk, indicator):
-        """Compute the survival of f_data_given_latent
-
-        Parameters
-        ----------
-
-        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
-            The relative risk
-
-        indicator: `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        survival : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of survival
-        """
-        survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
-        return survival
-
-    def f_y_given_latent(self, S, extracted_features):
-        """Compute the density of outcome given latent variables
-
-        Parameters
-        ----------
-
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        Returns
-        -------
-        f_y : `np.ndarray`, shape=(n_samples, K, N_MC)
--            The value of the f(Y | S, G, theta)
-        """
-        (U_list, V_list, y_list, N_list) = extracted_features[0]
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        phi, K = self.theta["phi"], self.K
-        N_MC = S.shape[0]
-
-        f_y = np.ones(shape=(n_samples, K, N_MC))
-        g3 = self.g3(S)
-        for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
-            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
-                         range(n_long_features)]
-            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i)))
-                * np.exp(np.sum(-0.5 *((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
-        return f_y
-
-    def f_data_given_latent(self, S, indicator_1, indicator_2):
-        """Compute the density of data given latent variables
-
-        Parameters
-        ----------
-
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        f : `np.ndarray`, shape=(n_samples, K, N_MC)
--            The value of the f(Y, T, delta| S, G, theta)
-        """
-
-        X, extracted_features = self.X, self.extracted_features
-        T, T_u, delta, theta = self.T, self.T_u, self.delta, self.theta
-        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        g1 = self.g1(S, False)
-        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
-        baseline_val = baseline_hazard.values.flatten()
-        rel_risk = g1.swapaxes(0, 2) * baseline_val
-        intensity = (self.intensity(rel_risk, ind_1) ** delta).T
-        survival = self.survival(rel_risk, ind_2)
-        f_y = self.f_y_given_latent(S, extracted_features)
-        f = intensity * survival * f_y
-        return f
 
     def g0(self, S):
         """Computes g0
@@ -256,7 +142,7 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        broadcast : `boolean`
+        broadcast : `boolean`, default=True
             Indicates to expand the dimension of g1 or not
 
         Returns
@@ -285,10 +171,11 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        #TODO : it is unclear what you do with indicator, must be well explained or be outside this function
         indicator : `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times (T == T_u)
 
-        broadcast : `boolean`
+        broadcast : `boolean`, default=True
             Indicate to expand the dimension of g2 or not
 
         Returns
@@ -327,12 +214,11 @@ class EstepFunctions:
             The values of g3 function
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
-        extracted_features = self.extracted_features
-        beta_0, beta_1 = self.theta["beta_0"], self.theta["beta_1"]
-        phi, K, N_MC = self.theta["phi"], self.K, S.shape[0]
-        (U_list, V_list, y_list, N_list) = extracted_features[0]
-        g3 = []
+        U_list, V_list, y_list, _ = self.extracted_features[0]
+        theta, K = self.theta, self.K
+        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         beta_stack = np.hstack((beta_0, beta_1))
+        g3 = []
         for i in range(n_samples):
             U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
@@ -358,18 +244,15 @@ class EstepFunctions:
         g4 : list, size=(n_samples, array_shape(K, n_i, N_MC))
                 The values of g4 function
         """
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        (_, _, y_list, N_list) = extracted_features[0]
+        n_samples, L = self.n_samples, self.n_long_features
+        _, _, y_list, N_list = extracted_features[0]
         phi = self.theta["phi"]
-
         g4 = []
         for i in range(n_samples):
             M_iS = g3[i]
-            Phi_i = [[1 / phi[l, 0]] * N_list[i][l]
-                     for l in range(n_long_features)]
+            Phi_i = [[1 / phi[l, 0]] * N_list[i][l] for l in range(L)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             g4.append(.5 * (M_iS ** 2) * Phi_i)
-
         return g4
 
     def g5(self, S, indicator=None, broadcast=True):
@@ -380,10 +263,11 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        #TODO : it is unclear what you do with indicator, must be well explained or be outside this function
         indicator : `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times
 
-        broadcast : `boolean`
+        broadcast : `boolean`, default=True
             Indicate to expand the dimension of g1 or not
 
         Returns
@@ -395,14 +279,12 @@ class EstepFunctions:
         g5 = get_asso_func(self.T_u, S, self.theta, self.asso_functions,
                            self.n_long_features, self.fixed_effect_time_order,
                            derivative=True)
-
         if broadcast:
             g5 = g5.swapaxes(0, 2)
             g5 = np.sum(np.broadcast_to(g5, (self.n_samples,) + g5.shape).T *
                         (indicator * 1).T, axis=-2).T
             g5 = np.broadcast_to(g5[..., None], g5.shape + (2,))\
                 .swapaxes(2, 5).swapaxes(1, 2)
-
         return g5
 
     def g6(self, S):
@@ -433,7 +315,7 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        broadcast : `boolean`
+        broadcast : `boolean`, default=True
             Indicate to expand the dimension of g1 or not
 
         Returns
@@ -464,7 +346,6 @@ class EstepFunctions:
         g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
             The values of g8 function
         """
-
         g7 = self.g7(S, False)
         g1 = self.g1(S, False)
         g8 = g1[..., np.newaxis] * g7
@@ -486,10 +367,8 @@ class EstepFunctions:
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
         extracted_features = self.extracted_features
-        beta_0, beta_1 = self.theta["beta_0"], self.theta["beta_1"]
         phi, K, N_MC = self.theta["phi"], self.K, S.shape[0]
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-
         g3 = self.g3(S)
         g4 = self.g4(g3, extracted_features)
         g9 = np.zeros(shape=(n_samples, K, N_MC))
@@ -499,9 +378,7 @@ class EstepFunctions:
                      for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
-
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
-
         return g9
 
     @staticmethod
@@ -549,7 +426,7 @@ class EstepFunctions:
             high-risk group given all observed data
 
         f: `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y, T, delta| S, G, theta)
+            The value of the f(Y, T, delta| S, G ; theta)
 
         Returns
         -------

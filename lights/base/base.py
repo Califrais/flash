@@ -171,6 +171,7 @@ def extract_features(Y, fixed_effect_time_order):
     Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
         The longitudinal data. Each element of the dataframe is a
         pandas.Series
+
     fixed_effect_time_order : `int`
         Order of the higher time monomial considered for the representations of
         the time-varying features corresponding to the fixed effect. The
