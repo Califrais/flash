@@ -11,7 +11,6 @@ from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
 
-
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
                                  rho: float = 0.5, cst: float = 1.):
     """Features obtained as samples of a centered Gaussian vector
@@ -247,8 +246,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5, decay: float = 3.,
                  n_long_features: int = 10, cov_corr_long: float = .001,
-                 fixed_effect_mean_low_risk: tuple = (1, .3),
-                 fixed_effect_mean_high_risk: tuple = (1, .5),
+                 fixed_effect_mean_low_risk: tuple = (1, .5),
+                 fixed_effect_mean_high_risk: tuple = (1, .3),
                  corr_fixed_effect: float = .01, std_error: float = 2.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
