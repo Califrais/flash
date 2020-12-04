@@ -23,12 +23,11 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.linear_predictor()
-        phi_0_1 = np.array([[9, 8, 11, 5, ],
-                            [22, 22, 25, 18],
-                            [41, 42, 45, 37]])
-        phi_1_3 = np.array([[8, 8, 0, 7],
-                            [10, 8, -4, 7],
-                            [10, 6, -10, 5]])
+        # values of g2 at first group and first feature
+        phi_0_1 = np.array([[[22], [22], [25], [18]],
+                            [[41], [42], [45], [37]]])
+        phi_1_3 = np.array([[[10], [8], [-4], [7]],
+                            [[10], [6], [-10], [5]]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
         np.testing.assert_almost_equal(phi[1, :, :, 2], phi_1_3)
 
@@ -37,23 +36,21 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.random_effects()
-        phi_0_0 = np.array([[1, 2, 3, 2, 3, 3],
-                            [-1, 3, 2, 4, 5, 1],
-                            [2, 3, -1, -2, 1, -3],
-                            [-3, 2, 3, -3, 4, 1]])
+        phi_0_0 = np.array([[[1, 2], [3, 2], [3, 3]],
+                            [[-1, 3], [2, 4], [5, 1]],
+                            [[2, 3], [-1, -2], [1, -3]],
+                            [[-3, 2], [3, -3], [4, 1]]])
         np.testing.assert_almost_equal(phi[0, 0], phi_0_0)
 
-    def test_tps_asso(self):
+    def test_tds_asso(self):
         """Tests the time dependent slope association function
         """
         self.setUp()
         phi = self.asso_func.time_dependent_slope()
-        phi_0_1 = np.array([[10, 11, 11, 10],
-                            [16, 17, 17, 16],
-                            [22, 23, 23, 22]])
-        phi_1_3 = np.array([[3, 1, -3, 1],
-                            [1, -1, -5, -1],
-                            [-1, -3, -7, -3]])
+        phi_0_1 = np.array([[[16], [17], [17], [16]],
+                            [[22], [23], [23], [22]]])
+        phi_1_3 = np.array([[[1], [-1], [-5], [-1]],
+                            [[-1], [-3], [-7], [-3]]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
         np.testing.assert_almost_equal(phi[1, :, :, 2], phi_1_3)
 
@@ -62,9 +59,8 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.cumulative_effects()
-        phi_0_1 = np.array([[5, 3.5, 6.5, 1],
-                            [20, 18, 24, 12],
-                            [51, 49.5, 58.5, 39]])
+        phi_0_1 = np.array([[[20], [18], [24], [12]],
+                            [[51], [49.5], [58.5], [39]]])
         np.testing.assert_almost_equal(phi[0, :, :, 0], phi_0_1)
 
     def test_dlp_asso(self):
@@ -72,8 +68,7 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_linear_predictor()
-        phi_0_1 = np.array([[1, 1, 1],
-                            [1, 2, 4],
+        phi_0_1 = np.array([[1, 2, 4],
                             [1, 3, 9]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
@@ -82,16 +77,15 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_random_effects()
-        phi_0_1 = np.zeros((3, 6))
+        phi_0_1 = np.zeros((2, 6))
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
-    def test_dtps_asso(self):
+    def test_dtds_asso(self):
         """Tests the derivative time dependent slope association function
         """
         self.setUp()
         phi = self.asso_func.derivative_time_dependent_slope()
-        phi_0_1 = np.array([[0, 1, 2],
-                            [0, 1, 4],
+        phi_0_1 = np.array([[0, 1, 4],
                             [0, 1, 6]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 
@@ -100,8 +94,7 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         phi = self.asso_func.derivative_cumulative_effects()
-        phi_0_1 = np.array([[1, 0.5, 1 / 3],
-                            [2, 2, 8 / 3],
+        phi_0_1 = np.array([[2, 2, 8 / 3],
                             [3, 4.5, 9]])
         np.testing.assert_almost_equal(phi[0, 0, :, 0], phi_0_1)
 

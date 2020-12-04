@@ -53,13 +53,14 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     if derivative:
         asso_func_stack = np.empty(shape=(K, N_MC, J, n_long_features, 0))
     else:
-        asso_func_stack = np.empty(shape=(K, J, N_MC, 0))
+        asso_func_stack = np.empty(shape=(K, J, N_MC, n_long_features, 0))
 
     for func_name in asso_functions:
         if derivative:
             func_name = "d_" + func_name
         func = asso_func.assoc_func_dict[func_name]
         asso_func_stack = np.concatenate((asso_func_stack, func), axis=-1)
+
     return asso_func_stack
 
 
@@ -129,12 +130,12 @@ class AssociationFunctions:
         U : `np.ndarray`, shape=(J, q_l)
             Fixed-effect design features
 
-        V : `np.ndarray`, , shape=(J, r_l)
+        V : `np.ndarray`, , shape=(J, r_l, 1)
             Random-effect design features
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of linear association function
         """
         beta = self.fixed_effect_coeffs
@@ -149,6 +150,7 @@ class AssociationFunctions:
             beta_l = beta[:, q_l * l: q_l * (l + 1)]
             phi[:, :, l] = U.dot(beta_l).T.reshape(K, -1, 1) + tmp
         phi = phi.swapaxes(2, 3)
+        phi = phi.reshape(phi.shape + (1,))
 
         return phi
 
@@ -169,11 +171,12 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, r)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, r_l)
             The value of random effects function
         """
         S, K, J = self.S, self.K, self.J
-        phi = np.broadcast_to(S, ((K, J) + S.shape))
+        S_ = S.reshape(self.N_MC, self.n_long_features, -1)
+        phi = np.broadcast_to(S_, ((K, J) + S_.shape))
         return phi
 
     def time_dependent_slope(self):
@@ -181,7 +184,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of time-dependent slope function
         """
         dU_l, dV_l = self.dU_l, self.dV_l
@@ -193,7 +196,7 @@ class AssociationFunctions:
 
         Returns
         -------
-        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features)
+        phi : `np.ndarray`, shape=(K, J, N_MC, n_long_features, 1)
             The value of cumulative effects function
         """
         iU_l, iV_l = self.iU_l, self.iV_l

@@ -30,11 +30,11 @@ class CreateTestingData:
         columns = ['long_feature_%s' % (l + 1) for l in
                    range(self.n_long_features)]
         self.Y = pd.DataFrame(data=data, columns=columns)
-        self.T = np.array([2, 3, 1])
+        self.T = np.array([2, 3, 3])
         self.delta = np.array([1, 0, 1], dtype=np.ushort)
         times_infos = get_times_infos(self.T)
         self.T_u, self.J, self.ind_1, self.ind_2 = times_infos
-        baseline_hazard = pd.Series(data=np.array([5, 8, 12]), index=self.T)
+        baseline_hazard = pd.Series(data=np.array([5, 8]), index=self.T_u)
         beta_0 = np.array([1, 2, 3, -3, 2, 2, -1, 3, -1]).reshape(-1, 1)
         beta_1 = np.array([-1, -2, 2, 2, 3, 1, 1, 2, -1]).reshape(-1, 1)
         gamma_0 = np.array([-1, 1, 1, 0, 2, -1, 1, 2, -2, 3, -1, 0,
@@ -66,3 +66,4 @@ class CreateTestingData:
                            [2, 3, -1, -2, 1, -3],
                            [-3, 2, 3, -3, 4, 1]])
         self.asso_functions = ['lp', 're', 'tps', 'ce']
+        self.nb_asso_feat = 17

@@ -300,6 +300,15 @@ def get_vect_from_ext(v_ext):
     v = v_ext[:dim // 2] - v_ext[dim // 2:]
     return v
 
+def get_ext_from_vec(v):
+    """Obtain r from extension vector include positive and negative parts
+    from the signed coefficient vecto
+    """
+    dim = len(v)
+    v_ext = np.concatenate((v, -v)).reshape(-1, 1)
+    v_ext[v_ext < 0] = 0
+    return v_ext
+
 
 def get_xi_from_xi_ext(xi_ext, fit_intercept):
     """Get the time-independent coefficient vector from its extension on

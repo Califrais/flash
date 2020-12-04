@@ -252,7 +252,22 @@ class QNMCEM(Learner):
             group
         """
         if self._fitted:
-            marker = None
+            n_samples = X.shape[0]
+            delta = np.zeros(n_samples)
+            asso_functions = self.asso_functions
+            L, p = self.n_long_features, self.n_time_indep_features
+            # TODO: Verify later
+            T, ind_1, ind_2 = self.T, None, None
+            N_MC = 10
+            alpha = self.fixed_effect_time_order
+            ext_feat = extract_features(Y, alpha)
+            E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
+                                    asso_functions, self.theta)
+            S = E_func.construct_MC_samples(N_MC)
+            f = E_func.f_data_given_latent(S, ind_1, ind_2)
+            Lambda_1 = f.mean(axis=-1)
+            pi_xi = self._get_proba(X, self.theta["xi"])
+            marker = self._get_post_proba(pi_xi, Lambda_1)
             return marker
         else:
             raise RuntimeError('You must fit the model first')
@@ -304,6 +319,8 @@ class QNMCEM(Learner):
         self.n_long_features = L
         q_l = alpha + 1
         r_l = 2  # Affine random effects
+        # TODO: Verify later
+        self.T = T
         if fit_intercept:
             p += 1
 
@@ -407,26 +424,26 @@ class QNMCEM(Learner):
                 gamma_init = [gamma_0_ext, gamma_1_ext]
             else:
                 xi_init = np.zeros(2 * p)
-                beta_init = np.zeros(2 * L * q_l)
+                beta_init = np.zeros(2 * L * q_l).reshape(-1, 1)
                 beta_init = [beta_init, beta_init.copy()]
                 gamma_init = np.zeros(2 * nb_asso_feat).reshape(-1, 1)
                 gamma_init = [gamma_init, gamma_init.copy()]
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: F_func.P_func(pi_est, xi_ext_), x0=xi_init,
-                fprime=lambda xi_ext_: F_func.grad_P(pi_est, xi_ext_),
+                func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_), x0=xi_init,
+                fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_),
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # beta update
             pi_est_K = [1 - pi_est, pi_est]
             [beta_0_ext, beta_1_ext] = [fmin_l_bfgs_b(
                 func=lambda beta_ext:
-                F_func.R_func(beta_ext, pi_est_K[k], E_g1.T[k].T, E_g2.T[k].T,
+                F_func.R_pen_func(beta_ext, pi_est_K[k], E_g1.T[k].T, E_g2.T[k].T,
                               E_g9.T[k].T, baseline_hazard, ind_2),
                 x0=beta_init[k],
                 fprime=lambda beta_ext:
-                F_func.grad_R(beta_ext, gamma_0_ext, pi_est_K[k], E_g5.T[k].T,
+                F_func.grad_R_pen(beta_ext, gamma_0_ext, pi_est_K[k], E_g5.T[k].T,
                               E_g6.T[k].T, E_gS, baseline_hazard, ind_2,
                               ext_feat, phi),
                 disp=False, bounds=bounds_beta, maxiter=maxiter,
@@ -445,11 +462,11 @@ class QNMCEM(Learner):
             # gamma update
             [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
                 func=lambda gamma_ext:
-                F_func.Q_func(gamma_ext, pi_est[k], E_log_g1.T[k].T, E_g1.T[k].T,
+                F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T, E_g1.T[k].T,
                               baseline_hazard, ind_1, ind_2),
                 x0=gamma_init[k],
                 fprime=lambda gamma_ext:
-                F_func.grad_Q(gamma_ext, pi_est[k], E_g1.T[k].T, E_g7.T[k].T,
+                F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T, E_g7.T[k].T,
                               E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
                 disp=False, bounds=bounds_gamma, maxiter=maxiter,
                 pgtol=pgtol)[0].reshape(-1, 1)
