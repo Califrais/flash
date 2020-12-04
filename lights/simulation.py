@@ -131,7 +131,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         Value of the active coefficients in the time-independent coefficient
         vectors
 
-    coeff_val_asso : `float`, default=.1
+    coeff_val_asso : `float`, default=.05
         Value of the coefficients parameter used in the association coefficient
         vectors
 
@@ -157,7 +157,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the low risk group
 
-    fixed_effect_mean_high_risk : `tuple`, default=(1, .5)
+    fixed_effect_mean_high_risk : `tuple`, default=(1, .4)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the high risk group
 
@@ -243,11 +243,11 @@ class SimuJointLongitudinalSurvival(Simulation):
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
                  sparsity: float = .7, coeff_val_time_indep: float = 1.,
-                 coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
+                 coeff_val_asso: float = .05, cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5, decay: float = 3.,
                  n_long_features: int = 10, cov_corr_long: float = .001,
-                 fixed_effect_mean_low_risk: tuple = (1, .5),
-                 fixed_effect_mean_high_risk: tuple = (1, .3),
+                 fixed_effect_mean_low_risk: tuple = (1, .3),
+                 fixed_effect_mean_high_risk: tuple = (1, .4),
                  corr_fixed_effect: float = .01, std_error: float = 2.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
@@ -416,7 +416,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                           nb_asso_param * (l + 1)] += coeff_val_asso
                 if l + 1 in S_k:
                     gamma[nb_asso_param * l:
-                          nb_asso_param * (l + 1)] += coeff_val_asso
+                          nb_asso_param * (l + 1)] += .5 * coeff_val_asso
             return gamma
 
         gamma_0 = simu_sparse_asso_features(0)

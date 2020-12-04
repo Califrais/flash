@@ -378,6 +378,12 @@ class QNMCEM(Learner):
                 # TODO: take last measurement times for each subject
                 #  (from ext_feat !)
                 prediction_times = 1
+            else:
+                if False:
+                    # TODO test that prediction_times is greater than the last measurement times
+                    raise ValueError('Prediction times must be greater than the'
+                                     ' last measurement times for each subject')
+
             # predictions for alive subjects only
             delta_prediction = np.zeros(n_samples)
             f = self.f_data_given_latent(X, ext_feat, prediction_times,
@@ -520,8 +526,8 @@ class QNMCEM(Learner):
             E_g0_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
             E_gS = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
             E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
-            E_g2 = E_func.Eg(E_func.g2(S, ind_1), Lambda_1, pi_xi, f)
-            E_g5 = E_func.Eg(E_func.g5(S, ind_1), Lambda_1, pi_xi, f)
+            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
+            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
             E_g6 = E_func.Eg(E_func.g6(S), Lambda_1, pi_xi, f)
             E_g9 = E_func.Eg(E_func.g9(S), Lambda_1, pi_xi, f)
 

@@ -47,7 +47,7 @@ class Test(unittest.TestCase):
         """Tests the g5 function
         """
         self.setUp()
-        g5 = self.E_func.g5(self.S, broadcast=False)
+        g5 = self.E_func.g5(self.S, False)
         g5_0_1 = np.array(
             [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
              [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],

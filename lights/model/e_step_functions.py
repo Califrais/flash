@@ -3,6 +3,7 @@
 
 import numpy as np
 from lights.model.associations import get_asso_func
+from lights.base.base import get_times_infos
 
 
 class EstepFunctions:
@@ -49,11 +50,13 @@ class EstepFunctions:
         self.K = 2  # 2 latent groups
         self.X, self.T, self.delta = X, T, delta
         self.T_u, self.n_samples = np.unique(T), len(T)
+        self.T_u, self.J, self.ind_1, _ = get_times_infos(T)
         self.extracted_features, self.theta = extracted_features, theta
         self.n_long_features = len(extracted_features[1][0])
         self.n_time_indep_features = X.shape[0]
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
+        self.g3, self.g4, self.g9 = None, None, None
 
     def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -152,8 +155,8 @@ class EstepFunctions:
         """
         n_samples, K, theta = self.n_samples, self.K, self.theta
         p = self.n_time_indep_features
-        X, T_u = self.X, self.T_u
-        N_MC, J = S.shape[0], T_u.shape[0]
+        X, T_u, J = self.X, self.T_u, self.J
+        N_MC = S.shape[0]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
         g2_ = self.g2(S, broadcast=False).reshape(K, 1, J, N_MC)
@@ -163,17 +166,13 @@ class EstepFunctions:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
 
-    def g2(self, S, indicator=None, broadcast=True):
+    def g2(self, S, broadcast=True):
         """Computes g2
 
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
-
-        #TODO : it is unclear what you do with indicator, must be well explained or be outside this function
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
 
         broadcast : `boolean`, default=True
             Indicate to expand the dimension of g2 or not
@@ -184,7 +183,7 @@ class EstepFunctions:
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
-        N_MC, J = S.shape[0], T_u.shape[0]
+        N_MC, J = S.shape[0], self.J
         asso_functions, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         theta = self.theta
@@ -196,11 +195,11 @@ class EstepFunctions:
         if broadcast:
             g2 = g2.swapaxes(0, 1)
             g2 = np.sum(np.broadcast_to(g2, (self.n_samples,) + g2.shape).T *
-                        (indicator * 1).T, axis=2).T
+                        (self.ind_1 * 1).T, axis=2).T
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
-    def g3(self, S):
+    def _g3(self, S):
         """Computes g3
 
         Parameters
@@ -225,7 +224,7 @@ class EstepFunctions:
             g3.append(M_iS)
         return g3
 
-    def g4(self, g3, extracted_features):
+    def _g4(self, g3, extracted_features):
         """Computes g4
 
         Parameters
@@ -255,17 +254,13 @@ class EstepFunctions:
             g4.append(.5 * (M_iS ** 2) * Phi_i)
         return g4
 
-    def g5(self, S, indicator=None, broadcast=True):
+    def g5(self, S, broadcast=True):
         """Computes g5
 
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
-
-        #TODO : it is unclear what you do with indicator, must be well explained or be outside this function
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times
 
         broadcast : `boolean`, default=True
             Indicate to expand the dimension of g1 or not
@@ -282,7 +277,7 @@ class EstepFunctions:
         if broadcast:
             g5 = g5.swapaxes(0, 2)
             g5 = np.sum(np.broadcast_to(g5, (self.n_samples,) + g5.shape).T *
-                        (indicator * 1).T, axis=-2).T
+                        (self.ind_1 * 1).T, axis=-2).T
             g5 = np.broadcast_to(g5[..., None], g5.shape + (2,))\
                 .swapaxes(2, 5).swapaxes(1, 2)
         return g5
@@ -301,7 +296,7 @@ class EstepFunctions:
             The values of g6 function
         """
         n_samples = self.n_samples
-        g1, g5 = self.g1(S, False), self.g5(S, broadcast=False)
+        g1, g5 = self.g1(S, False), self.g5(S, False)
         g5 = np.broadcast_to(g5, (n_samples,) + g5.shape)
         g6 = (g1.T * g5.T).T
         g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, -1)
@@ -324,7 +319,7 @@ class EstepFunctions:
             The values of g7 function
         """
         T_u, theta, K = self.T_u, self.theta, self.K
-        N_MC, J = S.shape[0], T_u.shape[0]
+        N_MC, J = S.shape[0], self.J
         asso_func, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         g7 = get_asso_func(T_u, S, theta, asso_func, L, alpha).swapaxes(1, 2)
@@ -352,7 +347,7 @@ class EstepFunctions:
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
 
-    def g9(self, S):
+    def _g9(self, S):
         """Computes g9
 
         Parameters
@@ -380,6 +375,31 @@ class EstepFunctions:
             g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
         return g9
+
+    def _get_g3_4_9(self, S):
+        """blabla
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        """
+        for i in range(n_samples):
+            print('ok')
+        self.g3, self.g4, self.g9 = g3, g4, g9
+
+    def g3(self, S):
+        if self.g3 is None:
+            self._get_g3_4_9(S)
+        return self.g3
+
+    def g9(self, S):
+        if self.g9 is None:
+            self._get_g3_4_9(S)
+        return self.g9
 
     @staticmethod
     def Lambda_g(g, f):
