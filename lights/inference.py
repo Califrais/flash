@@ -96,13 +96,14 @@ class QNMCEM(Learner):
         self.n_samples = None
         self.n_time_indep_features = None
         self.n_long_features = None
+        self.S = None
         self.theta = {
             "beta_0": np.empty(1),
             "beta_1": np.empty(1),
             "long_cov": np.empty(1),
             "phi": np.empty(1),
             "xi": np.empty(1),
-            "baseline_hazard": np.empty(1),
+            "baseline_hazard": pd.Series(),
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
@@ -185,7 +186,7 @@ class QNMCEM(Learner):
         pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
         return -log_lik + pen
 
-    def _get_proba(self, X, xi_ext):
+    def _get_proba(self, X):
         """Probability estimates for being on the high-risk group given
         time-independent features
 
@@ -194,18 +195,13 @@ class QNMCEM(Learner):
         X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
             The time-independent features matrix
 
-        xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
         Returns
         -------
         output : `np.ndarray`, shape=(n_samples,)
             Returns the probability of the sample for being on the high-risk
             group given time-independent features
         """
-        fit_intercept = self.fit_intercept
-        xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
+        xi_0, xi = self.theta["xi_0"], self.theta["xi"]
         u = xi_0 + X.dot(xi)
         return logistic_grad(u)
 
@@ -233,7 +229,126 @@ class QNMCEM(Learner):
         pi_est = tmp[:, 1] / tmp.sum(axis=1)
         return pi_est
 
-    def predict_marker(self, X, Y):
+    @staticmethod
+    def intensity(rel_risk, indicator):
+        """Compute the intensity of f_data_given_latent
+
+        Parameters
+        ----------
+        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+            The relative risk
+
+        indicator: `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times (T == T_u)
+
+        Returns
+        -------
+        intensity : `np.ndarray`, shape=(N_MC, K, n_samples)
+            The value of intensity
+        """
+        intensity = (rel_risk * indicator).sum(axis=-1)
+        return intensity
+
+    @staticmethod
+    def survival(rel_risk, indicator):
+        """Computes the survival function
+
+        Parameters
+        ----------
+        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+            The relative risk
+
+        indicator: `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times (T <= T_u)
+
+        Returns
+        -------
+        survival : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the survival function
+        """
+        survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
+        return survival
+
+    def f_y_given_latent(self, extracted_features, g3):
+        """Computes the density of the longitudinal processes given latent
+        variables
+
+        Parameters
+        ----------
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
+            The values of g3 function
+
+        Returns
+        -------
+        f_y : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the f(Y | S, G ; theta)
+        """
+        (U_list, V_list, y_list, N_list) = extracted_features[0]
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        phi = self.theta["phi"]
+        N_MC = g3[0].shape[2]
+        K = 2  # 2 latent groups
+        f_y = np.ones(shape=(n_samples, K, N_MC))
+        for i in range(n_samples):
+            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
+            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
+                         range(n_long_features)]
+            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
+            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i)))
+                      * np.exp(
+                        np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
+        return f_y
+
+    def f_data_given_latent(self, X, extracted_features, T, delta, S):
+        """Estimates the data density given latent variables
+
+        Parameters
+        ----------
+        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
+            The time-independent features matrix
+
+        extracted_features :  `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        T : `np.ndarray`, shape=(n_samples,)
+            Censored times of the event of interest
+
+        delta : `np.ndarray`, shape=(n_samples,)
+            Censoring indicator
+
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        f : `np.ndarray`, shape=(n_samples, K, N_MC)
+            The value of the f(Y, T, delta| S, G ; theta)
+        """
+        theta, alpha = self.theta, self.fixed_effect_time_order
+        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
+        E_func = EstepFunctions(X, T, delta, extracted_features, alpha,
+                                self.asso_functions, theta)
+        g1, g3 = E_func.g1(S, False), E_func.g3(S)
+        baseline_val = baseline_hazard.values.flatten()
+        rel_risk = g1.swapaxes(0, 2) * baseline_val
+        times_infos = get_times_infos(T)
+        ind_1, ind_2 = times_infos[2], times_infos[3]
+        intensity = self.intensity(rel_risk, ind_1)
+        survival = self.survival(rel_risk, ind_2)
+        f_y = self.f_y_given_latent(extracted_features, g3)
+        f = (intensity ** delta).T * survival * f_y
+        return f
+
+    def predict_marker(self, X, Y, prediction_times=None):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -242,8 +357,12 @@ class QNMCEM(Learner):
             The time-independent features matrix
 
         Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
+            The longitudinal data. Each element of the dataframe is
             a pandas.Series
+
+        prediction_times : `np.ndarray`, shape=(n_samples,), default=None
+            Times for prediction, that is up to which one has longitudinal data.
+            If `None`, takes the last measurement times in Y
 
         Returns
         -------
@@ -253,22 +372,19 @@ class QNMCEM(Learner):
         """
         if self._fitted:
             n_samples = X.shape[0]
-            delta = np.zeros(n_samples)
-            asso_functions = self.asso_functions
-            L, p = self.n_long_features, self.n_time_indep_features
-            # TODO: Verify later
-            T, ind_1, ind_2 = self.T, None, None
-            N_MC = 10
-            alpha = self.fixed_effect_time_order
+            theta, alpha = self.theta, self.fixed_effect_time_order
             ext_feat = extract_features(Y, alpha)
-            E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
-                                    asso_functions, self.theta)
-            S = E_func.construct_MC_samples(N_MC)
-            f = E_func.f_data_given_latent(S, ind_1, ind_2)
-            Lambda_1 = f.mean(axis=-1)
-            pi_xi = self._get_proba(X, self.theta["xi"])
-            marker = self._get_post_proba(pi_xi, Lambda_1)
-            return marker
+            if prediction_times is None:
+                # TODO: take last measurement times for each subject
+                #  (from ext_feat !)
+                prediction_times = 1
+            # predictions for alive subjects only
+            delta_prediction = np.zeros(n_samples)
+            f = self.f_data_given_latent(X, ext_feat, prediction_times,
+                                         delta_prediction, self.S)
+            pi_xi = self._get_proba(X)
+            # TODO : use f.mean() to get \hat f -> see eq (31)
+            return 0
         else:
             raise RuntimeError('You must fit the model first')
 
@@ -280,9 +396,9 @@ class QNMCEM(Learner):
                 self.theta[key] = get_vect_from_ext(value)
             elif key in ["long_cov", "phi", "baseline_hazard"]:
                 self.theta[key] = value
-            elif key in ["xi"]:
-                _, self.theta[key] = get_xi_from_xi_ext(value,
-                                                        self.fit_intercept)
+            elif key == "xi":
+                xi_0, xi = get_xi_from_xi_ext(value, self.fit_intercept)
+                self.theta["xi_0"], self.theta["xi"] = xi_0, xi
             else:
                 raise NameError('Parameter {} has not defined'.format(key))
 
@@ -295,7 +411,7 @@ class QNMCEM(Learner):
             The time-independent features matrix
 
         Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
+            The longitudinal data. Each element of the dataframe is
             a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)
@@ -319,8 +435,6 @@ class QNMCEM(Learner):
         self.n_long_features = L
         q_l = alpha + 1
         r_l = 2  # Affine random effects
-        # TODO: Verify later
-        self.T = T
         if fit_intercept:
             p += 1
 
@@ -371,8 +485,8 @@ class QNMCEM(Learner):
         beta_1_ext = beta_0_ext.copy()
 
         self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext, xi=xi_ext,
-                          gamma_0=gamma_0_ext, gamma_1=gamma_1_ext, long_cov=D,
-                          phi=phi, baseline_hazard=baseline_hazard)
+                           gamma_0=gamma_0_ext, gamma_1=gamma_1_ext, long_cov=D,
+                           phi=phi, baseline_hazard=baseline_hazard)
 
         # Stopping criteria and bounds vector for the L-BGFS-B algorithms
         maxiter, pgtol = 60, 1e-5
@@ -381,16 +495,16 @@ class QNMCEM(Learner):
         bounds_gamma = [(0, None)] * 2 * nb_asso_feat
 
         # Instanciates E-step and M-step functions
-        E_func = EstepFunctions(X, T, delta, ext_feat, L, p, alpha,
+        E_func = EstepFunctions(X, T, delta, ext_feat, alpha,
                                 asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen,
                                 self.eta_elastic_net, self.eta_sp_gp_l1,
                                 nb_asso_feat, alpha)
 
         S = E_func.construct_MC_samples(N)
-        f = E_func.f_data_given_latent(S, ind_1, ind_2)
+        f = self.f_data_given_latent(X, ext_feat, T, delta, S)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
-        pi_xi = self._get_proba(X, xi_ext)
+        pi_xi = self._get_proba(X)
         obj = self._func_obj(pi_xi, f)
 
         # Store init values
@@ -431,7 +545,8 @@ class QNMCEM(Learner):
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_), x0=xi_init,
+                func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_),
+                x0=xi_init,
                 fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_),
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
@@ -439,13 +554,15 @@ class QNMCEM(Learner):
             pi_est_K = [1 - pi_est, pi_est]
             [beta_0_ext, beta_1_ext] = [fmin_l_bfgs_b(
                 func=lambda beta_ext:
-                F_func.R_pen_func(beta_ext, pi_est_K[k], E_g1.T[k].T, E_g2.T[k].T,
-                              E_g9.T[k].T, baseline_hazard, ind_2),
+                F_func.R_pen_func(beta_ext, pi_est_K[k], E_g1.T[k].T,
+                                  E_g2.T[k].T,
+                                  E_g9.T[k].T, baseline_hazard, ind_2),
                 x0=beta_init[k],
                 fprime=lambda beta_ext:
-                F_func.grad_R_pen(beta_ext, gamma_0_ext, pi_est_K[k], E_g5.T[k].T,
-                              E_g6.T[k].T, E_gS, baseline_hazard, ind_2,
-                              ext_feat, phi),
+                F_func.grad_R_pen(beta_ext, gamma_0_ext, pi_est_K[k],
+                                  E_g5.T[k].T,
+                                  E_g6.T[k].T, E_gS, baseline_hazard, ind_2,
+                                  ext_feat, phi),
                 disp=False, bounds=bounds_beta, maxiter=maxiter,
                 pgtol=pgtol)[0].reshape(-1, 1)
                                         for k in [0, 1]]
@@ -462,12 +579,14 @@ class QNMCEM(Learner):
             # gamma update
             [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
                 func=lambda gamma_ext:
-                F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T, E_g1.T[k].T,
-                              baseline_hazard, ind_1, ind_2),
+                F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T,
+                                  E_g1.T[k].T,
+                                  baseline_hazard, ind_1, ind_2),
                 x0=gamma_init[k],
                 fprime=lambda gamma_ext:
-                F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T, E_g7.T[k].T,
-                              E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
+                F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
+                                  E_g7.T[k].T,
+                                  E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
                 disp=False, bounds=bounds_gamma, maxiter=maxiter,
                 pgtol=pgtol)[0].reshape(-1, 1)
                                           for k in [0, 1]]
@@ -501,11 +620,11 @@ class QNMCEM(Learner):
                 phi[l] = phi_l.sum() / N_l
 
             self._update_theta(phi=phi, baseline_hazard=baseline_hazard,
-                              long_cov=D, xi=xi_ext)
-            pi_xi = self._get_proba(X, xi_ext)
+                               long_cov=D, xi=xi_ext)
+            pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = E_func.f_data_given_latent(S, ind_1, ind_2)
+            f = self.f_data_given_latent(X, ext_feat, T, delta, S)
 
             prev_obj = obj
             obj = self._func_obj(pi_xi, f)
@@ -518,6 +637,7 @@ class QNMCEM(Learner):
 
             if (n_iter > max_iter) or (rel_obj < tol):
                 self._fitted = True
+                self.S = S  # useful for predictions
                 break
             else:
                 # Update for next iteration
@@ -535,7 +655,7 @@ class QNMCEM(Learner):
             The time-independent features matrix
 
         Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-            The simulated longitudinal data. Each element of the dataframe is
+            The longitudinal data. Each element of the dataframe is
             a pandas.Series
 
         T : `np.ndarray`, shape=(n_samples,)

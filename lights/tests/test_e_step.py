@@ -14,12 +14,11 @@ class Test(unittest.TestCase):
     def setUp(self):
         data = CreateTestingData()
         alpha = data.fixed_effect_time_order
-        L, p = data.n_long_features, data.n_time_indep_features
         theta, asso_functions = data.theta, data.asso_functions
         self.n_samples = data.n_samples
         self.S, self.n_MC = data.S, data.S.shape[0]
         self.E_func = EstepFunctions(data.X, data.T, data.delta, data.ext_feat,
-                                     L, p, alpha, asso_functions, theta)
+                                     alpha, asso_functions, theta)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
 
     def test_g1(self):

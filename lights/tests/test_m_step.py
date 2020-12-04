@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 from lights.model.m_step_functions import MstepFunctions
 from lights.tests.testing_data import CreateTestingData
-from lights.base.base import get_ext_from_vec
+from lights.base.base import get_ext_from_vect
 
 class Test(unittest.TestCase):
 
@@ -62,8 +62,8 @@ class Test(unittest.TestCase):
         self.setUp()
         ind = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         theta = self.data.theta
-        beta_ext = get_ext_from_vec(theta["beta_0"])
-        gamma_ext = get_ext_from_vec(theta["gamma_0"])
+        beta_ext = get_ext_from_vect(theta["beta_0"])
+        gamma_ext = get_ext_from_vect(theta["gamma_0"])
         baseline_hazard = theta["baseline_hazard"]
         phi = theta["phi"]
         ext_feat = self.data.ext_feat
