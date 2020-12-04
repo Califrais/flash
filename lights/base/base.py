@@ -293,6 +293,16 @@ def get_times_infos(T):
 def get_vect_from_ext(v_ext):
     """Obtain the signed coefficient vector from its extension on positive
     and negative parts
+
+    Parameters
+    ----------
+    v_ext : `np.ndarray`, shape=(2 * dim,)
+        An extended vector decomposed on positive and negative parts
+
+    Returns
+    -------
+    v : `np.ndarray`, shape=(dim,)
+        The signed vector in its original representation
     """
     dim = len(v_ext)
     if dim % 2 != 0:
@@ -300,11 +310,20 @@ def get_vect_from_ext(v_ext):
     v = v_ext[:dim // 2] - v_ext[dim // 2:]
     return v
 
-def get_ext_from_vec(v):
-    """Obtain r from extension vector include positive and negative parts
-    from the signed coefficient vecto
+
+def get_ext_from_vect(v):
+    """Get extension on positive and negative parts of a vector
+
+    Parameters
+    ----------
+    v : `np.ndarray`, shape=(dim,)
+        A vector
+
+    Returns
+    -------
+    v_ext : `np.ndarray`, shape=(2 * dim,)
+        The extended vector decomposed on positive and negative parts
     """
-    dim = len(v)
     v_ext = np.concatenate((v, -v)).reshape(-1, 1)
     v_ext[v_ext < 0] = 0
     return v_ext
