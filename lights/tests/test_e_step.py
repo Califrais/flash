@@ -17,8 +17,8 @@ class Test(unittest.TestCase):
         theta, asso_functions = data.theta, data.asso_functions
         self.n_samples = data.n_samples
         self.S, self.n_MC = data.S, data.S.shape[0]
-        self.E_func = EstepFunctions(data.X, data.T, data.delta, data.ext_feat,
-                                     alpha, asso_functions, theta)
+        self.E_func = EstepFunctions(data.X, data.T, data.T_u, data.delta,
+                                    data.ext_feat, alpha, asso_functions, theta)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
 
     def test_g1(self):

@@ -262,7 +262,7 @@ def logistic_loss(z):
     return res
 
 
-def get_times_infos(T):
+def get_times_infos(T, T_u):
     """Get censored times indicators
 
     Parameters
@@ -270,10 +270,11 @@ def get_times_infos(T):
     T : `np.ndarray`, shape=(n_samples,)
         Censored times of the event of interest
 
+    T_u : `np.ndarray`, shape=(J,)
+        The J unique censored times of the event of interest (training)
+
     Returns
     -------
-    T_u : `np.ndarray`, shape=(J,)
-        The J unique censored times of the event of interest
 
     J : `int`
         The J unique censored times of the event of interest
@@ -284,11 +285,10 @@ def get_times_infos(T):
     indicator_2 : `np.ndarray`, shape=(n_samples, J)
         The indicator matrix for comparing event times (T <= T_u)
     """
-    T_u = np.unique(T)
     J = T_u.shape[0]
     indicator_1 = T.reshape(-1, 1) == T_u
     indicator_2 = T.reshape(-1, 1) >= T_u
-    return T_u, J, indicator_1, indicator_2
+    return J, indicator_1, indicator_2
 
 
 def get_vect_from_ext(v_ext):

@@ -305,7 +305,7 @@ class QNMCEM(Learner):
                         np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
         return f_y
 
-    def f_data_given_latent(self, X, extracted_features, T, delta, S):
+    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
         Parameters
@@ -335,13 +335,13 @@ class QNMCEM(Learner):
         """
         theta, alpha = self.theta, self.fixed_effect_time_order
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        E_func = EstepFunctions(X, T, delta, extracted_features, alpha,
+        E_func = EstepFunctions(X, T, T_u, delta, extracted_features, alpha,
                                 self.asso_functions, theta)
         g1, g3 = E_func.g1(S, False), E_func.g3(S)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
-        times_infos = get_times_infos(T)
-        ind_1, ind_2 = times_infos[2], times_infos[3]
+        times_infos = get_times_infos(T, T_u)
+        ind_1, ind_2 = times_infos[1], times_infos[2]
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
         f_y = self.f_y_given_latent(extracted_features, g3)
@@ -366,7 +366,7 @@ class QNMCEM(Learner):
 
         Returns
         -------
-        output : `np.ndarray`, shape=(n_samples,)
+        marker : `np.ndarray`, shape=(n_samples,)
             Returns the marker rule of the sample for being on the high-risk
             group
         """
@@ -374,23 +374,23 @@ class QNMCEM(Learner):
             n_samples = X.shape[0]
             theta, alpha = self.theta, self.fixed_effect_time_order
             ext_feat = extract_features(Y, alpha)
+            last_measurement = np.array(list(map(max, ext_feat[0][2])))
             if prediction_times is None:
-                # TODO: take last measurement times for each subject
-                #  (from ext_feat !)
-                prediction_times = 1
+                prediction_times = last_measurement
             else:
-                if False:
-                    # TODO test that prediction_times is greater than the last measurement times
+                if not (prediction_times > last_measurement).all():
                     raise ValueError('Prediction times must be greater than the'
                                      ' last measurement times for each subject')
 
             # predictions for alive subjects only
             delta_prediction = np.zeros(n_samples)
-            f = self.f_data_given_latent(X, ext_feat, prediction_times,
+            T_u = self.T_u
+            f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
                                          delta_prediction, self.S)
             pi_xi = self._get_proba(X)
-            # TODO : use f.mean() to get \hat f -> see eq (31)
-            return 0
+            f_ = f.mean(axis = -1)
+            marker = self._get_post_proba(pi_xi, f_)
+            return marker
         else:
             raise RuntimeError('You must fit the model first')
 
@@ -455,7 +455,9 @@ class QNMCEM(Learner):
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
-        T_u, J, ind_1, ind_2 = get_times_infos(T)
+        self.T_u = np.unique(T)
+        T_u = self.T_u
+        J, ind_1, ind_2 = get_times_infos(T, self.T_u)
 
         # Initialization
         xi_ext = np.zeros(2 * p)
@@ -501,14 +503,14 @@ class QNMCEM(Learner):
         bounds_gamma = [(0, None)] * 2 * nb_asso_feat
 
         # Instanciates E-step and M-step functions
-        E_func = EstepFunctions(X, T, delta, ext_feat, alpha,
+        E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
                                 asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen,
                                 self.eta_elastic_net, self.eta_sp_gp_l1,
                                 nb_asso_feat, alpha)
 
         S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(X, ext_feat, T, delta, S)
+        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
         obj = self._func_obj(pi_xi, f)
