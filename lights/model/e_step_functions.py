@@ -53,10 +53,10 @@ class EstepFunctions:
         self.T_u, self.J, self.ind_1, _ = get_times_infos(T)
         self.extracted_features, self.theta = extracted_features, theta
         self.n_long_features = len(extracted_features[1][0])
-        self.n_time_indep_features = X.shape[0]
+        self.n_time_indep_features = X.shape[1]
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
-        self.g3, self.g4, self.g9 = None, None, None
+        self.g3_, self.g4_, self.g9_ = None, None, None
 
     def construct_MC_samples(self, N):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -199,61 +199,6 @@ class EstepFunctions:
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
-    def _g3(self, S):
-        """Computes g3
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-                Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
-            The values of g3 function
-        """
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        U_list, V_list, y_list, _ = self.extracted_features[0]
-        theta, K = self.theta, self.K
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        beta_stack = np.hstack((beta_0, beta_1))
-        g3 = []
-        for i in range(n_samples):
-            U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            g3.append(M_iS)
-        return g3
-
-    def _g4(self, g3, extracted_features):
-        """Computes g4
-
-        Parameters
-        ----------
-        g3 : `list, size=(n_samples, array_shape(K, n_i, N_MC))
-                The values of g3 function
-
-        extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        Returns
-        -------
-        g4 : list, size=(n_samples, array_shape(K, n_i, N_MC))
-                The values of g4 function
-        """
-        n_samples, L = self.n_samples, self.n_long_features
-        _, _, y_list, N_list = extracted_features[0]
-        phi = self.theta["phi"]
-        g4 = []
-        for i in range(n_samples):
-            M_iS = g3[i]
-            Phi_i = [[1 / phi[l, 0]] * N_list[i][l] for l in range(L)]
-            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            g4.append(.5 * (M_iS ** 2) * Phi_i)
-        return g4
-
     def g5(self, S, broadcast=True):
         """Computes g5
 
@@ -347,7 +292,49 @@ class EstepFunctions:
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
 
-    def _g9(self, S):
+    def _get_g3_4_9(self, S):
+        """Computes g3, g4, g9
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+        """
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        U_list, V_list, y_list, N_list = self.extracted_features[0]
+        theta, K, N_MC = self.theta, self.K, S.shape[0]
+        beta_0, beta_1, phi = theta["beta_0"], theta["beta_1"], theta["phi"]
+        beta_stack = np.hstack((beta_0, beta_1))
+        g3, g4, g9 = [], [], np.zeros(shape=(n_samples, K, N_MC))
+        for i in range(n_samples):
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
+            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
+            Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
+            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
+            g3.append(M_iS)
+            g4.append(.5 * (M_iS ** 2) * Phi_i)
+            g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
+        g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
+        self.g3_, self.g4_, self.g9_ = g3, g4, g9
+
+    def g3(self, S):
+        """Computes g3
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+                Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
+            The values of g3 function
+        """
+        if self.g3_ is None:
+            self._get_g3_4_9(S)
+        return self.g3_
+
+    def g9(self, S):
         """Computes g9
 
         Parameters
@@ -360,46 +347,9 @@ class EstepFunctions:
         g9 : `np.ndarray`, shape=(n_samples, K, N_MC, K)
             The values of g9 function
         """
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        extracted_features = self.extracted_features
-        phi, K, N_MC = self.theta["phi"], self.K, S.shape[0]
-        (U_list, V_list, y_list, N_list) = extracted_features[0]
-        g3 = self.g3(S)
-        g4 = self.g4(g3, extracted_features)
-        g9 = np.zeros(shape=(n_samples, K, N_MC))
-        for i in range(n_samples):
-            y_i, M_iS = y_list[i], g3[i]
-            Phi_i = [[1 / phi[l, 0]] * N_list[i][l]
-                     for l in range(n_long_features)]
-            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
-        g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
-        return g9
-
-    def _get_g3_4_9(self, S):
-        """blabla
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        """
-        for i in range(n_samples):
-            print('ok')
-        self.g3, self.g4, self.g9 = g3, g4, g9
-
-    def g3(self, S):
-        if self.g3 is None:
+        if self.g9_ is None:
             self._get_g3_4_9(S)
-        return self.g3
-
-    def g9(self, S):
-        if self.g9 is None:
-            self._get_g3_4_9(S)
-        return self.g9
+        return self.g9_
 
     @staticmethod
     def Lambda_g(g, f):
