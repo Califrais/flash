@@ -42,18 +42,6 @@ class Test(unittest.TestCase):
         sparse_group_l1_ = 27.831
         np.testing.assert_almost_equal(sparse_group_l1, sparse_group_l1_, 3)
 
-    def test_grad_sparse_group_l1(self):
-        """Test gradient of Sparse group lasso penalty
-        """
-        self.setUp()
-        l = self.n_long_features
-        grad_sparse_group_l1 = self.Penalties.grad_sparse_group_l1(self.v, l)
-        grad_sparse_group_l1_ = np.array([.8, 1.4, 1.76, 1.88, 1.177, 1.957,
-                                          2 , 1.4, 1.04, 0.92, 1.623, 0.843])
-        np.testing.assert_almost_equal(grad_sparse_group_l1,
-                                       grad_sparse_group_l1_, 3)
-
-
 
 if __name__ == "main":
     unittest.main()

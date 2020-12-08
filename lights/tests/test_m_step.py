@@ -7,6 +7,7 @@ from lights.model.m_step_functions import MstepFunctions
 from lights.tests.testing_data import CreateTestingData
 from lights.base.base import get_ext_from_vect
 
+
 class Test(unittest.TestCase):
 
     def setUp(self):
@@ -19,11 +20,10 @@ class Test(unittest.TestCase):
         fit_intercept = False
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
                                      L, p, l_pen, eta_elastic_net, eta_sp_gp_l1,
-                                        data.nb_asso_feat, alpha)
+                                     data.nb_asso_feat, alpha)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([.2, .4, .7])
         self.data = data
-
         self.E_g1 = np.array([[1, 2],
                               [3, 5],
                               [4, 6]])
@@ -70,14 +70,15 @@ class Test(unittest.TestCase):
         E_g5 = np.arange(1, 136).reshape((3, 3, 15))
         E_g6 = np.arange(1, 271).reshape((3, 2, 3, 15))
         E_gS = np.arange(1, 19).reshape(3, 6)
-
-        grad_R = self.M_func.grad_R(beta_ext, gamma_ext, self.pi_est, E_g5, E_g6,
+        grad_R = self.M_func.grad_R(beta_ext, gamma_ext, self.pi_est, E_g5,
+                                    E_g6,
                                     E_gS, baseline_hazard, ind, ext_feat, phi)
         grad_R_ = np.array([2579.433, 2694.2, 3027.733, 1956.267, 2423.667,
                             4571.267, 4180.3, 4514, 5677.2, -2579.433, -2694.2,
                             -3027.733, -1956.267, -2423.667, -4571.267, -4180.3,
                             -4514, -5677.2])
         np.testing.assert_almost_equal(grad_R, grad_R_, 3)
+
     def test_Q_func(self):
         """Tests the Q function
         """
@@ -86,7 +87,7 @@ class Test(unittest.TestCase):
         ind_2 = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         baseline_hazard = self.data.theta["baseline_hazard"]
         Q = self.M_func.Q_func(self.pi_est, np.log(self.E_g1), self.E_g1,
-                                baseline_hazard, ind_1, ind_2)
+                               baseline_hazard, ind_1, ind_2)
         Q_ = 23.115
         np.testing.assert_almost_equal(Q, Q_, 3)
 

@@ -17,8 +17,8 @@ class EstepFunctions:
     T : `np.ndarray`, shape=(n_samples,)
         The censored times of the event of interest
 
-    T_u : `np.ndarray`, shape=(n_samples,)
-        The censored times of the event of interest (training)
+    T_u : `np.ndarray`, shape=(J,)
+        The J unique training censored times of the event of interest
 
     delta : `np.ndarray`, shape=(n_samples,)
         The censoring indicator
@@ -48,8 +48,8 @@ class EstepFunctions:
         model
     """
 
-    def __init__(self, X, T, T_u, delta, extracted_features, fixed_effect_time_order,
-                 asso_functions, theta):
+    def __init__(self, X, T, T_u, delta, extracted_features,
+                 fixed_effect_time_order, asso_functions, theta):
         self.K = 2  # 2 latent groups
         self.X, self.T, self.delta = X, T, delta
         self.T_u, self.n_samples = T_u, len(T)

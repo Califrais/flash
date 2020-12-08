@@ -119,34 +119,3 @@ class Penalties:
         tmp = np.array([np.linalg.norm(v_l)
                         for v_l in np.array_split(v, n_long_features)]).sum()
         return l_pen * ((1. - eta) * abs(v).sum() + eta * tmp)
-
-    def grad_sparse_group_l1(self, v, n_long_features):
-        """Computes the gradient of the sparse group l1 penalization of a
-        vector v
-
-        Parameters
-        ----------
-        v : `np.ndarray`
-            A coefficient vector
-
-        n_long_features : `int`
-            Number of longitudinal features
-
-        Returns
-        -------
-        grad : `np.array`
-            The gradient of the sparse group l1 penalization of vector v
-        """
-        l_pen, eta = self.l_pen, self.eta_sp_gp_l1
-        dim = len(v)
-        grad = np.zeros(2 * dim)
-        # Gradient of lasso penalization
-        grad += l_pen * (1 - eta)
-        # Gradient of sparse group l1 penalization
-        tmp = np.array(
-            [np.repeat(np.linalg.norm(v_l), dim // n_long_features)
-             for v_l in np.array_split(v, n_long_features)]).flatten()
-        grad_pos = (l_pen * eta) * v / tmp
-        grad[:dim] += grad_pos
-        grad[dim:] -= grad_pos
-        return grad

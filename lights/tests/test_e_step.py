@@ -18,8 +18,18 @@ class Test(unittest.TestCase):
         self.n_samples = data.n_samples
         self.S, self.n_MC = data.S, data.S.shape[0]
         self.E_func = EstepFunctions(data.X, data.T, data.T_u, data.delta,
-                                    data.ext_feat, alpha, asso_functions, theta)
+                                     data.ext_feat, alpha, asso_functions,
+                                     theta)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
+        self.g5_0_1 = np.array(
+            [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
+             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3]])
+        self.g5_1_3 = np.array(
+            [[1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
+             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
+             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9]])
+        self.g6_0_1 = np.exp(49) * self.g5_0_1
 
     def test_g1(self):
         """Tests the g1 function
@@ -48,27 +58,15 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g5 = self.E_func.g5(self.S, False)
-        g5_0_1 = np.array(
-            [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
-             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
-             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3]])
-        g5_1_3 = np.array(
-            [[1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
-             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9],
-             [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9]])
-        np.testing.assert_almost_equal(g5[0, 0, 0], g5_0_1)
-        np.testing.assert_almost_equal(g5[1, 0, 1], g5_1_3)
+        np.testing.assert_almost_equal(g5[0, 0, 0], self.g5_0_1)
+        np.testing.assert_almost_equal(g5[1, 0, 1], self.g5_1_3)
 
     def test_g6(self):
         """Tests the g6 function
         """
         self.setUp()
         g6 = self.E_func.g6(self.S)
-        g6_0_1 = np.exp(49) * np.array(
-            [[1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
-             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3],
-             [1, 2, 4, 0, 0, 0, 0, 0, 0, 0, 1, 4, 2, 2, 8 / 3]])
-        np.testing.assert_almost_equal(g6[0, 0, 0, 0, :, :, 0], g6_0_1)
+        np.testing.assert_almost_equal(g6[0, 0, 0, 0, :, :, 0], self.g6_0_1)
 
     def test_g7(self):
         """Tests the g7 function
@@ -76,7 +74,7 @@ class Test(unittest.TestCase):
         self.setUp()
         g7 = self.E_func.g7(self.S, broadcast=False)
         g7_0_1 = np.array(
-            [22, 1, 2, 16, 20, 16, 3, 2, 12, 40/3, 10, 3, 3, 2, 40/3])
+            [22, 1, 2, 16, 20, 16, 3, 2, 12, 40 / 3, 10, 3, 3, 2, 40 / 3])
         np.testing.assert_almost_equal(g7[0, 0, 0], g7_0_1)
 
     def test_g8(self):
@@ -84,8 +82,8 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         g8 = self.E_func.g8(self.S)
-        g8_0_1 = np.exp(49) * \
-            np.array([22, 1, 2, 16, 20, 16, 3, 2, 12, 40/3, 10, 3, 3, 2, 40/3])
+        g8_0_1 = np.exp(49) * np.array([22, 1, 2, 16, 20, 16, 3, 2, 12, 40 / 3,
+                                        10, 3, 3, 2, 40 / 3])
         np.testing.assert_almost_equal(g8[0, 0, 0, 0, :, 0], g8_0_1)
 
     def test_g9(self):

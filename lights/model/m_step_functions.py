@@ -59,8 +59,8 @@ class MstepFunctions:
         self.pen = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
 
     def P_pen_func(self, pi_est, xi_ext):
-        """Computes the sub objective function denoted P in the lights paper
-        with penalty, to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+        """Computes the sub objective function P with penalty, to be minimized
+        at each QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
@@ -84,8 +84,7 @@ class MstepFunctions:
         return sub_obj
 
     def P_func(self, pi_est, xi_ext):
-        """Computes the sub objective function denoted P in the lights paper,
-        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+        """Computes the function denoted P in the lights paper.
 
         Parameters
         ----------
@@ -99,8 +98,8 @@ class MstepFunctions:
 
         Returns
         -------
-        output : `float`
-            The value of the P sub objective to be minimized at each QNMCEM step
+        P : `float`
+            The value of the P sub objective
         """
         xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
         u = xi_0 + self.X.dot(xi)
@@ -108,7 +107,7 @@ class MstepFunctions:
         return P
 
     def grad_P(self, pi_est, xi_ext):
-        """Computes the gradient of the sub objective P
+        """Computes the gradient of the function P
 
         Parameters
         ----------
@@ -166,9 +165,9 @@ class MstepFunctions:
         return grad_P + grad_pen
 
     def R_pen_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard,
-               indicator):
-        """Computes the sub objective function denoted R in the lights paper
-        with penalty, to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+                   indicator):
+        """Computes the sub objective function R with penalty, to be minimized
+        at each QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
@@ -207,8 +206,7 @@ class MstepFunctions:
         return R + pen
 
     def R_func(self, pi_est, E_g1, E_g2, E_g8, baseline_hazard, indicator):
-        """Computes the sub objective function denoted R in the lights paper,
-        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b.
+        """Computes the function denoted R in the lights paper.
 
         Parameters
         ----------
@@ -235,7 +233,7 @@ class MstepFunctions:
         Returns
         -------
         output : `float`
-            The value of the R sub objective to be minimized at each QNMCEM step
+            The value of the R function
         """
         n_samples = self.n_samples
         delta = self.delta
@@ -245,64 +243,9 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_R_pen(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS,
-               baseline_hazard, indicator, extracted_features, phi):
-        """Computes the gradient of the sub objective R with penalty
-
-        Parameters
-        ----------
-        gamma_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        beta_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
-
-        E_g5 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
-            The approximated expectations of function logarithm of g5 for each
-            latent group
-
-        E_g6 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
-            The approximated expectations of function g6 for each latent group
-
-        E_gS : `np.ndarray`, shape=(n_samples, r)
-            The approximated expectations of function gS
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        phi : `np.ndarray`, shape=(n_long_features,)
-            Variance vector for the error term of the longitudinal processes
-
-        Returns
-        -------
-        output : `np.ndarray`
-            The value of the R sub objective gradient
-        """
-        L = self.n_long_features
-        beta = get_vect_from_ext(beta_ext)
-        grad_pen = self.pen.grad_sparse_group_l1(beta, L)
-        grad_R = self.grad_R(beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS,
-               baseline_hazard, indicator, extracted_features, phi)
-        return grad_R + grad_pen
-
     def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS,
                baseline_hazard, indicator, extracted_features, phi):
-        """Computes the gradient of the sub objective R
+        """Computes the gradient of the function R
 
         Parameters
         ----------
@@ -346,7 +289,7 @@ class MstepFunctions:
         Returns
         -------
         output : `np.ndarray`
-            The value of the R sub objective gradient
+            The value of the R gradient
         """
         p, L = self.n_time_indep_features, self.n_long_features
         n_samples = self.n_samples
@@ -370,7 +313,7 @@ class MstepFunctions:
             y_i = y_i.flatten()
             Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta)-
+            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) -
                                           V_i.dot(E_gS[i]))).flatten()
 
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
@@ -378,9 +321,9 @@ class MstepFunctions:
         return -grad_sub_obj / n_samples
 
     def Q_pen_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard,
-               indicator_1, indicator_2):
-        """Computes the sub objective function denoted Q in the lights paper
-        with penalty, to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
+                   indicator_1, indicator_2):
+        """Computes the sub objective function Q with penalty, to be minimized
+        at each QNMCEM iteration using fmin_l_bfgs_b
 
         Parameters
         ----------
@@ -427,12 +370,10 @@ class MstepFunctions:
 
     def Q_func(self, pi_est, E_log_g1, E_g1, baseline_hazard,
                indicator_1, indicator_2):
-        """Computes the sub objective function denoted Q in the lights paper,
-        to be minimized at each QNMCEM iteration using fmin_l_bfgs_b
+        """Computes the function denoted Q in the lights paper
 
         Parameters
         ----------
-
         pi_est : `np.ndarray`, shape=(n_samples,)
             The estimated posterior probability of the latent class membership
             obtained by the E-step
@@ -456,7 +397,7 @@ class MstepFunctions:
         Returns
         -------
         output : `float`
-            The value of the Q sub objective to be minimized at each QNMCEM step
+            The value of the Q function
         """
         n_samples, delta = self.n_samples, self.delta
         baseline_val = baseline_hazard.values.flatten()
@@ -466,62 +407,12 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_Q_pen(self, gamma_ext, pi_est, E_g1, E_g7, E_g8, baseline_hazard,
-               indicator_1, indicator_2):
-        """Computes the gradient of the sub objective Q with penalty
-
-        Parameters
-        ----------
-        gamma_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
-
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        E_g7 : `np.ndarray`, shape=(n_samples, J, dim)
-            The approximated expectations of function g7 for each latent group
-
-        E_g8 : `np.ndarray`, shape=(n_samples, J, dim)
-            The approximated expectations of function g8 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        output : `np.ndarray`
-            The value of the Q sub objective gradient
-        """
-        p, L = self.n_time_indep_features, self.n_long_features
-        gamma = get_vect_from_ext(gamma_ext)
-        gamma_indep, gamma_dep = gamma[:p], gamma[p:]
-        E_g8 = E_g8.swapaxes(0, 1)
-        grad_pen_indep = self.pen.grad_elastic_net(gamma_indep)
-        grad_pen_dep = self.pen.grad_sparse_group_l1(gamma_dep, L)
-        grad_pen = np.vstack((grad_pen_indep.reshape(-1, 2),
-                              grad_pen_dep.reshape(-1, 2)))
-        grad_Q = self.grad_Q(pi_est, E_g1, E_g7, E_g8, baseline_hazard,
-               indicator_1, indicator_2)
-        return grad_Q + grad_pen.flatten()
-
     def grad_Q(self, pi_est, E_g1, E_g7, E_g8, baseline_hazard,
                indicator_1, indicator_2):
-        """Computes the gradient of the sub objective Q
+        """Computes the gradient of the function Q
 
         Parameters
         ----------
-
         pi_est : `np.ndarray`, shape=(n_samples,)
             The estimated posterior probability of the latent class membership
             obtained by the E-step
@@ -547,7 +438,7 @@ class MstepFunctions:
         Returns
         -------
         output : `np.ndarray`
-            The value of the Q sub objective gradient
+            The value of the Q gradient
         """
         p, L = self.n_time_indep_features, self.n_long_features
         nb_asso_features = self.nb_asso_features

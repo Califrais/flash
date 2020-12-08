@@ -97,6 +97,7 @@ class QNMCEM(Learner):
         self.n_time_indep_features = None
         self.n_long_features = None
         self.S = None
+        self.T_u = None
         self.theta = {
             "beta_0": np.empty(1),
             "beta_1": np.empty(1),
@@ -322,6 +323,9 @@ class QNMCEM(Learner):
         T : `np.ndarray`, shape=(n_samples,)
             Censored times of the event of interest
 
+        T_u : `np.ndarray`, shape=(J,)
+            The J unique training censored times of the event of interest
+
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
 
@@ -340,8 +344,7 @@ class QNMCEM(Learner):
         g1, g3 = E_func.g1(S, False), E_func.g3(S)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
-        times_infos = get_times_infos(T, T_u)
-        ind_1, ind_2 = times_infos[1], times_infos[2]
+        _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
         f_y = self.f_y_given_latent(extracted_features, g3)
@@ -388,11 +391,10 @@ class QNMCEM(Learner):
             f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
                                          delta_prediction, self.S)
             pi_xi = self._get_proba(X)
-            f_ = f.mean(axis = -1)
-            marker = self._get_post_proba(pi_xi, f_)
+            marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
             return marker
         else:
-            raise RuntimeError('You must fit the model first')
+            raise ValueError('You must fit the model first')
 
     def _update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
@@ -406,7 +408,7 @@ class QNMCEM(Learner):
                 xi_0, xi = get_xi_from_xi_ext(value, self.fit_intercept)
                 self.theta["xi_0"], self.theta["xi"] = xi_0, xi
             else:
-                raise NameError('Parameter {} has not defined'.format(key))
+                raise ValueError('Parameter {} has not defined'.format(key))
 
     def fit(self, X, Y, T, delta):
         """Fits the lights model
@@ -455,9 +457,9 @@ class QNMCEM(Learner):
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
-        self.T_u = np.unique(T)
-        T_u = self.T_u
-        J, ind_1, ind_2 = get_times_infos(T, self.T_u)
+        T_u = np.unique(T)
+        self.T_u = T_u
+        J, ind_1, ind_2 = get_times_infos(T, T_u)
 
         # Initialization
         xi_ext = np.zeros(2 * p)
@@ -559,21 +561,22 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # beta update
+            # TODO : update using tick
             pi_est_K = [1 - pi_est, pi_est]
-            [beta_0_ext, beta_1_ext] = [fmin_l_bfgs_b(
-                func=lambda beta_ext:
-                F_func.R_pen_func(beta_ext, pi_est_K[k], E_g1.T[k].T,
-                                  E_g2.T[k].T,
-                                  E_g9.T[k].T, baseline_hazard, ind_2),
-                x0=beta_init[k],
-                fprime=lambda beta_ext:
-                F_func.grad_R_pen(beta_ext, gamma_0_ext, pi_est_K[k],
-                                  E_g5.T[k].T,
-                                  E_g6.T[k].T, E_gS, baseline_hazard, ind_2,
-                                  ext_feat, phi),
-                disp=False, bounds=bounds_beta, maxiter=maxiter,
-                pgtol=pgtol)[0].reshape(-1, 1)
-                                        for k in [0, 1]]
+            # [beta_0_ext, beta_1_ext] = [fmin_l_bfgs_b(
+            #     func=lambda beta_ext:
+            #     F_func.R_pen_func(beta_ext, pi_est_K[k], E_g1.T[k].T,
+            #                       E_g2.T[k].T,
+            #                       E_g9.T[k].T, baseline_hazard, ind_2),
+            #     x0=beta_init[k],
+            #     fprime=lambda beta_ext:
+            #     F_func.grad_R_pen(beta_ext, gamma_0_ext, pi_est_K[k],
+            #                       E_g5.T[k].T,
+            #                       E_g6.T[k].T, E_gS, baseline_hazard, ind_2,
+            #                       ext_feat, phi),
+            #     disp=False, bounds=bounds_beta, maxiter=maxiter,
+            #     pgtol=pgtol)[0].reshape(-1, 1)
+            #                             for k in [0, 1]]
 
             # beta needs to be updated before gamma
             self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
@@ -585,19 +588,20 @@ class QNMCEM(Learner):
             E_g8 = E_func.Eg(E_func.g8(S), Lambda_1, pi_xi, f)
 
             # gamma update
-            [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
-                func=lambda gamma_ext:
-                F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T,
-                                  E_g1.T[k].T,
-                                  baseline_hazard, ind_1, ind_2),
-                x0=gamma_init[k],
-                fprime=lambda gamma_ext:
-                F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
-                                  E_g7.T[k].T,
-                                  E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
-                disp=False, bounds=bounds_gamma, maxiter=maxiter,
-                pgtol=pgtol)[0].reshape(-1, 1)
-                                          for k in [0, 1]]
+            # TODO : update using tick
+            # [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
+            #     func=lambda gamma_ext:
+            #     F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T,
+            #                       E_g1.T[k].T,
+            #                       baseline_hazard, ind_1, ind_2),
+            #     x0=gamma_init[k],
+            #     fprime=lambda gamma_ext:
+            #     F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
+            #                       E_g7.T[k].T,
+            #                       E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
+            #     disp=False, bounds=bounds_gamma, maxiter=maxiter,
+            #     pgtol=pgtol)[0].reshape(-1, 1)
+            #                               for k in [0, 1]]
 
             # gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)
@@ -632,7 +636,7 @@ class QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, ext_feat, T, delta, S)
+            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
 
             prev_obj = obj
             obj = self._func_obj(pi_xi, f)

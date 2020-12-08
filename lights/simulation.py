@@ -11,6 +11,7 @@ from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
 
+
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
                                  rho: float = 0.5, cst: float = 1.):
     """Features obtained as samples of a centered Gaussian vector

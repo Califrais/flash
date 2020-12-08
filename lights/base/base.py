@@ -100,13 +100,11 @@ def block_diag(l_arr):
     shapes = np.array([a.shape for a in l_arr])
     out_dtype = np.find_common_type([arr.dtype for arr in l_arr], [])
     out = np.zeros(np.sum(shapes, axis=0), dtype=out_dtype)
-
     r, c = 0, 0
     for i, (rr, cc) in enumerate(shapes):
         out[r:r + rr, c:c + cc] = l_arr[i]
         r += rr
         c += cc
-
     return out
 
 
@@ -271,13 +269,12 @@ def get_times_infos(T, T_u):
         Censored times of the event of interest
 
     T_u : `np.ndarray`, shape=(J,)
-        The J unique censored times of the event of interest (training)
+        The J unique training censored times of the event of interest
 
     Returns
     -------
-
     J : `int`
-        The J unique censored times of the event of interest
+        Number of unique training censored times of the event of interest
 
     indicator_1 : `np.ndarray`, shape=(n_samples, J)
         The indicator matrix for comparing event times (T == T_u)

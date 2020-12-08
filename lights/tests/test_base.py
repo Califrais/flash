@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pandas as pd
 from lights.base.base import get_vect_from_ext, get_xi_from_xi_ext, \
-    extract_features, block_diag
+    extract_features
 
 
 class Test(unittest.TestCase):

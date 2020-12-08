@@ -8,7 +8,7 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     Parameters
     ----------
     T_u : `np.ndarray`, shape=(J,)
-        The J unique censored times of the event of interest
+        The J unique training censored times of the event of interest
 
     S : `np.ndarray`, shape=(2*N, r)
         Set of constructed Monte Carlo samples
@@ -70,7 +70,7 @@ class AssociationFunctions:
     Parameters
     ----------
     T_u : `np.ndarray`, shape=(J,)
-        The J unique censored times of the event of interest
+        The J unique training censored times of the event of interest
 
     S : `np.ndarray`, shape=(2*N, r)
         Set of samples used for Monte Carlo approximation
