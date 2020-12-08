@@ -263,7 +263,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g7 : `np.ndarray`, shape=(K, N_MC, J, dim, K)
+        g7 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
             The values of g7 function
         """
         T_u, theta, K = self.T_u, self.theta, self.K
