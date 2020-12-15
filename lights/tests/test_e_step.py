@@ -99,23 +99,32 @@ class Test(unittest.TestCase):
         """Tests the Lambda_g function
         """
         self.setUp()
-        g8 = self.E_func.g8(self.S)
-        f = np.ones((3, 2, 4))
-        E_g8 = self.E_func.Lambda_g(g8, f)
-        # TODO: Update later
+        g8 = np.arange(1, 1441).reshape((3, 2, 4, 2, 15, 2))
+        f = 0.2*np.ones((3, 2, 4))
+        Lambda_g8 = self.E_func.Lambda_g(g8, f)
+        Lambda_g8_ = np.array([[18.2, 18.4], [18.6, 18.8], [19, 19.2],
+                          [19.4, 19.6], [19.8, 20], [20.2, 20.4],
+                          [20.6, 20.8], [21, 21.2], [21.4, 21.6],
+                          [21.8, 22], [22.2, 22.4], [22.6, 22.8],
+                          [23, 23.2], [23.4, 23.6], [23.8, 24]])
+        np.testing.assert_almost_equal(Lambda_g8[0, 0, 0], Lambda_g8_)
 
     def test_Eg(self):
         """Tests the expection of g functions
         """
         self.setUp()
-        g8 = self.E_func.g8(self.S)
+        g8 = np.arange(1, 1441).reshape((3, 2, 4, 2, 15, 2))
         f = np.ones((3, 2, 4))
         n_samples, n_MC, K = self.n_samples, self.n_MC, 2
         Lambda_1 = self.E_func.Lambda_g(np.ones(shape=(n_samples, K, n_MC)), f)
         pi_xi = 1 / (1 + np.exp(np.array([-3, -4, -6])))
-        Eg = self.E_func.Eg(g8, Lambda_1, pi_xi, f)
-        # TODO: Update later
-
+        Eg8 = self.E_func.Eg(g8, Lambda_1, pi_xi, f)
+        Eg8_ = np.array([319.61779044, 321.61779044, 323.61779044,
+                          325.61779044, 327.61779044, 329.61779044,
+                          331.61779044, 333.61779044, 335.61779044,
+                          337.61779044, 339.61779044, 341.61779044,
+                          343.61779044, 345.61779044, 347.61779044])
+        np.testing.assert_almost_equal(Eg8[0, 0, :, 0], Eg8_)
 
 if __name__ == "main":
     unittest.main()

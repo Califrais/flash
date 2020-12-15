@@ -92,8 +92,23 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(Q, Q_, 3)
 
     def test_grad_Q(self):
-        """TODO
+        """Test the gradient of Q function
         """
+        self.setUp()
+        ind_1 = self.data.T.reshape(-1, 1) == np.unique(self.data.T)
+        ind_2 = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
+        baseline_hazard = self.data.theta["baseline_hazard"]
+        E_g1 = np.arange(1, 7).reshape((3, 2))
+        E_g7 = np.arange(1, 91).reshape((3, 2, 15))
+        E_g8 = np.arange(1, 91).reshape(3, 2, 15)
+        grad_Q = self.M_func.grad_Q(self.pi_est, E_g1, E_g7, E_g8,
+                                    baseline_hazard, ind_1, ind_2)
+        grad_Q_ = np.array([12.267, -12.267, 57.2, -57.2, 265.3, -265.3, 270.1,
+                            -270.1, 274.9, -274.9, 279.7, -279.7, 284.5, -284.5,
+                            289.3, -289.3, 294.1, -294.1, 298.9, -298.9, 303.7,
+                            -303.7, 308.5, -308.5, 313.3, -313.3, 318.1, -318.1,
+                            322.9, -322.9, 327.7, -327.7, 332.5, -332.5])
+        np.testing.assert_almost_equal(grad_Q, grad_Q_, 3)
 
 
 if __name__ == "main":
