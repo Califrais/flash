@@ -164,47 +164,6 @@ class MstepFunctions:
         grad_P = self.grad_P(pi_est, xi_ext)
         return grad_P + grad_pen
 
-    def R_pen_func(self, beta_ext, pi_est, E_g1, E_g2, E_g8, baseline_hazard,
-                   indicator):
-        """Computes the sub objective function R with penalty, to be minimized
-        at each QNMCEM iteration using fmin_l_bfgs_b.
-
-        Parameters
-        ----------
-        beta_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
-
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        E_g2 : `np.ndarray`, shape=(n_samples)
-            The approximated expectations of function g2 for each latent group
-
-        E_g8 : `np.ndarray`, shape=(n_samples)
-            The approximated expectations of function g8 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        output : `float`
-            The value of the R sub objective to be minimized at each QNMCEM step
-        """
-        n_long_features = self.n_long_features
-        beta = get_vect_from_ext(beta_ext)
-        pen = self.pen.sparse_group_l1(beta, n_long_features)
-        R = self.R_func(pi_est, E_g1, E_g2, E_g8, baseline_hazard, indicator)
-        return R + pen
-
     def R_func(self, pi_est, E_g1, E_g2, E_g8, baseline_hazard, indicator):
         """Computes the function denoted R in the lights paper.
 
@@ -319,54 +278,6 @@ class MstepFunctions:
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
-
-    def Q_pen_func(self, gamma_ext, pi_est, E_log_g1, E_g1, baseline_hazard,
-                   indicator_1, indicator_2):
-        """Computes the sub objective function Q with penalty, to be minimized
-        at each QNMCEM iteration using fmin_l_bfgs_b
-
-        Parameters
-        ----------
-        gamma_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
-
-        E_log_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function logarithm of g1 for each
-            latent group
-
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        output : `float`
-            The value of the Q sub objective to be minimized at each QNMCEM step
-        """
-        n_time_indep_features = self.n_time_indep_features
-        n_long_features = self.n_long_features
-
-        gamma = get_vect_from_ext(gamma_ext)
-        gamma_indep = gamma[:n_time_indep_features]
-        gamma_dep = gamma[n_time_indep_features:]
-        pen = self.pen.elastic_net(gamma_indep) + self.pen.sparse_group_l1(
-            gamma_dep, n_long_features)
-        Q = self.Q_func(pi_est, E_log_g1, E_g1, baseline_hazard,
-                        indicator_1, indicator_2)
-        return Q + pen
 
     def Q_func(self, pi_est, E_log_g1, E_g1, baseline_hazard,
                indicator_1, indicator_2):

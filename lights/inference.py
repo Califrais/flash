@@ -529,7 +529,11 @@ class QNMCEM(Learner):
             E_g0 = E_func.Eg(E_func.g0(S), Lambda_1, pi_xi, f)
             E_g0_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
             E_gS = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
-            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
+
+            E_g1 = lambda gamma_0_, gamma_1_, beta_0_, beta_1_: E_func.Eg(
+                E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                Lambda_1, pi_xi, f)
+
             E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
             E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
             E_g6 = E_func.Eg(E_func.g6(S), Lambda_1, pi_xi, f)
@@ -561,7 +565,6 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # beta update
-            # TODO : update using tick
             pi_est_K = [1 - pi_est, pi_est]
             # [beta_0_ext, beta_1_ext] = [fmin_l_bfgs_b(
             #     func=lambda beta_ext:
@@ -580,28 +583,59 @@ class QNMCEM(Learner):
 
             # beta needs to be updated before gamma
             self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext)
-            E_func.theta = self.theta
-            g1 = E_func.g1(S)
-            E_g1 = E_func.Eg(g1, Lambda_1, pi_xi, f)
-            E_log_g1 = E_func.Eg(np.log(g1), Lambda_1, pi_xi, f)
-            E_g7 = E_func.Eg(E_func.g7(S), Lambda_1, pi_xi, f)
-            E_g8 = E_func.Eg(E_func.g8(S), Lambda_1, pi_xi, f)
+            # TODO: useless now ?
+            # E_func.theta = self.theta
+            # g1 = E_func.g1(S)
+            # E_g1 = E_func.Eg(g1, Lambda_1, pi_xi, f)
+            # E_log_g1 = E_func.Eg(np.log(g1), Lambda_1, pi_xi, f)
+            # E_g7 = E_func.Eg(E_func.g7(S), Lambda_1, pi_xi, f)
+            # E_g8 = E_func.Eg(E_func.g8(S), Lambda_1, pi_xi, f)
 
             # gamma update
-            # TODO : update using tick
-            # [gamma_0_ext, gamma_1_ext] = [fmin_l_bfgs_b(
-            #     func=lambda gamma_ext:
-            #     F_func.Q_pen_func(gamma_ext, pi_est[k], E_log_g1.T[k].T,
-            #                       E_g1.T[k].T,
-            #                       baseline_hazard, ind_1, ind_2),
-            #     x0=gamma_init[k],
-            #     fprime=lambda gamma_ext:
-            #     F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
-            #                       E_g7.T[k].T,
-            #                       E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
-            #     disp=False, bounds=bounds_gamma, maxiter=maxiter,
-            #     pgtol=pgtol)[0].reshape(-1, 1)
-            #                               for k in [0, 1]]
+
+            gamma_0 = fmin_l_bfgs_b(
+                func=lambda gamma_0_:
+                F_func.Q_func(pi_est, E_log_g1(gamma).T[k].T,
+                                  E_g1(gamma_0_, self.theta["gamma_1"], self.theta["beta_0"], self.theta["beta_1"]).T[0].T,
+                                  baseline_hazard, ind_1, ind_2),
+                # x0=gamma_init[k],
+                # fprime=lambda gamma_ext:
+                # F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
+                #                   E_g7.T[k].T,
+                #                   E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
+                # disp=False, bounds=bounds_gamma, maxiter=maxiter,
+                # pgtol=pgtol
+            )[0].reshape(-1, 1)
+
+            gamma_1 = fmin_l_bfgs_b(
+                func=lambda gamma_1_:
+                F_func.Q_func(pi_est, E_log_g1(gamma).T[k].T,
+                              E_g1(self.theta["gamma_0"], gamma_1_,
+                                   self.theta["beta_0"],
+                                   self.theta["beta_1"]).T[0].T,
+                              baseline_hazard, ind_1, ind_2),
+                # x0=gamma_init[k],
+                # fprime=lambda gamma_ext:
+                # F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
+                #                   E_g7.T[k].T,
+                #                   E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
+                # disp=False, bounds=bounds_gamma, maxiter=maxiter,
+                # pgtol=pgtol
+            )[0].reshape(-1, 1)
+
+            [gamma_0, gamma_1] = [fmin_l_bfgs_b(
+                func=lambda gamma_0_:
+                F_func.Q_func(pi_est[k], E_log_g1(gamma).T[k].T,
+                                  E_g1(gamma_0_, gamma_1_, beta_0_, beta_1_).T[k].T,
+                                  baseline_hazard, ind_1, ind_2),
+                x0=gamma_init[k],
+                fprime=lambda gamma_ext:
+                F_func.grad_Q_pen(gamma_ext, pi_est[k], E_g1.T[k].T,
+                                  E_g7.T[k].T,
+                                  E_g8.T[k].T, baseline_hazard, ind_1, ind_2),
+                disp=False, bounds=bounds_gamma, maxiter=maxiter,
+                pgtol=pgtol)[0].reshape(-1, 1)
+                                          for k in [0, 1]]
 
             # gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0_ext, gamma_1=gamma_1_ext)

@@ -140,7 +140,7 @@ class EstepFunctions:
         gS = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
         return gS
 
-    def g1(self, S, broadcast=True):
+    def g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
         """Computes g1
 
         Parameters
@@ -156,20 +156,20 @@ class EstepFunctions:
         g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
             The values of g1 function
         """
-        n_samples, K, theta = self.n_samples, self.K, self.theta
+        n_samples, K = self.n_samples, self.K
         p = self.n_time_indep_features
         X, T_u, J = self.X, self.T_u, self.J
         N_MC = S.shape[0]
-        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
-        g2_ = self.g2(S, broadcast=False).reshape(K, 1, J, N_MC)
+        g2_ = self.g2(S, gamma_0, beta_0, gamma_1, beta_1,
+                      broadcast=False).reshape(K, 1, J, N_MC)
         tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
         g1 = np.exp(tmp + g2_).swapaxes(0, 1).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
 
-    def g2(self, S, broadcast=True):
+    def g2(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
         """Computes g2
 
         Parameters
@@ -189,10 +189,9 @@ class EstepFunctions:
         N_MC, J = S.shape[0], self.J
         asso_functions, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
-        theta = self.theta
-        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape((K, 1, 1, -1))
-        asso_func = get_asso_func(T_u, S, theta, asso_functions, L, alpha)
+        asso_func = get_asso_func(T_u, S, beta_0, beta_1, asso_functions, L,
+                                  alpha)
         asso_func_ = asso_func.reshape(K, J, N_MC, -1)
         g2 = np.sum(asso_func_ * gamma_dep, axis=-1)
         if broadcast:

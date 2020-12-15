@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
+def get_asso_func(T_u, S, beta_0, beta_1, asso_functions, n_long_features,
                   fixed_effect_time_order, derivative=False):
     """Computes association functions or derivatives association ones
 
@@ -13,9 +13,7 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
     S : `np.ndarray`, shape=(2*N, r)
         Set of constructed Monte Carlo samples
 
-    theta : `dict`
-        Vector that concatenates all parameters to be inferred in the lights
-        model
+    beta_0, beta_1 blabla
 
     asso_functions : `list` or `str`='all'
         List of association functions wanted or string 'all' to select all
@@ -45,7 +43,7 @@ def get_asso_func(T_u, S, theta, asso_functions, n_long_features,
         subjects, all groups and all Monte Carlo samples. `dim` is the
         total dimension of returned association functions.
     """
-    fixed_effect_coeffs = np.array([theta["beta_0"], theta["beta_1"]])
+    fixed_effect_coeffs = np.array([beta_0, beta_1])
     J, N_MC = T_u.shape[0], S.shape[0]
     K = 2  # 2 latent groups
     asso_func = AssociationFunctions(T_u, S, fixed_effect_coeffs,
