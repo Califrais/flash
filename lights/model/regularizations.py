@@ -2,7 +2,7 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
-
+from copt.penalty import L1Norm, GroupL1
 
 class Penalties:
     """A class to define the required penalties of the lights model
@@ -99,23 +99,35 @@ class Penalties:
         grad[dim:] -= grad_pos
         return grad
 
-    def sparse_group_l1(self, v, n_long_features):
-        """Computes the sparse group l1 penalization of vector v
+class sparse_group_l1:
+    """Sparse group Lasso regularization
 
-        Parameters
-        ----------
-        v: `np.ndarray`
-            A coefficient vector
+    Parameters
+    ----------
+    alpha: float
+        Constant multiplying this loss
 
-        n_long_features : `int`
-            Number of longitudinal features
+    groups: list of lists
+    """
 
-        Returns
-        -------
-        output : `float`
-            The value of the sparse group l1 penalization of vector v
-        """
-        l_pen, eta = self.l_pen, self.eta_sp_gp_l1
-        tmp = np.array([np.linalg.norm(v_l)
-                        for v_l in np.array_split(v, n_long_features)]).sum()
-        return l_pen * ((1. - eta) * abs(v).sum() + eta * tmp)
+    def __init__(self, alpha, groups):
+        self.alpha = alpha
+        # groups need to be increasing
+        for i, g in enumerate(groups):
+            if not np.all(np.diff(g) == 1):
+                raise ValueError("Groups must be contiguous")
+            if i > 0 and groups[i - 1][-1] >= g[0]:
+                raise ValueError("Groups must be increasing")
+        self.groups = groups
+        self.L1 = L1Norm(1 - alpha)
+        self.GL1 = GroupL1(alpha, self.groups)
+
+    def __call__(self, x):
+        L1 = self.L1.__call__(x)
+        GL1 = self.GL1.__call__(x)
+        return L1 + GL1
+
+    def prox(self, x, step_size):
+        L1_prox = self.L1.prox(x, step_size)
+        out = self.GL1.prox(L1_prox, step_size)
+        return out
