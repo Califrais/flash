@@ -249,7 +249,7 @@ class EstepFunctions:
         g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, -1)
         return g6
 
-    def g7(self, S, broadcast=True):
+    def g7(self, S, beta_0, beta_1, broadcast=True):
         """Computes g7
 
         Parameters
@@ -269,14 +269,14 @@ class EstepFunctions:
         N_MC, J = S.shape[0], self.J
         asso_func, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
-        g7 = get_asso_func(T_u, S, theta, asso_func, L, alpha).swapaxes(1, 2)
+        g7 = get_asso_func(T_u, S, beta_0, beta_1, asso_func, L, alpha).swapaxes(1, 2)
         g7 = g7.reshape(K, N_MC, J, -1)
         if broadcast:
             g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
             g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
         return g7
 
-    def g8(self, S):
+    def g8(self, S, gamma_0_, beta_0_, gamma_1_, beta_1_):
         """Computes g8
         Parameters
         ----------
@@ -288,8 +288,8 @@ class EstepFunctions:
         g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
             The values of g8 function
         """
-        g7 = self.g7(S, False)
-        g1 = self.g1(S, False)
+        g7 = self.g7(S, beta_0_, beta_1_, False)
+        g1 = self.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_, False)
         g8 = g1[..., np.newaxis] * g7
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8

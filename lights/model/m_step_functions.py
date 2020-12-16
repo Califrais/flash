@@ -279,31 +279,13 @@ class MstepFunctions:
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
 
-    def Q_func(self, pi_est, E_log_g1, E_g1, baseline_hazard,
-               indicator_1, indicator_2):
-        """Computes the function denoted Q in the lights paper
-
+    def Q_func(self, gamma, *args):
+        """ Computes the function denoted Q in the lights paper.
         Parameters
         ----------
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
+        gamma :
 
-        E_log_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function logarithm of g1 for each
-            latent group
-
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
+        args :
 
         Returns
         -------
@@ -311,40 +293,26 @@ class MstepFunctions:
             The value of the Q function
         """
         n_samples, delta = self.n_samples, self.delta
-        baseline_val = baseline_hazard.values.flatten()
-        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
+        arg = args[0]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
+        E_log_g1 = arg["E_log_g1"](gamma)
+        E_g1 = arg["R_g1"](gamma)
+        pi_est = arg["pi_est"]
+
         sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
                   (E_g1 * ind_2 * baseline_val).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_Q(self, pi_est, E_g1, E_g7, E_g8, baseline_hazard,
-               indicator_1, indicator_2):
+    def grad_Q(self, gamma, *args):
         """Computes the gradient of the function Q
 
         Parameters
         ----------
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
+        gamma :
 
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        E_g7 : `np.ndarray`, shape=(n_samples, J, dim)
-            The approximated expectations of function g7 for each latent group
-
-        E_g8 : `np.ndarray`, shape=(n_samples, J, dim)
-            The approximated expectations of function g8 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        indicator_2 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
+        args :
 
         Returns
         -------
@@ -354,9 +322,13 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         nb_asso_features = self.nb_asso_features
         n_samples, delta = self.n_samples, self.delta
-        baseline_val = baseline_hazard.values.flatten()
-        ind_1, ind_2 = indicator_1 * 1, indicator_2 * 1
-        E_g8 = E_g8.swapaxes(0, 1)
+        arg = args[0]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
+        E_g1 = arg["E_g1"](gamma)
+        E_g8 = arg["R_g8"](gamma).swapaxes(0, 1)
+        E_g7 = arg["E_g7"](gamma)
+        pi_est = arg["pi_est"]
 
         grad = np.zeros(nb_asso_features)
         grad[:p] = (self.X.T * (pi_est * (delta - (E_g1 * baseline_val * ind_2)
