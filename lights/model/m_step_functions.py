@@ -199,11 +199,13 @@ class MstepFunctions:
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_ = arg["ind_"] * 1
-        E_g1 = arg["E_g1"](beta)
-        E_g2 = arg["E_g2"](beta)
-        E_g8 = arg["E_g8"](beta)
+        idx = arg["idx"]
+        beta = beta.reshape(-1, 1)
+        E_g1 = arg["E_g1"](beta).T[idx].T
+        E_g2 = arg["E_g2"](beta).T[idx].T
+        E_g9 = arg["E_g9"](beta).T[idx].T
         pi_est = arg["pi_est"]
-        sub_obj = E_g2 * delta + E_g8 - (E_g1 * baseline_val * ind_).sum(axis=1)
+        sub_obj = E_g2 * delta + E_g9 - (E_g1 * baseline_val * ind_).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
@@ -229,8 +231,10 @@ class MstepFunctions:
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_ =  arg["ind_"] * 1
-        E_g5 = arg["E_g5"](beta)
-        E_g6 = arg["E_g6"](beta)
+        idx = arg["idx"]
+        beta = beta.reshape(-1, 1)
+        E_g5 = arg["E_g5"](beta).T[idx].T
+        E_g6 = arg["E_g6"](beta).T[idx].T
         E_gS = arg["E_gS"]
         pi_est = arg["pi_est"]
         extracted_features = arg["extracted_features"]
@@ -251,7 +255,7 @@ class MstepFunctions:
             y_i = y_i.flatten()
             Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta) -
+            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta.flatten()) -
                                           V_i.dot(E_gS[i]))).flatten()
 
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
@@ -273,10 +277,12 @@ class MstepFunctions:
         """
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
+        idx = arg["idx"]
+        gamma = gamma.reshape(-1, 1)
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
-        E_log_g1 = arg["E_log_g1"](gamma)
-        E_g1 = arg["R_g1"](gamma)
+        E_g1 = arg["E_g1"](gamma).T[idx].T
+        E_log_g1 = np.log(E_g1)
         pi_est = arg["pi_est"]
 
         sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
@@ -304,9 +310,11 @@ class MstepFunctions:
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
-        E_g1 = arg["E_g1"](gamma)
-        E_g8 = arg["R_g8"](gamma).swapaxes(0, 1)
-        E_g7 = arg["E_g7"](gamma)
+        idx = arg["idx"]
+        gamma = gamma.reshape(-1, 1)
+        E_g1 = arg["E_g1"](gamma).T[idx].T
+        E_g8 = arg["E_g8"](gamma).T[idx].T.swapaxes(0, 1)
+        E_g7 = arg["E_g7"].T[idx].T
         pi_est = arg["pi_est"]
 
         grad = np.zeros(nb_asso_features)

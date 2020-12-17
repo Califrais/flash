@@ -295,7 +295,7 @@ class EstepFunctions:
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
 
-    def _get_g3_4_9(self, S):
+    def _get_g3_4_9(self, beta_0_, beta_1_, S):
         """Computes g3, g4, g9
 
         Parameters
@@ -306,8 +306,8 @@ class EstepFunctions:
         n_samples, n_long_features = self.n_samples, self.n_long_features
         U_list, V_list, y_list, N_list = self.extracted_features[0]
         theta, K, N_MC = self.theta, self.K, S.shape[0]
-        beta_0, beta_1, phi = theta["beta_0"], theta["beta_1"], theta["phi"]
-        beta_stack = np.hstack((beta_0, beta_1))
+        phi  = theta["phi"]
+        beta_stack = np.hstack((beta_0_, beta_1_))
         g3, g4, g9 = [], [], np.zeros(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
@@ -320,7 +320,7 @@ class EstepFunctions:
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
         self.g3_, self.g4_, self.g9_ = g3, g4, g9
 
-    def g3(self, S):
+    def g3(self, S, beta_0_, beta_1_):
         """Computes g3
 
         Parameters
@@ -334,10 +334,10 @@ class EstepFunctions:
             The values of g3 function
         """
         if self.g3_ is None:
-            self._get_g3_4_9(S)
+            self._get_g3_4_9(beta_0_, beta_1_, S)
         return self.g3_
 
-    def g9(self, S):
+    def g9(self, S, beta_0_, beta_1_):
         """Computes g9
 
         Parameters
@@ -351,7 +351,7 @@ class EstepFunctions:
             The values of g9 function
         """
         if self.g9_ is None:
-            self._get_g3_4_9(S)
+            self._get_g3_4_9(beta_0_, beta_1_, S)
         return self.g9_
 
     @staticmethod

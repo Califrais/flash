@@ -166,6 +166,7 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         p, L = self.n_time_indep_features, self.n_long_features
+        eta = self.eta_sp_gp_l1
         theta = self.theta
         log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
@@ -173,18 +174,20 @@ class QNMCEM(Learner):
         xi_pen = self.pen.elastic_net(xi)
         # beta sparse group l1 penalty
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        beta_0_pen = self.pen.sparse_group_l1(beta_0, L)
-        beta_1_pen = self.pen.sparse_group_l1(beta_1, L)
+        groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
+        beta_0_pen = sparse_group_l1(eta, groups).__call__(beta_0)
+        beta_1_pen = sparse_group_l1(eta, groups).__call__(beta_1)
         # gamma sparse group l1 penalty
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_0_indep = gamma_0[:p]
         gamma_0_dep = gamma_0[p:]
         gamma_0_pen = self.pen.elastic_net(gamma_0_indep)
-        gamma_0_pen += self.pen.sparse_group_l1(gamma_0_dep, L)
+        groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
+        gamma_0_pen += sparse_group_l1(eta, groups).__call__(gamma_0_dep)
         gamma_1_indep = gamma_1[:p]
         gamma_1_dep = gamma_1[p:]
         gamma_1_pen = self.pen.elastic_net(gamma_1_indep)
-        gamma_1_pen += self.pen.sparse_group_l1(gamma_1_dep, L)
+        gamma_1_pen += sparse_group_l1(eta, groups).__call__(gamma_1_dep)
         pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
         return -log_lik + pen
 
@@ -342,7 +345,10 @@ class QNMCEM(Learner):
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         E_func = EstepFunctions(X, T, T_u, delta, extracted_features, alpha,
                                 self.asso_functions, theta)
-        g1, g3 = E_func.g1(S, False), E_func.g3(S)
+        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
+        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
+        g1 = E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1, False)
+        g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
@@ -401,9 +407,8 @@ class QNMCEM(Learner):
         """Update class attributes corresponding to lights model parameters
         """
         for key, value in kwargs.items():
-            if key in ["beta_0", "beta_1", "gamma_0", "gamma_1"]:
-                self.theta[key] = get_vect_from_ext(value)
-            elif key in ["long_cov", "phi", "baseline_hazard"]:
+            if key in ["long_cov", "phi", "baseline_hazard",
+                       "beta_0", "beta_1", "gamma_0", "gamma_1"]:
                 self.theta[key] = value
             elif key == "xi":
                 xi_0, xi = get_xi_from_xi_ext(value, self.fit_intercept)
@@ -485,25 +490,21 @@ class QNMCEM(Learner):
             time_indep_cox_coeffs = np.zeros(p)
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
-        gamma = np.zeros(nb_asso_feat)
-        gamma[:p] = time_indep_cox_coeffs
-        gamma_0_ext = np.concatenate((gamma, -gamma)).reshape(-1, 1)
-        gamma_0_ext[gamma_0_ext < 0] = 0
-        gamma_1_ext = gamma_0_ext.copy()
+        gamma_0 = np.zeros(nb_asso_feat)
+        gamma_0[:p] = time_indep_cox_coeffs
+        gamma_0 = gamma_0.reshape(-1, 1)
+        gamma_1 = gamma_0.copy()
 
-        beta_0_ext = np.concatenate((beta, -beta)).reshape(-1, 1)
-        beta_0_ext[beta_0_ext < 0] = 0
-        beta_1_ext = beta_0_ext.copy()
+        beta_0 = beta.reshape(-1, 1)
+        beta_1 = beta_0.copy()
 
-        self._update_theta(beta_0=beta_0_ext, beta_1=beta_1_ext, xi=xi_ext,
-                           gamma_0=gamma_0_ext, gamma_1=gamma_1_ext, long_cov=D,
+        self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
+                           gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
                            phi=phi, baseline_hazard=baseline_hazard)
 
         # Stopping criteria and bounds vector for the L-BGFS-B algorithms
         maxiter, pgtol = 60, 1e-5
         bounds_xi = [(0, None)] * 2 * p
-        bounds_beta = [(0, None)] * 2 * L * q_l
-        bounds_gamma = [(0, None)] * 2 * nb_asso_feat
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
@@ -531,22 +532,33 @@ class QNMCEM(Learner):
             E_g0_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
             E_gS = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
 
-            E_g1 = lambda gamma_0_, gamma_1_, beta_0_, beta_1_: E_func.Eg(
+            E_g1 = lambda gamma_0_, beta_0_, gamma_1_, beta_1_: E_func.Eg(
                 E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                Lambda_1, pi_xi, f)
+
+            E_g2 = lambda gamma_0_, beta_0_, gamma_1_, beta_1_: E_func.Eg(
+                E_func.g2(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                Lambda_1, pi_xi, f)
+
+            E_g5 = lambda beta_0_, beta_1_: E_func.Eg(
+                E_func.g5(S, beta_0_, beta_1_),
+                Lambda_1, pi_xi, f)
+
+            E_g6 = lambda gamma_0_, beta_0_, gamma_1_, beta_1_: E_func.Eg(
+                E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                 Lambda_1, pi_xi, f)
 
             E_g7 = lambda beta_0_, beta_1_: E_func.Eg(
                 E_func.g7(S, beta_0_, beta_1_),
                 Lambda_1, pi_xi, f)
 
-            E_g8 = lambda gamma_0_, gamma_1_, beta_0_, beta_1_: E_func.Eg(
+            E_g8 = lambda gamma_0_, beta_0_, gamma_1_, beta_1_: E_func.Eg(
                 E_func.g8(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                 Lambda_1, pi_xi, f)
 
-            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
-            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
-            E_g6 = E_func.Eg(E_func.g6(S), Lambda_1, pi_xi, f)
-            E_g9 = E_func.Eg(E_func.g9(S), Lambda_1, pi_xi, f)
+            E_g9 = lambda beta_0_, beta_1_: E_func.Eg(
+                E_func.g9(S, beta_0_, beta_1_),
+                Lambda_1, pi_xi, f)
 
             if False:  # TODO: condition to be defined
                 N *= 1.1
@@ -557,14 +569,12 @@ class QNMCEM(Learner):
 
             if warm_start:
                 xi_init = xi_ext
-                beta_init = [beta_0_ext, beta_1_ext]
-                gamma_init = [gamma_0_ext, gamma_1_ext]
+                beta_init = [beta_0, beta_1]
+                gamma_init = [gamma_0, gamma_1]
             else:
                 xi_init = np.zeros(2 * p)
-                beta_init = np.zeros(2 * L * q_l).reshape(-1, 1)
-                beta_init = [beta_init, beta_init.copy()]
-                gamma_init = np.zeros(2 * nb_asso_feat).reshape(-1, 1)
-                gamma_init = [gamma_init, gamma_init.copy()]
+                beta_init = np.zeros(L * q_l).reshape(-1, 1)
+                gamma_init = np.zeros(nb_asso_feat).reshape(-1, 1)
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
@@ -575,109 +585,108 @@ class QNMCEM(Learner):
 
             # beta update
             E_g1_ = lambda beta_0_: E_g1(self.theta["gamma_0"],
-                                          beta_0_, self.theta["gamma_1_"],
+                                          beta_0_, self.theta["gamma_1"],
                                           self.theta["beta_1"])
-            E_g2_ = lambda beta_0_: E_g2(beta_0_, self.theta["beta_1"])
-            E_g5_ = lambda beta_0_: E_g5(self.theta["gamma_0"],
-                                         beta_0_, self.theta["gamma_1_"],
-                                         self.theta["beta_1"])
+            E_g2_ = lambda beta_0_: E_g2(self.theta["gamma_0"],
+                                          beta_0_, self.theta["gamma_1"],
+                                          self.theta["beta_1"])
+            E_g5_ = lambda beta_0_: E_g5(beta_0_, self.theta["beta_1"])
             E_g6_ = lambda beta_0_: E_g6(self.theta["gamma_0"],
-                                         beta_0_, self.theta["gamma_1_"],
+                                         beta_0_, self.theta["gamma_1"],
                                          self.theta["beta_1"])
-            E_g9_ = lambda beta_0_: E_g9(self.theta["gamma_0"],
-                                          beta_0_, self.theta["gamma_1_"],
-                                          self.theta["beta_1"])
+            E_g9_ = lambda beta_0_: E_g9(beta_0_, self.theta["beta_1"])
+            alpha = self.eta_sp_gp_l1
+            groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = sparse_group_l1(alpha, groups).prox
-            args = {"pi_est": pi_est,
-                    "E_g1": E_g1_.T[0].T,
-                    "E_g2": E_g2_.T[0].T,
-                    "E_g5": E_g5_.T[0].T,
-                    "E_g6": E_g6_.T[0].T,
-                    "E_g9": E_g9_.T[0].T,
-                    "E_gS": E_gS,
-                    "gamma": gamma_0,
-                    "extracted_feature": ext_feat,
-                    "phi": phi,
-                    "baseline_hazard": baseline_hazard,
-                    "ind_": ind_2
-                    }
-            beta_0 = cp.minimize_proximal_gradient(
-                fun=F_func.R_func,
-                x0=gamma_1,
-                prox=prox,
-                args=args,
-                jac=F_func.grad_R,
-                step="backtracking",
-                max_iter=100,
-                accelerated=True)
-
-            E_g1_ = lambda beta_1_: E_g1(self.theta["gamma_0"],
-                                         self.theta["beta_0"],
-                                         self.theta["gamma_1_"], beta_1_)
-            E_g2_ = lambda beta_1_: E_g2(self.theta["beta_0"], beta_1_)
-            E_g5_ = lambda beta_1_: E_g5(self.theta["gamma_0"],
-                                         self.theta["beta_0"],
-                                         self.theta["gamma_1_"], beta_1_)
-            E_g6_ = lambda beta_1_: E_g6(self.theta["gamma_0"],
-                                         self.theta["beta_0"],
-                                         self.theta["gamma_1_"], beta_1_)
-            E_g9_ = lambda beta_1_: E_g9(self.theta["gamma_0"],
-                                         self.theta["beta_0"],
-                                         self.theta["gamma_1_"], beta_1_)
-            prox = sparse_group_l1(alpha, groups).prox
-            args = {"pi_est": pi_est,
-                    "E_g1": E_g1_.T[1].T,
-                    "E_g2": E_g2_.T[1].T,
-                    "E_g5": E_g5_.T[1].T,
-                    "E_g6": E_g6_.T[1].T,
-                    "E_g9": E_g9_.T[1].T,
+            args = [{"idx" : 0,
+                    "pi_est": pi_est,
+                    "E_g1": E_g1_,
+                    "E_g2": E_g2_,
+                    "E_g5": E_g5_,
+                    "E_g6": E_g6_,
+                    "E_g9": E_g9_,
                     "E_gS": E_gS,
                     "gamma": gamma_0,
                     "extracted_features": ext_feat,
                     "phi": phi,
                     "baseline_hazard": baseline_hazard,
                     "ind_": ind_2
-                    }
-            beta_1 = cp.minimize_proximal_gradient(
+                    }]
+            beta_0 = cp.minimize_proximal_gradient(
                 fun=F_func.R_func,
-                x0=gamma_1,
+                x0=beta_0,
                 prox=prox,
                 args=args,
                 jac=F_func.grad_R,
-                step="backtracking",
                 max_iter=100,
-                accelerated=True)
+                step="",
+                accelerated=True).x.reshape(-1, 1)
+
+            E_g1_ = lambda beta_1_: E_g1(self.theta["gamma_0"],
+                                         self.theta["beta_0"],
+                                         self.theta["gamma_1"], beta_1_)
+            E_g2_ = lambda beta_1_: E_g2(self.theta["gamma_0"],
+                                         self.theta["beta_0"],
+                                         self.theta["gamma_1"], beta_1_)
+            E_g5_ = lambda beta_1_: E_g5(self.theta["beta_0"], beta_1_)
+            E_g6_ = lambda beta_1_: E_g6(self.theta["gamma_0"],
+                                         self.theta["beta_0"],
+                                         self.theta["gamma_1"], beta_1_)
+            E_g9_ = lambda beta_1_: E_g9(self.theta["beta_0"], beta_1_)
+            prox = sparse_group_l1(alpha, groups).prox
+            args = [{"idx" : 1,
+                    "pi_est": pi_est,
+                    "E_g1": E_g1_,
+                    "E_g2": E_g2_,
+                    "E_g5": E_g5_,
+                    "E_g6": E_g6_,
+                    "E_g9": E_g9_,
+                    "E_gS": E_gS,
+                    "gamma": gamma_0,
+                    "extracted_features": ext_feat,
+                    "phi": phi,
+                    "baseline_hazard": baseline_hazard,
+                    "ind_": ind_2
+                    }]
+            beta_1 = cp.minimize_proximal_gradient(
+                fun=F_func.R_func,
+                x0=beta_1,
+                prox=prox,
+                args=args,
+                jac=F_func.grad_R,
+                max_iter=100,
+                step="",
+                accelerated=True).x.reshape(-1, 1)
 
             # beta needs to be updated before gamma
             self._update_theta(beta_0=beta_0, beta_1=beta_1)
 
             # gamma update
-            E_g1_ = lambda gamma_0_ : E_g1(gamma_0_,
-                                    self.theta["beta_0"], self.theta["gamma_1"],
-                                           self.theta["beta_1"])
+            E_g1_ = lambda gamma_0_ : E_g1(gamma_0_, self.theta["beta_0"],
+                                    self.theta["gamma_1"], self.theta["beta_1"])
             E_g7_ = E_g7(self.theta["beta_0"], self.theta["beta_1"])
-            E_g8_ = lambda gamma_0_ : E_g8(gamma_0_,
-                                    self.theta["beta_0"], self.theta["gamma_1"],
-                                           self.theta["beta_1"])
+            E_g8_ = lambda gamma_0_ : E_g8(gamma_0_,self.theta["beta_0"],
+                                    self.theta["gamma_1"], self.theta["beta_1"])
+            groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
             prox = sparse_group_l1(alpha, groups).prox
-            args = {"pi_est" : pi_est,
-                    "E_log_g1" : np.log(E_g1_).T[0].T,
-                    "E_g1" : E_g1_.T[0].T,
-                    "E_g7" : E_g7_.T[0].T,
-                    "E_g8" : E_g8_.T[0].T,
+            args = [{"idx" : 0,
+                   "pi_est" : pi_est,
+                    "E_g1" : E_g1_,
+                    "E_g7" : E_g7_,
+                    "E_g8" : E_g8_,
                    "baseline_hazard": baseline_hazard,
                     "ind_1": ind_1,
                     "ind_2": ind_2
-            }
+            }]
             gamma_0 = cp.minimize_proximal_gradient(
                 fun=F_func.Q_func,
-                x0=gamma_1,
+                x0=gamma_0,
                 prox=prox,
                 args=args,
                 jac=F_func.grad_Q,
-                step="backtracking",
                 max_iter=100,
-                accelerated=True)
+                step="",
+                accelerated=True).x.reshape(-1, 1)
 
             E_g1_ = lambda gamma_1_: E_g1(self.theta["gamma_0"],
                                           self.theta["beta_0"], gamma_1_,
@@ -687,29 +696,30 @@ class QNMCEM(Learner):
                                           self.theta["beta_0"], gamma_1_,
                                           self.theta["beta_1"])
             prox = sparse_group_l1(alpha, groups).prox
-            args = {"pi_est" : pi_est,
-                    "E_log_g1" : np.log(E_g1_).T[1].T,
-                    "E_g1" : E_g1_.T[1].T,
-                    "E_g7" : E_g7_.T[1].T,
-                    "E_g8" : E_g8_.T[1].T,
+            args = [{"idx" : 1,
+                    "pi_est" : pi_est,
+                    "E_g1" : E_g1_,
+                    "E_g7" : E_g7_,
+                    "E_g8" : E_g8_,
                    "baseline_hazard": baseline_hazard,
                     "ind_1": ind_1,
                     "ind_2": ind_2
-            }
+            }]
             gamma_1 = cp.minimize_proximal_gradient(
                 fun=F_func.Q_func,
                 x0=gamma_1,
                 prox=prox,
                 args=args,
                 jac=F_func.grad_Q,
-                step="backtracking",
                 max_iter=100,
-                accelerated=True)
+                step="",
+                accelerated=True).x.reshape(-1, 1)
 
             # gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
-            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
+            E_g1 = E_func.Eg(E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1),
+                             Lambda_1, pi_xi, f)
 
             # baseline hazard update
             baseline_hazard = pd.Series(

@@ -43,6 +43,7 @@ def get_asso_func(T_u, S, beta_0, beta_1, asso_functions, n_long_features,
         subjects, all groups and all Monte Carlo samples. `dim` is the
         total dimension of returned association functions.
     """
+
     fixed_effect_coeffs = np.array([beta_0, beta_1])
     J, N_MC = T_u.shape[0], S.shape[0]
     K = 2  # 2 latent groups
@@ -142,7 +143,6 @@ class AssociationFunctions:
         S, N_MC, q_l, K = self.S, self.N_MC, self.q_l, self.K
         r_l = 2  # Affine random effects
         phi = np.zeros(shape=(K, J, n_long_features, N_MC))
-
         for l in range(n_long_features):
             tmp = V.dot(S[:, r_l * l: r_l * (l + 1)].T)
             beta_l = beta[:, q_l * l: q_l * (l + 1)]
