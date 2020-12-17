@@ -164,7 +164,7 @@ class MstepFunctions:
         grad_P = self.grad_P(pi_est, xi_ext)
         return grad_P + grad_pen
 
-    def R_func(self, pi_est, E_g1, E_g2, E_g8, baseline_hazard, indicator):
+    def R_func(self, beta, *args):
         """Computes the function denoted R in the lights paper.
 
         Parameters
@@ -196,54 +196,27 @@ class MstepFunctions:
         """
         n_samples = self.n_samples
         delta = self.delta
-        baseline_val = baseline_hazard.values.flatten()
-        ind_ = indicator * 1
+        arg = args[0]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        ind_ = arg["ind_"] * 1
+        E_g1 = arg["E_g1"](beta)
+        E_g2 = arg["E_g2"](beta)
+        E_g8 = arg["E_g8"](beta)
+        pi_est = arg["pi_est"]
         sub_obj = E_g2 * delta + E_g8 - (E_g1 * baseline_val * ind_).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_R(self, beta_ext, gamma_ext, pi_est, E_g5, E_g6, E_gS,
-               baseline_hazard, indicator, extracted_features, phi):
+    def grad_R(self, beta, *args):
         """Computes the gradient of the function R
 
         Parameters
         ----------
-        gamma_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
+        Parameters
+        ----------
+        gamma :
 
-        beta_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-            The time-independent coefficient vector decomposed on positive and
-            negative parts
-
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
-
-        E_g5 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
-            The approximated expectations of function logarithm of g5 for each
-            latent group
-
-        E_g6 : `np.ndarray`, shape=(n_samples, J, n_long_features, dim)
-            The approximated expectations of function g6 for each latent group
-
-        E_gS : `np.ndarray`, shape=(n_samples, r)
-            The approximated expectations of function gS
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        phi : `np.ndarray`, shape=(n_long_features,)
-            Variance vector for the error term of the longitudinal processes
+        args :
 
         Returns
         -------
@@ -253,13 +226,19 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         n_samples = self.n_samples
         q_l = self.fixed_effect_time_order + 1
-        beta = get_vect_from_ext(beta_ext).flatten()
-        gamma = get_vect_from_ext(gamma_ext)[p:].reshape(L, -1)
+        arg = args[0]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        ind_ =  arg["ind_"] * 1
+        E_g5 = arg["E_g5"](beta)
+        E_g6 = arg["E_g6"](beta)
+        E_gS = arg["E_gS"]
+        pi_est = arg["pi_est"]
+        extracted_features = arg["extracted_features"]
+        phi = arg["phi"]
+        gamma = arg["gamma"][p:].reshape(L, -1)
         # To match the dimension of the association func derivative over beta
         gamma_ = np.repeat(gamma, q_l, axis=1)
 
-        ind_ = indicator * 1
-        baseline_val = baseline_hazard.values
         tmp1 = (E_g5.T * self.delta).T - \
                (E_g6.T * (ind_ * baseline_val).T).T.sum(axis=1)
         # split and sum over each l-th beta

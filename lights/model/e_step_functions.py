@@ -201,7 +201,7 @@ class EstepFunctions:
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
-    def g5(self, S, broadcast=True):
+    def g5(self, S, beta_0, beta_1, broadcast=True):
         """Computes g5
 
         Parameters
@@ -218,7 +218,7 @@ class EstepFunctions:
                         or (n_samples, K, N_MC, n_long_features, A*r_l, K)
             The values of g5 function
         """
-        g5 = get_asso_func(self.T_u, S, self.theta, self.asso_functions,
+        g5 = get_asso_func(self.T_u, S, beta_0, beta_1, self.asso_functions,
                            self.n_long_features, self.fixed_effect_time_order,
                            derivative=True)
         if broadcast:
@@ -229,7 +229,7 @@ class EstepFunctions:
                 .swapaxes(2, 5).swapaxes(1, 2)
         return g5
 
-    def g6(self, S):
+    def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
         """Computes g6
 
         Parameters
@@ -243,7 +243,8 @@ class EstepFunctions:
             The values of g6 function
         """
         n_samples = self.n_samples
-        g1, g5 = self.g1(S, False), self.g5(S, False)
+        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, False)
+        g5 = self.g5(S, beta_0, beta_1, False)
         g5 = np.broadcast_to(g5, (n_samples,) + g5.shape)
         g6 = (g1.T * g5.T).T
         g6 = np.broadcast_to(g6[..., None], g6.shape + (2,)).swapaxes(1, -1)
