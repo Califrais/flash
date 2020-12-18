@@ -4,29 +4,25 @@
 import numpy as np
 from copt.penalty import L1Norm, GroupL1
 
-class Penalties:
-    """A class to define the required penalties of the lights model
+
+class ElasticNet:
+    """A class to define the Elastic Net penalty
 
     Parameters
     ----------
+    l_pen : `float`
+        Level of penalization for the ElasticNet
 
-    l_pen : `float`, default=0
-        Level of penalization for the ElasticNet and the Sparse Group l1
-
-    eta_elastic_net: `float`, default=0.1
-        The ElasticNet mixing parameter, with 0 <= eta_elastic_net <= 1.
-        For eta_elastic_net = 0 this is ridge (L2) regularization
-        For eta_elastic_net = 1 this is lasso (L1) regularization
-        For 0 < eta_elastic_net < 1, the regularization is a linear combination
-        of L1 and L2
-
-    eta_sp_gp_l1: `float`, default=0.1
-        The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
+    eta: `float`
+        The ElasticNet mixing parameter, with 0 <= eta <= 1.
+        For eta = 1 this is ridge (L2) regularization
+        For eta = 0 this is lasso (L1) regularization
+        For 0 < eta < 1, the regularization is a linear combination of L1 and L2
     """
-    def __init__(self, l_pen, eta_elastic_net, eta_sp_gp_l1):
+
+    def __init__(self, l_pen, eta):
         self.l_pen = l_pen
-        self.eta_elastic_net = eta_elastic_net
-        self.eta_sp_gp_l1 = eta_sp_gp_l1
+        self.eta = eta
 
     @property
     def l_pen(self):
@@ -39,26 +35,16 @@ class Penalties:
         self._l_pen = val
 
     @property
-    def eta_elastic_net(self):
-        return self._eta_elastic_net
+    def eta(self):
+        return self._eta
 
-    @eta_elastic_net.setter
-    def eta_elastic_net(self, val):
+    @eta.setter
+    def eta(self, val):
         if not 0 <= val <= 1:
-            raise ValueError("``eta_elastic_net`` must be in (0, 1)")
-        self._eta_elastic_net = val
+            raise ValueError("``eta`` must be in (0, 1)")
+        self._eta = val
 
-    @property
-    def eta_sp_gp_l1(self):
-        return self._eta_sp_gp_l1
-
-    @eta_sp_gp_l1.setter
-    def eta_sp_gp_l1(self, val):
-        if not 0 <= val <= 1:
-            raise ValueError("``eta_sp_gp_l1`` must be in (0, 1)")
-        self._eta_sp_gp_l1 = val
-
-    def elastic_net(self, v):
+    def pen(self, v):
         """Computes the elasticNet penalization of vector v
 
         Parameters
@@ -71,11 +57,11 @@ class Penalties:
         output : `float`
             The value of the elasticNet penalization part of vector v
         """
-        l_pen, eta, = self.l_pen, self.eta_elastic_net
+        l_pen, eta, = self.l_pen, self.eta
         return l_pen * ((1. - eta) * abs(v).sum() +
                         .5 * eta * np.linalg.norm(v) ** 2)
 
-    def grad_elastic_net(self, v):
+    def grad(self, v):
         """Computes the gradient of the elasticNet penalization of a vector v
 
         Parameters
@@ -88,7 +74,7 @@ class Penalties:
         grad : `np.array`
             The gradient of the elasticNet penalization part of vector v
         """
-        l_pen, eta = self.l_pen, self.eta_elastic_net
+        l_pen, eta = self.l_pen, self.eta
         dim = v.shape[0]
         grad = np.zeros(2 * dim)
         # Gradient of lasso penalization
@@ -99,35 +85,88 @@ class Penalties:
         grad[dim:] -= grad_pos
         return grad
 
-class sparse_group_l1:
-    """Sparse group Lasso regularization
+
+class SparseGroupL1:
+    """A class to define the proximal operator of the Sparse group Lasso penalty
 
     Parameters
     ----------
-    alpha: float
-        Constant multiplying this loss
+    l_pen : `float`
+        Level of penalization for the Sparse group Lasso
+
+    eta: `float`
+        The Sparse Group l1 mixing parameter, with 0 <= eta <= 1
+        For eta = 1 this is group lasso regularization
+        For eta = 0 this is lasso (L1) regularization
+        For 0 < eta < 1, the regularization is a linear combination of L1 and
+        group lasso
 
     groups: list of lists
+        The groups to be considered for the group lasso part
     """
 
-    def __init__(self, eta, l_pen, groups):
+    def __init__(self, l_pen, eta, groups):
+        self.l_pen = l_pen
         self.eta = eta
-        # groups need to be increasing
-        for i, g in enumerate(groups):
-            if not np.all(np.diff(g) == 1):
-                raise ValueError("Groups must be contiguous")
-            if i > 0 and groups[i - 1][-1] >= g[0]:
-                raise ValueError("Groups must be increasing")
         self.groups = groups
         self.L1 = L1Norm(l_pen * (1 - eta))
         self.GL1 = GroupL1(l_pen * eta, self.groups)
 
-    def __call__(self, x):
-        L1 = self.L1.__call__(x)
-        GL1 = self.GL1.__call__(x)
+    @property
+    def l_pen(self):
+        return self._l_pen
+
+    @l_pen.setter
+    def l_pen(self, val):
+        if not val >= 0:
+            raise ValueError("``l_pen`` must be non negative")
+        self._l_pen = val
+
+    @property
+    def eta(self):
+        return self._eta
+
+    @eta.setter
+    def eta(self, val):
+        if not 0 <= val <= 1:
+            raise ValueError("``eta`` must be in (0, 1)")
+        self._eta = val
+
+    @property
+    def groups(self):
+        return self._groups
+
+    @groups.setter
+    def groups(self, val):
+        for i, g in enumerate(val):
+            if not np.all(np.diff(g) == 1):
+                raise ValueError("Groups must be contiguous")
+            if i > 0 and val[i - 1][-1] >= g[0]:
+                raise ValueError("Groups must be increasing")
+        self._groups = val
+
+    def pen(self, v):
+        L1 = self.L1.__call__(v)
+        GL1 = self.GL1.__call__(v)
         return L1 + GL1
 
-    def prox(self, x, step_size):
-        L1_prox = self.L1.prox(x, step_size)
-        out = self.GL1.prox(L1_prox, step_size)
-        return out
+    def prox(self, v, step_size):
+        """Computes the proximal operator for the Sparse group Lasso
+         penalization of a vector v
+
+        Parameters
+        ----------
+        v : `np.ndarray`
+            A coefficient vector
+
+        step_size : `float`
+            Value of the step size for the optimization update at the current
+            solver iteration
+
+        Returns
+        -------
+        grad : `np.array`
+            The gradient of the elasticNet penalization part of vector v
+        """
+        L1_prox = self.L1.prox(v, step_size)
+        return self.GL1.prox(L1_prox, step_size)

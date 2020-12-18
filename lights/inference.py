@@ -6,12 +6,12 @@ import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, block_diag, \
-    get_vect_from_ext, get_xi_from_xi_ext, logistic_grad, get_times_infos
+    get_xi_from_xi_ext, logistic_grad, get_times_infos
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
-from lights.model.regularizations import Penalties, sparse_group_l1
+from lights.model.regularizations import ElasticNet, SparseGroupL1
 import copt as cp
 
 
@@ -90,7 +90,7 @@ class QNMCEM(Learner):
         self.l_pen = l_pen
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
-        self.pen = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
+        self.ENet = ElasticNet(l_pen, eta_elastic_net)
         self._fitted = False
 
         # Attributes that will be instantiated afterwards
@@ -171,23 +171,25 @@ class QNMCEM(Learner):
         log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
         xi = theta["xi"]
-        xi_pen = self.pen.elastic_net(xi)
+        xi_pen = self.ENet.pen(xi)
         # beta sparse group l1 penalty
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-        beta_0_pen = sparse_group_l1(eta, l_pen, groups).__call__(beta_0)
-        beta_1_pen = sparse_group_l1(eta, l_pen, groups).__call__(beta_1)
+        SGL1 = SparseGroupL1(l_pen, eta, groups)
+        beta_0_pen = SGL1.pen(beta_0)
+        beta_1_pen = SGL1.pen(beta_1)
         # gamma sparse group l1 penalty
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_0_indep = gamma_0[:p]
         gamma_0_dep = gamma_0[p:]
-        gamma_0_pen = self.pen.elastic_net(gamma_0_indep)
+        gamma_0_pen = self.ENet.pen(gamma_0_indep)
         groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-        gamma_0_pen += sparse_group_l1(eta, l_pen, groups).__call__(gamma_0_dep)
+        SGL1 = SparseGroupL1(l_pen, eta, groups)
+        gamma_0_pen += SGL1.pen(gamma_0_dep)
         gamma_1_indep = gamma_1[:p]
         gamma_1_dep = gamma_1[p:]
-        gamma_1_pen = self.pen.elastic_net(gamma_1_indep)
-        gamma_1_pen += sparse_group_l1(eta, l_pen, groups).__call__(gamma_1_dep)
+        gamma_1_pen = self.ENet.pen(gamma_1_indep)
+        gamma_1_pen += SGL1.pen(gamma_1_dep)
         pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
         return -log_lik + pen
 
@@ -510,8 +512,7 @@ class QNMCEM(Learner):
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
                                 asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen,
-                                self.eta_elastic_net, self.eta_sp_gp_l1,
-                                nb_asso_feat, alpha)
+                                self.eta_elastic_net, nb_asso_feat, alpha)
 
         S = E_func.construct_MC_samples(N)
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
@@ -595,9 +596,9 @@ class QNMCEM(Learner):
                                          beta_0_, self.theta["gamma_1"],
                                          self.theta["beta_1"])
             E_g9_ = lambda beta_0_: E_g9(beta_0_, self.theta["beta_1"])
-            eta, l_pen = self.eta_sp_gp_l1, self.l_pen
+            eta_sp_gp_l1, l_pen = self.eta_sp_gp_l1, self.l_pen
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-            prox = sparse_group_l1(eta, l_pen, groups).prox
+            prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
             args = [{"idx" : 0,
                     "pi_est": pi_est,
                     "E_g1": E_g1_,
@@ -633,7 +634,7 @@ class QNMCEM(Learner):
                                          self.theta["beta_0"],
                                          self.theta["gamma_1"], beta_1_)
             E_g9_ = lambda beta_1_: E_g9(self.theta["beta_0"], beta_1_)
-            prox = sparse_group_l1(eta, l_pen, groups).prox
+
             args = [{"idx" : 1,
                     "pi_est": pi_est,
                     "E_g1": E_g1_,
@@ -668,7 +669,6 @@ class QNMCEM(Learner):
             E_g8_ = lambda gamma_0_ : E_g8(gamma_0_,self.theta["beta_0"],
                                     self.theta["gamma_1"], self.theta["beta_1"])
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 0,
                    "pi_est" : pi_est,
                     "E_g1" : E_g1_,
@@ -695,7 +695,6 @@ class QNMCEM(Learner):
             E_g8_ = lambda gamma_1_: E_g8(self.theta["gamma_0"],
                                           self.theta["beta_0"], gamma_1_,
                                           self.theta["beta_1"])
-            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 1,
                     "pi_est" : pi_est,
                     "E_g1" : E_g1_,

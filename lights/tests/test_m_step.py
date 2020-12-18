@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 from lights.model.m_step_functions import MstepFunctions
 from lights.tests.testing_data import CreateTestingData
-from lights.base.base import get_ext_from_vect
+from lights.base.base import get_ext_from_vect, get_times_infos
 
 
 class Test(unittest.TestCase):
@@ -16,17 +16,17 @@ class Test(unittest.TestCase):
         L, p = data.n_long_features, data.n_time_indep_features
         l_pen = 2.
         eta_elastic_net = .2
-        eta_sp_gp_l1 = .3
         fit_intercept = False
+        T = np.unique(data.T)
+        T_u = np.unique(T)
+        _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
-                                     L, p, l_pen, eta_elastic_net, eta_sp_gp_l1,
+                                     L, p, l_pen, eta_elastic_net,
                                      data.nb_asso_feat, alpha)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([.2, .4, .7])
         self.data = data
-        self.E_g1 = np.array([[1, 2],
-                              [3, 5],
-                              [4, 6]])
+        self.E_g1 = np.array([[1, 2], [3, 5], [4, 6]])
         self.E_g2 = np.array([1, 4, 5])
         self.E_g8 = np.array([1, 5, 2])
 
@@ -50,9 +50,8 @@ class Test(unittest.TestCase):
         """Tests the R function
         """
         self.setUp()
-        ind = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         R = self.M_func.R_func(self.pi_est, self.E_g1, self.E_g2, self.E_g8,
-                               self.data.theta["baseline_hazard"], ind)
+                               self.data.theta["baseline_hazard"], self.ind_2)
         R_ = 21.1
         np.testing.assert_almost_equal(R, R_, 3)
 
@@ -60,7 +59,6 @@ class Test(unittest.TestCase):
         """Tests the gradient of R function
         """
         self.setUp()
-        ind = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         theta = self.data.theta
         beta_ext = get_ext_from_vect(theta["beta_0"])
         gamma_ext = get_ext_from_vect(theta["gamma_0"])
@@ -71,8 +69,8 @@ class Test(unittest.TestCase):
         E_g6 = np.arange(1, 271).reshape((3, 2, 3, 15))
         E_gS = np.arange(1, 19).reshape(3, 6)
         grad_R = self.M_func.grad_R(beta_ext, gamma_ext, self.pi_est, E_g5,
-                                    E_g6,
-                                    E_gS, baseline_hazard, ind, ext_feat, phi)
+                                    E_g6, E_gS, baseline_hazard, self.ind_2,
+                                    ext_feat, phi)
         grad_R_ = np.array([2579.433, 2694.2, 3027.733, 1956.267, 2423.667,
                             4571.267, 4180.3, 4514, 5677.2, -2579.433, -2694.2,
                             -3027.733, -1956.267, -2423.667, -4571.267, -4180.3,
@@ -83,11 +81,9 @@ class Test(unittest.TestCase):
         """Tests the Q function
         """
         self.setUp()
-        ind_1 = self.data.T.reshape(-1, 1) == np.unique(self.data.T)
-        ind_2 = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         baseline_hazard = self.data.theta["baseline_hazard"]
         Q = self.M_func.Q_func(self.pi_est, np.log(self.E_g1), self.E_g1,
-                               baseline_hazard, ind_1, ind_2)
+                               baseline_hazard, self.ind_1, self.ind_2)
         Q_ = 23.115
         np.testing.assert_almost_equal(Q, Q_, 3)
 
@@ -95,14 +91,12 @@ class Test(unittest.TestCase):
         """Test the gradient of Q function
         """
         self.setUp()
-        ind_1 = self.data.T.reshape(-1, 1) == np.unique(self.data.T)
-        ind_2 = self.data.T.reshape(-1, 1) >= np.unique(self.data.T)
         baseline_hazard = self.data.theta["baseline_hazard"]
         E_g1 = np.arange(1, 7).reshape((3, 2))
         E_g7 = np.arange(1, 91).reshape((3, 2, 15))
-        E_g8 = np.arange(1, 91).reshape(3, 2, 15)
+        E_g8 = np.arange(1, 91).reshape((3, 2, 15))
         grad_Q = self.M_func.grad_Q(self.pi_est, E_g1, E_g7, E_g8,
-                                    baseline_hazard, ind_1, ind_2)
+                                    baseline_hazard, self.ind_1, self.ind_2)
         grad_Q_ = np.array([12.267, -12.267, 57.2, -57.2, 265.3, -265.3, 270.1,
                             -270.1, 274.9, -274.9, 279.7, -279.7, 284.5, -284.5,
                             289.3, -289.3, 294.1, -294.1, 298.9, -298.9, 303.7,

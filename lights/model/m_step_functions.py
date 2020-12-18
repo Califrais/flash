@@ -2,9 +2,8 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import numpy as np
-from lights.base.base import get_vect_from_ext, logistic_loss, \
-    get_xi_from_xi_ext
-from lights.model.regularizations import Penalties
+from lights.base.base import logistic_loss, get_xi_from_xi_ext
+from lights.model.regularizations import ElasticNet
 
 
 class MstepFunctions:
@@ -40,13 +39,10 @@ class MstepFunctions:
         For eta_elastic_net = 1 this is lasso (L1) regularization
         For 0 < eta_elastic_net < 1, the regularization is a linear combination
         of L1 and L2
-
-    eta_sp_gp_l1: `float`, default=0.1
-        The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
     """
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
-                 n_time_indep_features, l_pen, eta_elastic_net, eta_sp_gp_l1,
+                 n_time_indep_features, l_pen, eta_elastic_net,
                  nb_asso_features, fixed_effect_time_order):
         self.fit_intercept = fit_intercept
         self.X, self.T, self.delta = X, T, delta
@@ -56,7 +52,7 @@ class MstepFunctions:
         self.n_samples = n_samples
         self.nb_asso_features = nb_asso_features
         self.fixed_effect_time_order = fixed_effect_time_order
-        self.pen = Penalties(l_pen, eta_elastic_net, eta_sp_gp_l1)
+        self.ENet = ElasticNet(l_pen, eta_elastic_net)
 
     def P_pen_func(self, pi_est, xi_ext):
         """Computes the sub objective function P with penalty, to be minimized
@@ -78,7 +74,7 @@ class MstepFunctions:
             The value of the P sub objective to be minimized at each QNMCEM step
         """
         xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
-        pen = self.pen.elastic_net(xi)
+        pen = self.ENet.pen(xi)
         P = self.P_func(pi_est, xi_ext)
         sub_obj = P + pen
         return sub_obj
@@ -157,7 +153,7 @@ class MstepFunctions:
         fit_intercept = self.fit_intercept
         n_time_indep_features = self.n_time_indep_features
         xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
-        grad_pen = self.pen.grad_elastic_net(xi)
+        grad_pen = self.ENet.grad(xi)
         if fit_intercept:
             grad_pen = np.concatenate([[0], grad_pen[:n_time_indep_features],
                                        [0], grad_pen[n_time_indep_features:]])
@@ -165,16 +161,12 @@ class MstepFunctions:
         return grad_P + grad_pen
 
     def R_func(self, beta, *args):
-        """Computes the function denoted R in the lights paper.
+        """Computes the function denoted R in the lights paper
 
         Parameters
         ----------
-
         beta : `np.ndarray`, shape=(n_long_features * q_l,)
-            fixed effect coefficients
-
-        args : dict
-            arguments for computing R
+            Fixed effect coefficients
 
         Returns
         -------
@@ -204,9 +196,6 @@ class MstepFunctions:
         beta : `np.ndarray`, shape=(n_long_features * q_l,)
             fixed effect coefficients
 
-        args : dict
-            arguments for computing gradient of R
-
         Returns
         -------
         output : `np.ndarray`
@@ -217,7 +206,7 @@ class MstepFunctions:
         q_l = self.fixed_effect_time_order + 1
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_ =  arg["ind_"] * 1
+        ind_ = arg["ind_"] * 1
         idx = arg["idx"]
         beta = beta.reshape(-1, 1)
         E_g5 = arg["E_g5"](beta).T[idx].T
@@ -256,9 +245,6 @@ class MstepFunctions:
         gamma : `np.ndarray`, shape=(nb_asso_feat,)
             Cox coefficients
 
-        args : dict
-            arguments for computing Q
-
         Returns
         -------
         output : `float`
@@ -286,9 +272,6 @@ class MstepFunctions:
         ----------
         gamma : `np.ndarray`, shape=(nb_asso_feat,)
             Cox coefficients
-
-        args : dict
-            arguments for computing gradient of Q
 
         Returns
         -------
