@@ -597,10 +597,11 @@ class QNMCEM(Learner):
                                          self.theta["beta_1"])
             E_g9_ = lambda beta_0_: E_g9(beta_0_, self.theta["beta_1"])
             eta_sp_gp_l1, l_pen = self.eta_sp_gp_l1, self.l_pen
+            pi_est_K = [1 - pi_est, pi_est]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
             args = [{"idx" : 0,
-                    "pi_est": pi_est,
+                    "pi_est": pi_est_K,
                     "E_g1": E_g1_,
                     "E_g2": E_g2_,
                     "E_g5": E_g5_,
@@ -636,7 +637,7 @@ class QNMCEM(Learner):
             E_g9_ = lambda beta_1_: E_g9(self.theta["beta_0"], beta_1_)
 
             args = [{"idx" : 1,
-                    "pi_est": pi_est,
+                    "pi_est": pi_est_K,
                     "E_g1": E_g1_,
                     "E_g2": E_g2_,
                     "E_g5": E_g5_,
@@ -670,7 +671,7 @@ class QNMCEM(Learner):
                                     self.theta["gamma_1"], self.theta["beta_1"])
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
             args = [{"idx" : 0,
-                   "pi_est" : pi_est,
+                   "pi_est" : pi_est_K,
                     "E_g1" : E_g1_,
                     "E_g7" : E_g7_,
                     "E_g8" : E_g8_,
@@ -696,7 +697,7 @@ class QNMCEM(Learner):
                                           self.theta["beta_0"], gamma_1_,
                                           self.theta["beta_1"])
             args = [{"idx" : 1,
-                    "pi_est" : pi_est,
+                    "pi_est" : pi_est_K,
                     "E_g1" : E_g1_,
                     "E_g7" : E_g7_,
                     "E_g8" : E_g8_,

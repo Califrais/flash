@@ -183,7 +183,7 @@ class MstepFunctions:
         E_g1 = arg["E_g1"](beta).T[idx].T
         E_g2 = arg["E_g2"](beta).T[idx].T
         E_g9 = arg["E_g9"](beta).T[idx].T
-        pi_est = arg["pi_est"]
+        pi_est = arg["pi_est"][idx]
         sub_obj = E_g2 * delta + E_g9 - (E_g1 * baseline_val * ind_).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
@@ -212,7 +212,7 @@ class MstepFunctions:
         E_g5 = arg["E_g5"](beta).T[idx].T
         E_g6 = arg["E_g6"](beta).T[idx].T
         E_gS = arg["E_gS"]
-        pi_est = arg["pi_est"]
+        pi_est = arg["pi_est"][idx]
         extracted_features = arg["extracted_features"]
         phi = arg["phi"]
         gamma = arg["gamma"][p:].reshape(L, -1)
@@ -258,7 +258,7 @@ class MstepFunctions:
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         E_g1 = arg["E_g1"](gamma).T[idx].T
         E_log_g1 = np.log(E_g1)
-        pi_est = arg["pi_est"]
+        pi_est = arg["pi_est"][idx]
 
         sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
                   (E_g1 * ind_2 * baseline_val).sum(axis=1)
@@ -289,7 +289,7 @@ class MstepFunctions:
         E_g1 = arg["E_g1"](gamma).T[idx].T
         E_g8 = arg["E_g8"](gamma).T[idx].T.swapaxes(0, 1)
         E_g7 = arg["E_g7"].T[idx].T
-        pi_est = arg["pi_est"]
+        pi_est = arg["pi_est"][idx]
 
         grad = np.zeros(nb_asso_features)
         grad[:p] = (self.X.T * (pi_est * (delta - (E_g1 * baseline_val * ind_2)
