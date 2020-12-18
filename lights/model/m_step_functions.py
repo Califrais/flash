@@ -170,24 +170,11 @@ class MstepFunctions:
         Parameters
         ----------
 
-        pi_est : `np.ndarray`, shape=(n_samples,)
-            The estimated posterior probability of the latent class membership
-            obtained by the E-step
+        beta : `np.ndarray`, shape=(n_long_features * q_l,)
+            fixed effect coefficients
 
-        E_g1 : `np.ndarray`, shape=(n_samples, J)
-            The approximated expectations of function g1 for each latent group
-
-        E_g2 : `np.ndarray`, shape=(n_samples)
-            The approximated expectations of function g2 for each latent group
-
-        E_g8 : `np.ndarray`, shape=(n_samples)
-            The approximated expectations of function g8 for each latent group
-
-        baseline_hazard : `np.ndarray`, shape=(n_samples,)
-            The baseline hazard function evaluated at each censored time
-
-        indicator : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
+        args : dict
+            arguments for computing R
 
         Returns
         -------
@@ -214,11 +201,11 @@ class MstepFunctions:
 
         Parameters
         ----------
-        Parameters
-        ----------
-        gamma :
+        beta : `np.ndarray`, shape=(n_long_features * q_l,)
+            fixed effect coefficients
 
-        args :
+        args : dict
+            arguments for computing gradient of R
 
         Returns
         -------
@@ -266,9 +253,11 @@ class MstepFunctions:
         """ Computes the function denoted Q in the lights paper.
         Parameters
         ----------
-        gamma :
+        gamma : `np.ndarray`, shape=(nb_asso_feat,)
+            Cox coefficients
 
-        args :
+        args : dict
+            arguments for computing Q
 
         Returns
         -------
@@ -295,9 +284,11 @@ class MstepFunctions:
 
         Parameters
         ----------
-        gamma :
+        gamma : `np.ndarray`, shape=(nb_asso_feat,)
+            Cox coefficients
 
-        args :
+        args : dict
+            arguments for computing gradient of Q
 
         Returns
         -------
