@@ -166,7 +166,7 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         p, L = self.n_time_indep_features, self.n_long_features
-        eta = self.eta_sp_gp_l1
+        eta, l_pen = self.eta_sp_gp_l1, self.l_pen
         theta = self.theta
         log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
@@ -175,19 +175,19 @@ class QNMCEM(Learner):
         # beta sparse group l1 penalty
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-        beta_0_pen = sparse_group_l1(eta, groups).__call__(beta_0)
-        beta_1_pen = sparse_group_l1(eta, groups).__call__(beta_1)
+        beta_0_pen = sparse_group_l1(eta, l_pen, groups).__call__(beta_0)
+        beta_1_pen = sparse_group_l1(eta, l_pen, groups).__call__(beta_1)
         # gamma sparse group l1 penalty
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_0_indep = gamma_0[:p]
         gamma_0_dep = gamma_0[p:]
         gamma_0_pen = self.pen.elastic_net(gamma_0_indep)
         groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-        gamma_0_pen += sparse_group_l1(eta, groups).__call__(gamma_0_dep)
+        gamma_0_pen += sparse_group_l1(eta, l_pen, groups).__call__(gamma_0_dep)
         gamma_1_indep = gamma_1[:p]
         gamma_1_dep = gamma_1[p:]
         gamma_1_pen = self.pen.elastic_net(gamma_1_indep)
-        gamma_1_pen += sparse_group_l1(eta, groups).__call__(gamma_1_dep)
+        gamma_1_pen += sparse_group_l1(eta, l_pen, groups).__call__(gamma_1_dep)
         pen = xi_pen + beta_0_pen + beta_1_pen + gamma_0_pen + gamma_1_pen
         return -log_lik + pen
 
@@ -595,9 +595,9 @@ class QNMCEM(Learner):
                                          beta_0_, self.theta["gamma_1"],
                                          self.theta["beta_1"])
             E_g9_ = lambda beta_0_: E_g9(beta_0_, self.theta["beta_1"])
-            alpha = self.eta_sp_gp_l1
+            eta, l_pen = self.eta_sp_gp_l1, self.l_pen
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-            prox = sparse_group_l1(alpha, groups).prox
+            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 0,
                     "pi_est": pi_est,
                     "E_g1": E_g1_,
@@ -633,7 +633,7 @@ class QNMCEM(Learner):
                                          self.theta["beta_0"],
                                          self.theta["gamma_1"], beta_1_)
             E_g9_ = lambda beta_1_: E_g9(self.theta["beta_0"], beta_1_)
-            prox = sparse_group_l1(alpha, groups).prox
+            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 1,
                     "pi_est": pi_est,
                     "E_g1": E_g1_,
@@ -668,7 +668,7 @@ class QNMCEM(Learner):
             E_g8_ = lambda gamma_0_ : E_g8(gamma_0_,self.theta["beta_0"],
                                     self.theta["gamma_1"], self.theta["beta_1"])
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-            prox = sparse_group_l1(alpha, groups).prox
+            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 0,
                    "pi_est" : pi_est,
                     "E_g1" : E_g1_,
@@ -695,7 +695,7 @@ class QNMCEM(Learner):
             E_g8_ = lambda gamma_1_: E_g8(self.theta["gamma_0"],
                                           self.theta["beta_0"], gamma_1_,
                                           self.theta["beta_1"])
-            prox = sparse_group_l1(alpha, groups).prox
+            prox = sparse_group_l1(eta, l_pen, groups).prox
             args = [{"idx" : 1,
                     "pi_est" : pi_est,
                     "E_g1" : E_g1_,

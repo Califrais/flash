@@ -110,8 +110,8 @@ class sparse_group_l1:
     groups: list of lists
     """
 
-    def __init__(self, alpha, groups):
-        self.alpha = alpha
+    def __init__(self, eta, l_pen, groups):
+        self.eta = eta
         # groups need to be increasing
         for i, g in enumerate(groups):
             if not np.all(np.diff(g) == 1):
@@ -119,8 +119,8 @@ class sparse_group_l1:
             if i > 0 and groups[i - 1][-1] >= g[0]:
                 raise ValueError("Groups must be increasing")
         self.groups = groups
-        self.L1 = L1Norm(1 - alpha)
-        self.GL1 = GroupL1(alpha, self.groups)
+        self.L1 = L1Norm(l_pen * (1 - eta))
+        self.GL1 = GroupL1(l_pen * eta, self.groups)
 
     def __call__(self, x):
         L1 = self.L1.__call__(x)
