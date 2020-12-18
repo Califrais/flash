@@ -27,7 +27,7 @@ cloudpickle==1.2.1
 colorlover==0.3.0
 copt==0.8.4
 crisp-api==1.1.1
-cryptography==2.7
+cryptography==3.2
 cufflinks==0.17.0
 cycler==0.10.0
 dask==2.9.1
