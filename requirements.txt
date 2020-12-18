@@ -10,6 +10,7 @@ bleach==3.1.5
 certifi==2020.4.5.2
 cffi==1.14.3
 chardet==3.0.4
+copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
 cycler==0.10.0
 decorator==4.4.2
 defusedxml==0.6.0
@@ -66,6 +67,7 @@ scikit-learn==0.23.1
 scipy==1.4.1
 Send2Trash==1.5.0
 six==1.15.0
+sklearn==0.0
 snowballstemmer==2.0.0
 Sphinx==3.1.0
 sphinxcontrib-applehelp==1.0.2
@@ -80,6 +82,7 @@ testpath==0.4.4
 threadpoolctl==2.1.0
 tick==0.6.0.0
 tornado==6.0.4
+tqdm==4.54.1
 traitlets==4.3.3
 urllib3==1.25.9
 wcwidth==0.2.4
