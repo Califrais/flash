@@ -413,7 +413,7 @@ class QNMCEM(Learner):
                 xi_0, xi = get_xi_from_xi_ext(value, self.fit_intercept)
                 self.theta["xi_0"], self.theta["xi"] = xi_0, xi
             else:
-                raise ValueError('Parameter {} has not defined'.format(key))
+                raise ValueError('Parameter {} is not defined'.format(key))
 
     def fit(self, X, Y, T, delta):
         """Fits the lights model
