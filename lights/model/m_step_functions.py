@@ -160,13 +160,13 @@ class MstepFunctions:
         grad_P = self.grad_P(pi_est, xi_ext)
         return grad_P + grad_pen
 
-    def R_func(self, beta, *args):
+    def R_func(self, beta_k, *args):
         """Computes the function denoted R in the lights paper
 
         Parameters
         ----------
-        beta : `np.ndarray`, shape=(n_long_features * q_l,)
-            Fixed effect coefficients
+        beta_k : `np.ndarray`, shape=(n_long_features * q_l,)
+            Fixed effect parameters for group k
 
         Returns
         -------
@@ -177,24 +177,25 @@ class MstepFunctions:
         delta = self.delta
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_ = arg["ind_"] * 1
+        ind_2 = arg["ind_2"] * 1
         group = arg["group"]
-        beta = beta.reshape(-1, 1)
-        E_g1 = arg["E_g1"](beta).T[group].T
-        E_g2 = arg["E_g2"](beta).T[group].T
-        E_g9 = arg["E_g9"](beta).T[group].T
+        beta_k = beta_k.reshape(-1, 1)
+        E_g1 = arg["E_g1"](beta_k).T[group].T
+        E_g2 = arg["E_g2"](beta_k).T[group].T
+        E_g9 = arg["E_g9"](beta_k).T[group].T
         pi_est = arg["pi_est"][group]
-        sub_obj = E_g2 * delta + E_g9 - (E_g1 * baseline_val * ind_).sum(axis=1)
+        sub_obj = E_g2 * delta + E_g9 - (E_g1 * baseline_val * ind_2).sum(
+            axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_R(self, beta, *args):
+    def grad_R(self, beta_k, *args):
         """Computes the gradient of the function R
 
         Parameters
         ----------
-        beta : `np.ndarray`, shape=(n_long_features * q_l,)
-            fixed effect coefficients
+        beta_k : `np.ndarray`, shape=(n_long_features * q_l,)
+            Fixed effect parameters for group k
 
         Returns
         -------
@@ -206,23 +207,23 @@ class MstepFunctions:
         q_l = self.fixed_effect_time_order + 1
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_ = arg["ind_"] * 1
+        ind_2 = arg["ind_2"] * 1
         group = arg["group"]
-        beta = beta.reshape(-1, 1)
-        E_g5 = arg["E_g5"](beta).T[group].T
-        E_g6 = arg["E_g6"](beta).T[group].T
+        beta_k = beta_k.reshape(-1, 1)
+        E_g5 = arg["E_g5"](beta_k).T[group].T
+        E_g6 = arg["E_g6"](beta_k).T[group].T
         E_gS = arg["E_gS"]
         pi_est = arg["pi_est"][group]
         extracted_features = arg["extracted_features"]
         phi = arg["phi"]
-        gamma = arg["gamma"][p:].reshape(L, -1)
+        gamma_k = arg["gamma"][group][p:].reshape(L, -1)
         # To match the dimension of the association func derivative over beta
-        gamma_ = np.repeat(gamma, q_l, axis=1)
+        gamma_k = np.repeat(gamma_k, q_l, axis=1)
 
         tmp1 = (E_g5.T * self.delta).T - \
-               (E_g6.T * (ind_ * baseline_val).T).T.sum(axis=1)
-        # split and sum over each l-th beta
-        tmp1 = (tmp1 * gamma_).reshape(n_samples, L, -1, q_l).sum(axis=2)
+               (E_g6.T * (ind_2 * baseline_val).T).T.sum(axis=1)
+        # Split and sum over each l-th beta
+        tmp1 = (tmp1 * gamma_k).reshape(n_samples, L, -1, q_l).sum(axis=2)
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         tmp2 = np.zeros((n_samples, L * q_l))
@@ -231,19 +232,20 @@ class MstepFunctions:
             y_i = y_i.flatten()
             Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta.flatten()) -
+            tmp2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
                                           V_i.dot(E_gS[i]))).flatten()
 
         grad = ((tmp1.reshape(n_samples, -1) + tmp2).T * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
 
-    def Q_func(self, gamma, *args):
+    def Q_func(self, gamma_k, *args):
         """ Computes the function denoted Q in the lights paper.
+
         Parameters
         ----------
-        gamma : `np.ndarray`, shape=(nb_asso_feat,)
-            Cox coefficients
+        gamma_k : `np.ndarray`, shape=(nb_asso_feat,)
+            Association parameters for group k
 
         Returns
         -------
@@ -253,25 +255,24 @@ class MstepFunctions:
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
         group = arg["group"]
-        gamma = gamma.reshape(-1, 1)
+        gamma_k = gamma_k.reshape(-1, 1)
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
-        E_g1 = arg["E_g1"](gamma).T[group].T
+        E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_log_g1 = np.log(E_g1)
         pi_est = arg["pi_est"][group]
-
         sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
                   (E_g1 * ind_2 * baseline_val).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_Q(self, gamma, *args):
+    def grad_Q(self, gamma_k, *args):
         """Computes the gradient of the function Q
 
         Parameters
         ----------
-        gamma : `np.ndarray`, shape=(nb_asso_feat,)
-            Cox coefficients
+        gamma_k : `np.ndarray`, shape=(nb_asso_feat,)
+            Association parameters for group k
 
         Returns
         -------
@@ -285,17 +286,16 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
-        gamma = gamma.reshape(-1, 1)
-        E_g1 = arg["E_g1"](gamma).T[group].T
-        E_g8 = arg["E_g8"](gamma).T[group].T.swapaxes(0, 1)
+        gamma_k = gamma_k.reshape(-1, 1)
+        E_g1 = arg["E_g1"](gamma_k).T[group].T
+        E_g8 = arg["E_g8"](gamma_k).T[group].T.swapaxes(0, 1)
         E_g7 = arg["E_g7"].T[group].T
         pi_est = arg["pi_est"][group]
-
         grad = np.zeros(nb_asso_features)
         grad[:p] = (self.X.T * (pi_est * (delta - (E_g1 * baseline_val * ind_2)
                                           .sum(axis=1)))).sum(axis=1)
         tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - (
                     E_g8.T * baseline_val * ind_2).sum(axis=-1).T
         grad[p:] = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
-        grad_sub_obj = np.vstack((grad, -grad)).T
-        return (-grad_sub_obj / n_samples).flatten()
+        grad_sub_obj = np.concatenate([grad, -grad])
+        return -grad_sub_obj / n_samples
