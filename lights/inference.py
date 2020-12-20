@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 import numpy as np
 import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b

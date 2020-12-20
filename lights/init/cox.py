@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 from lifelines import CoxPHFitter
 import pandas as pd
 import numpy as np

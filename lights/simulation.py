@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz

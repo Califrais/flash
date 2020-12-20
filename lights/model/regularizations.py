@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 import numpy as np
 from copt.penalty import L1Norm, GroupL1
 

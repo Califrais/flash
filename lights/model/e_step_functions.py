@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 import numpy as np
 from lights.model.associations import get_asso_func
 from lights.base.base import get_times_infos

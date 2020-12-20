@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt

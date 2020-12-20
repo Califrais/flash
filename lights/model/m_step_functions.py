@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 import numpy as np
 from lights.base.base import logistic_loss, get_xi_from_xi_ext
 from lights.model.regularizations import ElasticNet

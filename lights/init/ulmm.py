@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 from lights.base.base import Learner
 import numpy as np
 import statsmodels.formula.api as smf

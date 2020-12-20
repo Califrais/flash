@@ -4,8 +4,7 @@
 import unittest
 import numpy as np
 import pandas as pd
-from lights.base.base import get_vect_from_ext, get_xi_from_xi_ext, \
-    extract_features
+from lights.base.base import get_xi_from_xi_ext, extract_features
 
 
 class Test(unittest.TestCase):
@@ -46,14 +45,6 @@ class Test(unittest.TestCase):
                         [1, 2, 4],
                         [1, 4, 16]])
         np.testing.assert_almost_equal(U_L[0], U_1)
-
-    def test_get_vect_from_ext(self):
-        """Test get_vect_from_ext function
-        """
-        v_ext = np.array([1, 0, 3, 0, 5, 0])
-        v = get_vect_from_ext(v_ext)
-        v_ = np.array([1, -5, 3])
-        np.testing.assert_almost_equal(v, v_)
 
     def test_get_xi_from_xi_ext(self):
         """Test get_xi_from_xi_ext function

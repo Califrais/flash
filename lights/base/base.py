@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# Author: Simon Bussy <simon.bussy@gmail.com>
-
 from datetime import datetime
 from lights.base.history import History
 from time import time
@@ -286,27 +283,6 @@ def get_times_infos(T, T_u):
     indicator_1 = T.reshape(-1, 1) == T_u
     indicator_2 = T.reshape(-1, 1) >= T_u
     return J, indicator_1, indicator_2
-
-
-def get_vect_from_ext(v_ext):
-    """Obtain the signed coefficient vector from its extension on positive
-    and negative parts
-
-    Parameters
-    ----------
-    v_ext : `np.ndarray`, shape=(2 * dim,)
-        An extended vector decomposed on positive and negative parts
-
-    Returns
-    -------
-    v : `np.ndarray`, shape=(dim,)
-        The signed vector in its original representation
-    """
-    dim = len(v_ext)
-    if dim % 2 != 0:
-        raise ValueError("``v_ext`` dimension cannot be odd, got %s" % dim)
-    v = v_ext[:dim // 2] - v_ext[dim // 2:]
-    return v
 
 
 def get_ext_from_vect(v):
