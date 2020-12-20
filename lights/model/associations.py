@@ -13,7 +13,11 @@ def get_asso_func(T_u, S, beta_0, beta_1, asso_functions, n_long_features,
     S : `np.ndarray`, shape=(2*N, r)
         Set of constructed Monte Carlo samples
 
-    beta_0, beta_1 blabla
+    beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+    beta_1 : `np.ndarray`, shape=(q,)
+        Fixed effect parameters for high-risk group
 
     asso_functions : `list` or `str`='all'
         List of association functions wanted or string 'all' to select all
