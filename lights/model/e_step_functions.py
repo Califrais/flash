@@ -148,6 +148,18 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for low-risk group
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
         broadcast : `boolean`, default=True
             Indicates to expand the dimension of g1 or not
 
@@ -176,6 +188,18 @@ class EstepFunctions:
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for low-risk group
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
 
         broadcast : `boolean`, default=True
             Indicate to expand the dimension of g2 or not
@@ -209,6 +233,12 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
         broadcast : `boolean`, default=True
             Indicate to expand the dimension of g1 or not
 
@@ -225,8 +255,8 @@ class EstepFunctions:
             g5 = g5.swapaxes(0, 2)
             g5 = np.sum(np.broadcast_to(g5, (self.n_samples,) + g5.shape).T *
                         (self.ind_1 * 1).T, axis=-2).T
-            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,))\
-                .swapaxes(2, 5).swapaxes(1, 2)
+            g5 = np.broadcast_to(g5[..., None], g5.shape + (2,))
+            g5 = g5.swapaxes(2, 5).swapaxes(1, 2)
         return g5
 
     def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
@@ -236,6 +266,18 @@ class EstepFunctions:
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for low-risk group
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
 
         Returns
         -------
@@ -258,6 +300,12 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
         broadcast : `boolean`, default=True
             Indicate to expand the dimension of g1 or not
 
@@ -270,44 +318,63 @@ class EstepFunctions:
         N_MC, J = S.shape[0], self.J
         asso_func, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
-        g7 = get_asso_func(T_u, S, beta_0, beta_1, asso_func, L, alpha).swapaxes(1, 2)
-        g7 = g7.reshape(K, N_MC, J, -1)
+        g7 = get_asso_func(T_u, S, beta_0, beta_1, asso_func, L, alpha)
+        g7 = g7.swapaxes(1, 2).reshape(K, N_MC, J, -1)
         if broadcast:
             g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
             g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
         return g7
 
-    def g8(self, S, gamma_0_, beta_0_, gamma_1_, beta_1_):
+    def g8(self, S, gamma_0, beta_0, gamma_1, beta_1):
         """Computes g8
+
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for low-risk group
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
 
         Returns
         -------
         g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
             The values of g8 function
         """
-        g7 = self.g7(S, beta_0_, beta_1_, False)
-        g1 = self.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_, False)
+        g7 = self.g7(S, beta_0, beta_1, False)
+        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, False)
         g8 = g1[..., np.newaxis] * g7
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
 
-    def _get_g3_4_9(self, beta_0_, beta_1_, S):
+    def _get_g3_4_9(self, S, beta_0, beta_1):
         """Computes g3, g4, g9
 
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
         U_list, V_list, y_list, N_list = self.extracted_features[0]
         theta, K, N_MC = self.theta, self.K, S.shape[0]
-        phi  = theta["phi"]
-        beta_stack = np.hstack((beta_0_, beta_1_))
+        phi = theta["phi"]
+        beta_stack = np.hstack((beta_0, beta_1))
         g3, g4, g9 = [], [], np.zeros(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
@@ -320,7 +387,7 @@ class EstepFunctions:
         g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
         self.g3_, self.g4_, self.g9_ = g3, g4, g9
 
-    def g3(self, S, beta_0_, beta_1_):
+    def g3(self, S, beta_0, beta_1):
         """Computes g3
 
         Parameters
@@ -328,16 +395,22 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
                 Set of constructed Monte Carlo samples
 
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
         Returns
         -------
         g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
             The values of g3 function
         """
         if self.g3_ is None:
-            self._get_g3_4_9(beta_0_, beta_1_, S)
+            self._get_g3_4_9(S, beta_0, beta_1)
         return self.g3_
 
-    def g9(self, S, beta_0_, beta_1_):
+    def g9(self, S, beta_0, beta_1):
         """Computes g9
 
         Parameters
@@ -345,13 +418,19 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
         Returns
         -------
         g9 : `np.ndarray`, shape=(n_samples, K, N_MC, K)
             The values of g9 function
         """
         if self.g9_ is None:
-            self._get_g3_4_9(beta_0_, beta_1_, S)
+            self._get_g3_4_9(S, beta_0, beta_1)
         return self.g9_
 
     @staticmethod
@@ -408,5 +487,5 @@ class EstepFunctions:
         """
         Lambda_g = self.Lambda_g(g, f)
         Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
-                    Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
+                Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
         return Eg.T

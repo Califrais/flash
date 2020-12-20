@@ -166,7 +166,7 @@ class SparseGroupL1:
         Returns
         -------
         grad : `np.array`
-            The gradient of the elasticNet penalization part of vector v
+            The proximal operator of the Sparse group Lasso computed on vector v
         """
         L1_prox = self.L1.prox(v, step_size)
         return self.GL1.prox(L1_prox, step_size)
