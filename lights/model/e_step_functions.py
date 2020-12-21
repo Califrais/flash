@@ -163,6 +163,7 @@ class EstepFunctions:
         Returns
         -------
         g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
+                            or (n_samples, K, N_MC, J, K)
             The values of g1 function
         """
         n_samples, K = self.n_samples, self.K
@@ -203,7 +204,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g2 : `np.ndarray`, shape=(K, J, N_MC)
+        g2 : `np.ndarray`, shape=(K, J, N_MC) or (n_samples, K, N_MC, K)
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
@@ -308,7 +309,8 @@ class EstepFunctions:
 
         Returns
         -------
-        g7 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
+        g7 : `np.ndarray`, shape=(K, N_MC, J, dim)
+                            or (n_samples, K, N_MC, J, dim, K)
             The values of g7 function
         """
         T_u, theta, K = self.T_u, self.theta, self.K
