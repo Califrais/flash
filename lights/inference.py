@@ -593,14 +593,11 @@ class QNMCEM(Learner):
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "E_gS": E_gS, "phi": phi,
+            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_gS, "phi": phi,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
-                      "E_g2": lambda v: E_g2(gamma_0, v, gamma_1, beta_1),
-                      "E_g5": lambda v: E_g5(v, beta_1),
-                      "E_g6": lambda v: E_g6(gamma_0, v, gamma_1, beta_1),
-                      "E_g9": lambda v: E_g9(v, beta_1), "group": 0}
+                      "group": 0}
             beta_0_prev = beta_0.copy()
             args = [{**args_all, **args_0}]
             beta_0 = copt.minimize_proximal_gradient(
@@ -610,10 +607,7 @@ class QNMCEM(Learner):
 
             # beta_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0, beta_0_prev, gamma_1, v),
-                      "E_g2": lambda v: E_g2(gamma_0, beta_0_prev, gamma_1, v),
-                      "E_g5": lambda v: E_g5(beta_0, v),
-                      "E_g6": lambda v: E_g6(gamma_0, beta_0_prev, gamma_1, v),
-                      "E_g9": lambda v: E_g9(beta_0_prev, v), "group": 1}
+                     "group": 1}
             args = [{**args_all, **args_1}]
             beta_1 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[1], prox=prox, args=args,

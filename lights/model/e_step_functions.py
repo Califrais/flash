@@ -1,5 +1,5 @@
 import numpy as np
-from lights.model.associations import get_asso_func
+from lights.model.associations import AssociationFunctions
 from lights.base.base import get_times_infos
 
 
@@ -212,8 +212,7 @@ class EstepFunctions:
         asso_functions, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape((K, 1, 1, -1))
-        asso_func = get_asso_func(T_u, S, beta_0, beta_1, asso_functions, L,
-                                  alpha)
+        asso_func = AssociationFunctions(self.T_u, self.fixed_effect_time_order, self.n_long_features)
         asso_func_ = asso_func.reshape(K, J, N_MC, -1)
         g2 = np.sum(asso_func_ * gamma_dep, axis=-1)
         if broadcast:
