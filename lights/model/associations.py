@@ -23,6 +23,7 @@ class AssociationFunctions:
         self.J = len(T_u)
         self.n_long_features = n_long_features
         self.q_l = fixed_effect_time_order + 1
+        r_l = 2
         J = self.J
 
         # U, integral over U, derivative of U
@@ -44,6 +45,14 @@ class AssociationFunctions:
         V_l = np.c_[np.ones(J), T_u]
         iV_l = np.c_[T_u, (T_u ** 2) / 2]
         dV_l = np.c_[np.zeros(J), np.ones(J)]
+
+        self.V = np.zeros(shape=(J, L, L * r_l))
+        self.iV = np.zeros(shape=(J, L, L * r_l))
+        self.dV = np.zeros(shape=(J, L, L * r_l))
+        for j in range(J):
+            self.V[j] = block_diag((V_l[j].reshape(1, -1),) * L)
+            self.iV[j] = block_diag((iV_l[j].reshape(1, -1),) * L)
+            self.dV[j] = block_diag((dV_l[j].reshape(1, -1),) * L)
 
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l

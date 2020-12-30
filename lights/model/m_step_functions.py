@@ -178,40 +178,41 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_2 = arg["ind_2"] * 1
         group = arg["group"]
-        beta_k = beta_k.reshape(-1, 1)
-        gamma_k = arg["gamma"][group][p:].reshape(L, -1)
+        # beta_k = beta_k.reshape(-1, 1)
+        gamma_k = arg["gamma"][group][p:]
         pi_est = arg["pi_est"][group]
 
         E_g1 = arg["E_g1"](beta_k).T[group].T
-        Eb = arg["Eb"](beta_k).T[group].T
-        EbbT = arg["EbbT"](beta_k).T[group].T
+        Eb = arg["E_b"]
+        EbbT = arg["E_bbT"]
+        phi = arg["phi"]
 
         T_u = np.unique(self.T)
-        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L)
-        tmp1 = delta * gamma_k * (fixed_feat_assoc * beta_k + rand_feat_assoc * Eb) - \
+        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L)._get_assoc_feat()
+        tmp1 = delta * (fixed_feat_assoc.dot(beta_k.flatten()) + (rand_feat_assoc.swapaxes(0, 1) * Eb).sum(axis=-1).T).dot(gamma_k) - \
                (E_g1 * baseline_val * ind_2).sum(axis=1)
-        tmp2 = arg["E_g9"](beta_k).T[group].T
         extracted_features = arg["extracted_features"]
-        tmp = self._Eg(extracted_features, Eb, EbbT, beta_k)
+        tmp = self._Eg(extracted_features, Eb, EbbT, beta_k, phi)
 
-        sub_obj = (pi_est * (tmp1 + tmp2)).sum()
+        sub_obj = (pi_est * (tmp1 + tmp)).sum()
 
         return -sub_obj / n_samples
 
-    def _Eg(self, extracted_features, Eb, EbbT, beta):
+    def _Eg(self, extracted_features, Eb, EbbT, beta, phi):
         U_list, V_list, y_list, N_list = extracted_features[0]
-        phi = self.theta["phi"]
         n_samples, n_long_features = self.n_samples, self.n_long_features
-        N_MC = Eb.shape[0]
-        g = np.zeros(shape=(n_samples, N_MC))
+        g = np.zeros(shape=(n_samples))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
-            M_i = U_i.dot(beta).T.reshape(-1, 1) + V_i.dot(Eb)
+
+            M_i = U_i.dot(beta) + V_i.dot(Eb[i]).reshape(-1, 1)
             Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            tmp1 = M_i * y_i * Phi_i
-            tmp2 = Phi_i * ((U_i * beta) ** 2 + 2 * U_i * beta * Eb * V_i.T
-                            + V_i * EbbT * V_i.T)
+            tmp1 = (M_i * y_i).T.dot(Phi_i)
+            # TODO: Verify the math
+            tmp2 = ((U_i.dot(beta)) ** 2 + 2 * U_i.dot(beta) * (V_i.dot(Eb[i]).reshape(-1, 1))
+                            + V_i.dot(EbbT[i].dot(V_i.T))).dot(Phi_i)
+
             g[i] = tmp1 - .5 * tmp2
 
     def grad_R(self, beta_k, *args):
