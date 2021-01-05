@@ -222,6 +222,60 @@ class EstepFunctions:
             g2 = np.broadcast_to(g2[..., None], g2.shape + (2,)).swapaxes(1, 3)
         return g2
 
+    def _get_g3_4_9(self, S, beta_0, beta_1):
+        """Computes g3, g4, g9
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+        """
+        n_samples, n_long_features = self.n_samples, self.n_long_features
+        U_list, V_list, y_list, N_list = self.extracted_features[0]
+        theta, K, N_MC = self.theta, self.K, S.shape[0]
+        phi = theta["phi"]
+        beta_stack = np.hstack((beta_0, beta_1))
+        g3, g4, g9 = [], [], np.zeros(shape=(n_samples, K, N_MC))
+        for i in range(n_samples):
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
+            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
+            Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
+            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
+            g3.append(M_iS)
+            g4.append(.5 * (M_iS ** 2) * Phi_i)
+            g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
+        g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
+        self.g3_, self.g4_, self.g9_ = g3, g4, g9
+
+    def g3(self, S, beta_0, beta_1):
+        """Computes g3
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+                Set of constructed Monte Carlo samples
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
+        Returns
+        -------
+        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
+            The values of g3 function
+        """
+        if self.g3_ is None:
+            self._get_g3_4_9(S, beta_0, beta_1)
+        return self.g3_
+
     def g5(self, S, beta_0, beta_1, broadcast=True):
         """Computes g5
 
@@ -352,60 +406,6 @@ class EstepFunctions:
         g8 = g1[..., np.newaxis] * g7
         g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
         return g8
-
-    def _get_g3_4_9(self, S, beta_0, beta_1):
-        """Computes g3, g4, g9
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
-        """
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        U_list, V_list, y_list, N_list = self.extracted_features[0]
-        theta, K, N_MC = self.theta, self.K, S.shape[0]
-        phi = theta["phi"]
-        beta_stack = np.hstack((beta_0, beta_1))
-        g3, g4, g9 = [], [], np.zeros(shape=(n_samples, K, N_MC))
-        for i in range(n_samples):
-            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
-            Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
-            g3.append(M_iS)
-            g4.append(.5 * (M_iS ** 2) * Phi_i)
-            g9[i] = np.sum(g3[i] * y_i * Phi_i - g4[i], axis=1)
-        g9 = np.broadcast_to(g9[..., None], g9.shape + (2,)).swapaxes(1, -1)
-        self.g3_, self.g4_, self.g9_ = g3, g4, g9
-
-    def g3(self, S, beta_0, beta_1):
-        """Computes g3
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-                Set of constructed Monte Carlo samples
-
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
-
-        Returns
-        -------
-        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
-            The values of g3 function
-        """
-        if self.g3_ is None:
-            self._get_g3_4_9(S, beta_0, beta_1)
-        return self.g3_
 
     def g9(self, S, beta_0, beta_1):
         """Computes g9
