@@ -58,6 +58,16 @@ class AssociationFunctions:
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
     def get_asso_feat(self):
+        """
+        Produces matrices of stacked association fixed and random features
+        Returns
+        -------
+        fixed_feat : `np.ndarray`, shape=(J, A*r, q)
+            The fixed feature corresponding to fixed effect
+
+        rand_feat : `np.ndarray`, shape=(J, A*r, r)
+            The random feature corresponding to random effect
+        """
         L = self.n_long_features
         q_l = self.q_l
         r_l = 2
