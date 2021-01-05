@@ -575,7 +575,7 @@ class QNMCEM(Learner):
             args = [{**args_all, **args_0}]
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, args=args,
-                jac=F_func.grad_R, max_iter=100, step="backtracking",
+                jac=F_func.grad_R, max_iter=100, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # beta_1 update
@@ -584,7 +584,7 @@ class QNMCEM(Learner):
             args = [{**args_all, **args_1}]
             beta_1 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[1], prox=prox, args=args,
-                jac=F_func.grad_R, max_iter=100, step="backtracking",
+                jac=F_func.grad_R, max_iter=100, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # TODO : no need for that then ? to be checked
