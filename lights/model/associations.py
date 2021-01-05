@@ -57,8 +57,7 @@ class AssociationFunctions:
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
-
-    def _get_assoc_feat(self):
+    def get_asso_feat(self):
         L = self.n_long_features
         q_l = self.q_l
         r_l = 2
@@ -67,6 +66,5 @@ class AssociationFunctions:
         fixed_feat = np.concatenate((self.U, tmp, self.dU, self.iU), axis=1)
         tmp = np.broadcast_to(np.eye(L * r_l, L * r_l), (J, L * r_l, L * r_l))
         rand_feat = np.concatenate((self.V, tmp, self.dV, self.iV), axis=1)
-
         return fixed_feat, rand_feat
 

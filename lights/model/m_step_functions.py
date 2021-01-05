@@ -188,7 +188,7 @@ class MstepFunctions:
         phi = arg["phi"]
 
         T_u = np.unique(self.T)
-        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L)._get_assoc_feat()
+        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L).get_asso_feat()
         tmp1 = delta * (fixed_feat_assoc.dot(beta_k.flatten()) + (rand_feat_assoc.swapaxes(0, 1) * Eb).sum(axis=-1).T).dot(gamma_k) - \
                (E_g1 * baseline_val * ind_2).sum(axis=1)
         extracted_features = arg["extracted_features"]
