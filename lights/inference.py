@@ -535,6 +535,15 @@ class QNMCEM(Learner):
                     E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                     Lambda_1, pi_xi, f)
 
+            def E_log_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
+                return E_func.Eg(
+                    E_func.log_g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                    Lambda_1, pi_xi, f)
+
+            def E_g6(gamma_0_, beta_0_, gamma_1_, beta_1_):
+                return E_func.Eg(E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                    Lambda_1, pi_xi, f)
+
             if False:  # TODO: condition to be defined
                 N *= 1.1
                 fctr *= .1
@@ -571,8 +580,8 @@ class QNMCEM(Learner):
                         "extracted_features": ext_feat, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
-            beta_0_prev = beta_0.copy()
             args = [{**args_all, **args_0}]
+            beta_0_prev = beta_0.copy()
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, args=args,
                 jac=F_func.grad_R, max_iter=100, step="",
@@ -592,28 +601,33 @@ class QNMCEM(Learner):
             # self._update_theta(beta_0=beta_0, beta_1=beta_1)
 
             # gamma_0 update
+            beta_K = [beta_0, beta_1]
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "baseline_hazard": baseline_hazard,
-                        "ind_1": ind_1, "ind_2": ind_2}
+            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0,
+                        "phi": phi, "beta": beta_K,
+                        "baseline_hazard": baseline_hazard,
+                        "extracted_features": ext_feat, "ind_1": ind_1, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(v, beta_0, gamma_1, beta_1),
-                      "E_g7": E_g7(beta_0, beta_1), "group": 0,
-                      "E_g8": lambda v: E_g8(v, beta_0, gamma_1, beta_1)}
+                      "E_log_g1": lambda v: E_log_g1(v, beta_0, gamma_1, beta_1),
+                      "E_g6": lambda v: E_g6(v, beta_0, gamma_1, beta_1),
+                      "group": 0}
             args = [{**args_all, **args_0}]
             gamma_0_prev = gamma_0.copy()
             gamma_0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox, args=args,
-                jac=F_func.grad_Q, max_iter=100, step="backtracking",
+                jac=F_func.grad_Q, max_iter=100, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, beta_0, v, beta_1),
-                      "E_g7": E_g7(beta_0, beta_1), "group": 1,
-                      "E_g8": lambda v: E_g8(gamma_0_prev, beta_0, v, beta_1)}
+                      "E_log_g1": lambda v: E_log_g1(gamma_0, beta_0, v, beta_1),
+                      "E_g6": lambda v: E_g6(gamma_0, beta_0, v, beta_1),
+                      "group": 1}
             args = [{**args_all, **args_1}]
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox, args=args,
-                jac=F_func.grad_Q, max_iter=100, step="backtracking",
+                jac=F_func.grad_Q, max_iter=100, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma needs to be updated before the baseline

@@ -176,6 +176,11 @@ class EstepFunctions:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
 
+    def log_g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
+        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
+        log_g1 = np.log(g1)
+        return log_g1
+
     def g2(self, S, gamma_0, beta_0, gamma_1, beta_1):
         """Computes g2
 
@@ -237,6 +242,37 @@ class EstepFunctions:
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g3.append(M_iS)
         return g3
+
+    def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
+        """Computes g6
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for low-risk group
+
+        beta_0 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+
+        Returns
+        -------
+        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, r, J, K)
+            The values of g6 function
+        """
+        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
+        g6 = (g1.swapaxes(2, -1)[..., np.newaxis] * S).swapaxes(2, -1)\
+                                        .swapaxes(3, 4).swapaxes(2, 3)
+
+        return g6
 
     @staticmethod
     def Lambda_g(g, f):
