@@ -577,7 +577,8 @@ class QNMCEM(Learner):
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0, "phi": phi,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat, "ind_2": ind_2}
+                        "extracted_features": ext_feat,
+                        "ind_1": ind_1, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
             args = [{**args_all, **args_0}]
@@ -607,7 +608,8 @@ class QNMCEM(Learner):
             args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat, "ind_1": ind_1, "ind_2": ind_2}
+                        "extracted_features": ext_feat,
+                        "ind_1": ind_1, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(v, beta_0, gamma_1, beta_1),
                       "E_log_g1": lambda v: E_log_g1(v, beta_0, gamma_1, beta_1),
                       "E_g6": lambda v: E_g6(v, beta_0, gamma_1, beta_1),

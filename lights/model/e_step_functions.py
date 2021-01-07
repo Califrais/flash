@@ -212,9 +212,9 @@ class EstepFunctions:
         alpha = self.fixed_effect_time_order
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
         beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
-        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L).get_asso_feat()
-        g2 = ((fixed_feat_assoc.dot(beta.T)[:, :, :, None] +
-              rand_feat_assoc.dot(S.T)[:, :, None, :]).swapaxes(1,3) * gamma_dep).sum(axis=-1)
+        F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
+        g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
+              .swapaxes(1,3) * gamma_dep).sum(axis=-1)
         g2 = g2.swapaxes(0, 1).T
         return g2
 

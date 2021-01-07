@@ -177,7 +177,7 @@ class MstepFunctions:
         delta = self.delta
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_2 = arg["ind_2"] * 1
+        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
         gamma_k = arg["gamma"][group][p:]
@@ -189,10 +189,10 @@ class MstepFunctions:
         phi = arg["phi"]
 
         T_u = np.unique(self.T)
-        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L).get_asso_feat()
-        op1 = delta * (fixed_feat_assoc.dot(beta_k.flatten())
-            + (rand_feat_assoc.swapaxes(0, 1) * Eb).sum(axis=-1).T).dot(gamma_k).flatten()\
-            - (E_g1 * baseline_val * ind_2).sum(axis=1)
+        F_f, F_r = AssociationFunctions(T_u, alpha,L).get_asso_feat()
+        op1 = (delta * ind_1.dot((F_f.dot(beta_k.flatten())
+            + (F_r.swapaxes(0, 1) * Eb).sum(axis=-1).T).dot(gamma_k).flatten())\
+            - (E_g1 * baseline_val * ind_2)).sum(axis=1)
 
         extracted_features = arg["extracted_features"]
         U_list, V_list, y_list, N_list = extracted_features[0]
@@ -234,7 +234,7 @@ class MstepFunctions:
         delta = self.delta
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_2 = arg["ind_2"] * 1
+        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
         E_g1 = arg["E_g1"](beta_k).T[group].T
@@ -245,9 +245,9 @@ class MstepFunctions:
         gamma_k = arg["gamma"][group][p:].flatten()
 
         T_u = np.unique(self.T)
-        fixed_feat_assoc, rand_feat_assoc = AssociationFunctions(T_u, alpha, L).get_asso_feat()
-        tmp = fixed_feat_assoc.swapaxes(1, 2).dot(gamma_k)
-        m1 = tmp.T * delta - (baseline_val * E_g1 * ind_2).dot(tmp).T
+        F_f, _ = AssociationFunctions(T_u, alpha,L).get_asso_feat()
+        tmp = F_f.swapaxes(1, 2).dot(gamma_k)
+        m1 = ind_1.dot(tmp).T * delta - (baseline_val * E_g1 * ind_2).dot(tmp).T
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         m2 = np.zeros((n_samples, L * q_l))
@@ -322,13 +322,15 @@ class MstepFunctions:
                                           .sum(axis=1)))).sum(axis=1)
 
         T_u = np.unique(self.T)
-        fixed_feat_assoc, rand_feat_assoc = \
-            AssociationFunctions(T_u, alpha,L).get_asso_feat()
+        F_f, F_r = AssociationFunctions(T_u, alpha,L).get_asso_feat()
 
-        op1 = ((fixed_feat_assoc.dot(beta_k.flatten())
-              + (rand_feat_assoc.swapaxes(0, 1) * Eb).sum(axis=-1).T)).T * delta\
-              - fixed_feat_assoc.dot(beta_k.flatten()).T * (E_g1 * baseline_val * ind_2).sum(axis=1)
-        op2 = (rand_feat_assoc.swapaxes(0, 1) * (E_g6.swapaxes(0,1) * ind_2).sum(axis=-1).T).sum(axis=-1)
+        op1 = (ind_1.dot(F_f.dot(beta_k.flatten())
+              + (F_r.swapaxes(0, 1) * Eb).sum(axis=-1).T)).T * delta
+
+        op2 = ((- (F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T) \
+              + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2)
+                .swapaxes(1, 2)) * baseline_val * ind_2.T).sum(axis=-1)
+
         grad[p:] = ((op1 + op2) * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
