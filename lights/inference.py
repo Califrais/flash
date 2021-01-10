@@ -501,7 +501,7 @@ class QNMCEM(Learner):
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
                            phi=phi, baseline_hazard=baseline_hazard)
 
-        # Stopping criteria and bounds vector for the L-BGFS-B algorithms
+        # Stopping criteria and bounds vector for the L-BGFS-B algorithm
         maxiter, pgtol = 60, 1e-5
         bounds_xi = [(0, None)] * 2 * p
 
@@ -537,11 +537,12 @@ class QNMCEM(Learner):
 
             def E_log_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
-                    E_func.log_g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                    np.log(E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_)),
                     Lambda_1, pi_xi, f)
 
             def E_g6(gamma_0_, beta_0_, gamma_1_, beta_1_):
-                return E_func.Eg(E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
+                return E_func.Eg(
+                    E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                     Lambda_1, pi_xi, f)
 
             if False:  # TODO: condition to be defined
@@ -575,26 +576,24 @@ class QNMCEM(Learner):
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0, "phi": phi,
+            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat,
+                        "extracted_features": ext_feat, "phi": phi,
                         "ind_1": ind_1, "ind_2": ind_2}
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
-            args = [{**args_all, **args_0}]
             beta_0_prev = beta_0.copy()
             beta_0 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[0], prox=prox, args=args,
-                jac=F_func.grad_R, max_iter=100, step="",
+                fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=100,
+                args=[{**args_all, **args_0}], jac=F_func.grad_R, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # beta_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0, beta_0_prev, gamma_1, v),
-                     "group": 1}
-            args = [{**args_all, **args_1}]
+                      "group": 1}
             beta_1 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[1], prox=prox, args=args,
-                jac=F_func.grad_R, max_iter=100, step="",
+                fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=100,
+                args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # TODO : no need for that then ? to be checked
@@ -614,11 +613,10 @@ class QNMCEM(Learner):
                       "E_log_g1": lambda v: E_log_g1(v, beta_0, gamma_1, beta_1),
                       "E_g6": lambda v: E_g6(v, beta_0, gamma_1, beta_1),
                       "group": 0}
-            args = [{**args_all, **args_0}]
             gamma_0_prev = gamma_0.copy()
             gamma_0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[0], prox=prox, args=args,
-                jac=F_func.grad_Q, max_iter=100, step="",
+                fun=F_func.Q_func, x0=gamma_init[0], prox=prox, max_iter=100,
+                args=[{**args_all, **args_0}], jac=F_func.grad_Q, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma_1 update
@@ -626,10 +624,9 @@ class QNMCEM(Learner):
                       "E_log_g1": lambda v: E_log_g1(gamma_0, beta_0, v, beta_1),
                       "E_g6": lambda v: E_g6(gamma_0, beta_0, v, beta_1),
                       "group": 1}
-            args = [{**args_all, **args_1}]
             gamma_1 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[1], prox=prox, args=args,
-                jac=F_func.grad_Q, max_iter=100, step="",
+                fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=100,
+                args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma needs to be updated before the baseline
@@ -647,14 +644,13 @@ class QNMCEM(Learner):
 
             # phi update
             (U_L, V_L, y_L, N_L) = ext_feat[1]
-            E_gS_ = E_gS.reshape(n_samples, L, q_l)
             for l in range(L):
                 pi_est_ = np.concatenate([[pi_est[i]] * N_L[l][i]
                                           for i in range(n_samples)])
                 pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
-                E_b_l = E_gS_[:, l].reshape(-1, 1)
+                E_b_l = E_gS.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
                 E_bb_l = block_diag(E_g0_l[:, l])
                 tmp = y_l - U_l.dot(beta_l)
                 phi_l = pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) +

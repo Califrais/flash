@@ -123,10 +123,12 @@ class EstepFunctions:
 
     def gS(self, S):
         """Computes gS
+
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
+
         Returns
         -------
         gS : `np.ndarray`, shape=(n_samples, K, N_MC, r)
@@ -169,17 +171,12 @@ class EstepFunctions:
         X, T_u, J = self.X, self.T_u, self.J
         N_MC = S.shape[0]
         gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
-        g2_ = self.g2(S, gamma_0, beta_0, gamma_1, beta_1).reshape(K, 1, J, N_MC)
+        g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1).reshape(K, 1, J, N_MC)
         tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
-        g1 = np.exp(tmp + g2_).swapaxes(0, 1).swapaxes(2, 3)
+        g1 = np.exp(tmp + g2).swapaxes(0, 1).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
-
-    def log_g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
-        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
-        log_g1 = np.log(g1)
-        return log_g1
 
     def g2(self, S, gamma_0, beta_0, gamma_1, beta_1):
         """Computes g2
@@ -207,14 +204,13 @@ class EstepFunctions:
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
-        N_MC, J = S.shape[0], self.J
         asso_functions, L = self.asso_functions, self.n_long_features
         alpha = self.fixed_effect_time_order
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
         beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
         F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
         g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
-              .swapaxes(1,3) * gamma_dep).sum(axis=-1)
+              .swapaxes(1, 3) * gamma_dep).sum(axis=-1)
         g2 = g2.swapaxes(0, 1).T
         return g2
 
@@ -269,10 +265,8 @@ class EstepFunctions:
             The values of g6 function
         """
         g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
-        g6 = (g1.swapaxes(2, -1)[..., np.newaxis] * S).swapaxes(2, -1)\
-                                        .swapaxes(3, 4).swapaxes(2, 3)
-
-        return g6
+        g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
+        return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
 
     @staticmethod
     def Lambda_g(g, f):

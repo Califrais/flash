@@ -1,6 +1,7 @@
 import numpy as np
 from lights.base.base import block_diag
 
+
 class AssociationFunctions:
     """A class to define all the association functions
 
@@ -18,6 +19,7 @@ class AssociationFunctions:
     n_long_features: `int`, default=5
         Number of longitudinal features
     """
+
     def __init__(self, T_u, fixed_effect_time_order=5, n_long_features=5):
         self.K = 2  # 2 latent groups
         self.J = len(T_u)
@@ -38,7 +40,7 @@ class AssociationFunctions:
         self.iU = np.zeros(shape=(J, L, L * self.q_l))
         self.dU = np.zeros(shape=(J, L, L * self.q_l))
         for j in range(J):
-            self.U[j] = block_diag((U_l[j].reshape(1, -1), ) * L)
+            self.U[j] = block_diag((U_l[j].reshape(1, -1),) * L)
             self.iU[j] = block_diag((iU_l[j].reshape(1, -1),) * L)
             self.dU[j] = block_diag((dU_l[j].reshape(1, -1),) * L)
 
@@ -63,10 +65,10 @@ class AssociationFunctions:
         Returns
         -------
         fixed_feat : `np.ndarray`, shape=(J, A*r, q)
-            The fixed feature corresponding to fixed effect
+            Feature corresponding to fixed effect
 
         rand_feat : `np.ndarray`, shape=(J, A*r, r)
-            The random feature corresponding to random effect
+            Feature corresponding to random effect
         """
         L = self.n_long_features
         q_l = self.q_l
@@ -77,4 +79,3 @@ class AssociationFunctions:
         tmp = np.broadcast_to(np.eye(L * r_l, L * r_l), (J, L * r_l, L * r_l))
         rand_feat = np.concatenate((self.V, tmp, self.dV, self.iV), axis=1)
         return fixed_feat, rand_feat
-
