@@ -174,7 +174,7 @@ class MstepFunctions:
         """
         p, L = self.n_time_indep_features, self.n_long_features
         alpha = self.fixed_effect_time_order
-        delta = self.delta
+        delta = self.delta.reshape(-1, 1)
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
@@ -189,9 +189,9 @@ class MstepFunctions:
 
         T_u = np.unique(self.T)
         F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
-        op1 = (delta * ind_1.dot((F_f.dot(beta_k.flatten())
-                                  + (F_r.swapaxes(0, 1) * Eb).sum(
-                    axis=-1).T).dot(gamma_k).flatten())
+        op1 = (delta * (F_f.dot(beta_k.flatten())
+                        + (F_r.swapaxes(0, 1)[..., np.newaxis] * Eb.T).sum(
+                    axis=2).T).dot(gamma_k.flatten()) * ind_1
                - (E_g1 * baseline_val * ind_2)).sum(axis=1)
 
         extracted_features = arg["extracted_features"]
@@ -303,7 +303,7 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         nb_asso_features = self.nb_asso_features
         alpha = self.fixed_effect_time_order
-        n_samples, delta = self.n_samples, self.delta
+        n_samples, delta = self.n_samples, self.delta.reshape(-1, 1)
         T_u = np.unique(self.T)
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
@@ -316,17 +316,15 @@ class MstepFunctions:
         Eb, EbbT = arg["E_b"], arg["E_bbT"]
         pi_est = arg["pi_est"][group]
         grad = np.zeros(nb_asso_features)
-        grad[:p] = (self.X.T * (pi_est * (delta - (E_g1 * baseline_val * ind_2)
-                                          .sum(axis=1)))).sum(axis=1)
-
+        grad[:p] = (self.X.T * (pi_est * (delta.flatten() -
+                    (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
         F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
-
-        op1 = (ind_1.dot(F_f.dot(beta_k.flatten())
-                         + (F_r.swapaxes(0, 1) * Eb).sum(axis=-1).T)).T * delta
+        op1 = (delta * (F_f.dot(beta_k.flatten())
+                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * Eb.T).sum(
+                    axis=2).T).dot(gamma_k[p:].flatten()) * ind_1).sum(axis=1)
         op2 = ((- (F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
-                + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2)
-                .swapaxes(1, 2)) * baseline_val * ind_2.T).sum(axis=-1)
-
+                + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2)).swapaxes(1,2)
+               * baseline_val * ind_2).sum(axis=-1)
         grad[p:] = ((op1 + op2) * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
