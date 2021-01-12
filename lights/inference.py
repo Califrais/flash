@@ -516,7 +516,6 @@ class QNMCEM(Learner):
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
         obj = self._func_obj(pi_xi, f)
-        first_iter = True
 
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
@@ -553,24 +552,16 @@ class QNMCEM(Learner):
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
 
-            if first_iter:
-                if warm_start:
-                    xi_init = xi_ext
-                    beta_init = [beta_0, beta_1]
-                    gamma_init = [gamma_0, gamma_1]
-                else:
-                    xi_init = np.zeros(2 * p)
-                    beta_init = [np.zeros(L * q_l).reshape(-1, 1),
-                                 np.zeros(L * q_l).reshape(-1, 1)]
-                    gamma_init = [np.zeros(nb_asso_feat).reshape(-1, 1),
-                                  np.zeros(nb_asso_feat).reshape(-1, 1)]
-                first_iter = False
-            else:
+            if warm_start:
                 xi_init = xi_ext
                 beta_init = [beta_0, beta_1]
                 gamma_init = [gamma_0, gamma_1]
-
-            print("Step", n_iter)
+            else:
+                xi_init = np.zeros(2 * p)
+                beta_init = [np.zeros(L * q_l).reshape(-1, 1),
+                             np.zeros(L * q_l).reshape(-1, 1)]
+                gamma_init = [np.zeros(nb_asso_feat).reshape(-1, 1),
+                              np.zeros(nb_asso_feat).reshape(-1, 1)]
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
