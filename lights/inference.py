@@ -526,9 +526,8 @@ class QNMCEM(Learner):
 
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
-            E_g4 = E_func.Eg(E_func.g0(S), Lambda_1, pi_xi, f)
-            E_g4_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
-            E_g5 = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
+            E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f)
+            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
 
             def E_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
@@ -647,11 +646,12 @@ class QNMCEM(Learner):
                 pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
-                E_b_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
-                E_bb_l = block_diag(E_g4_l[:, l])
+                E_g5_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
+                E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
+                                    r_l * l: r_l * (l + 1)])
                 tmp = y_l - U_l.dot(beta_l)
-                phi_l = pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) +
-                                   np.trace((V_l.T.dot(V_l).dot(E_bb_l))))
+                phi_l = pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_g5_l))) +
+                                   np.trace((V_l.T.dot(V_l).dot(E_g4_l))))
                 phi[l] = phi_l.sum() / N_l
 
             self._update_theta(phi=phi, baseline_hazard=baseline_hazard,

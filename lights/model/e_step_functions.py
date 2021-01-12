@@ -79,64 +79,6 @@ class EstepFunctions:
         S = np.vstack((b, -b))
         return S
 
-    def g0(self, S):
-        """Computes g0
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        g0 : `np.ndarray`, shape=(n_samples, K, N_MC,)
-            The values of g0 function
-        """
-        tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
-        g0 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
-        return g0
-
-    def g0_l(self, S):
-        """Computes g0_tide
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        g0_l : `np.ndarray`,
-            shape=(n_samples, K, N_MC, n_long_features, r_l, r_l)
-            The values of g0_l function
-        """
-        N_MC = S.shape[0]
-        n_long_features = self.n_long_features
-        S_ = S.reshape(N_MC, n_long_features, -1)
-        tmp = []
-        for s in S_:
-            tmp.append(np.array([s_.reshape(-1, 1).dot(s_.reshape(-1, 1).T)
-                                 for s_ in s]))
-        tmp = np.array(tmp)
-        g0_l = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
-        return g0_l
-
-    def gS(self, S):
-        """Computes gS
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        gS : `np.ndarray`, shape=(n_samples, K, N_MC, r)
-            The values of gS function
-        """
-        gS = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
-        return gS
-
     def g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
         """Computes g1
 
@@ -238,6 +180,39 @@ class EstepFunctions:
             M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g3.append(M_iS)
         return g3
+
+    def g4(self, S):
+        """Computes g4
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g4 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
+            The values of g4 function
+        """
+        tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
+        g4 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
+        return g4
+
+    def g5(self, S):
+        """Computes g5
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g5 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
+            The values of gS function
+        """
+        g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
+        return g5
 
     def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
         """Computes g6
