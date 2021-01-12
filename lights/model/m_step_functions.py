@@ -256,8 +256,7 @@ class MstepFunctions:
                                         V_i.dot(E_g5[i]))).flatten()
 
         grad = (m1 - m2.T).dot(pi_est)
-        grad_sub_obj = np.concatenate([grad, -grad])
-        return -grad_sub_obj / n_samples
+        return -grad / n_samples
 
     def Q_func(self, gamma_k, *args):
         """Computes the function denoted Q in the lights paper.
@@ -325,5 +324,4 @@ class MstepFunctions:
                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
                .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)
         grad[p:] = ((op1 + op2) * pi_est).sum(axis=1)
-        grad_sub_obj = np.concatenate([grad, -grad])
-        return -grad_sub_obj / n_samples
+        return -grad / n_samples
