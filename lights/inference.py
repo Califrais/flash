@@ -527,9 +527,9 @@ class QNMCEM(Learner):
 
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
-            E_gS = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
-            E_g0 = E_func.Eg(E_func.g0(S), Lambda_1, pi_xi, f)
-            E_g0_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
+            E_g4 = E_func.Eg(E_func.g0(S), Lambda_1, pi_xi, f)
+            E_g4_l = E_func.Eg(E_func.g0_l(S), Lambda_1, pi_xi, f)
+            E_g5 = E_func.Eg(E_func.gS(S), Lambda_1, pi_xi, f)
 
             def E_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
@@ -551,7 +551,7 @@ class QNMCEM(Learner):
                 fctr *= .1
 
             # M-Step
-            D = E_g0.sum(axis=0) / n_samples  # D update
+            D = E_g4.sum(axis=0) / n_samples  # D update
 
             if first_iter:
                 if warm_start:
@@ -585,7 +585,7 @@ class QNMCEM(Learner):
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0,
+            args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat, "phi": phi,
                         "ind_1": ind_1, "ind_2": ind_2}
@@ -605,15 +605,11 @@ class QNMCEM(Learner):
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="",
                 accelerated=True).x.reshape(-1, 1)
 
-            # TODO : no need for that then ? to be checked
-            # beta needs to be updated before gamma
-            # self._update_theta(beta_0=beta_0, beta_1=beta_1)
-
             # gamma_0 update
             beta_K = [beta_0, beta_1]
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "E_b": E_gS, "E_bbT": E_g0,
+            args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
@@ -638,8 +634,9 @@ class QNMCEM(Learner):
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="",
                 accelerated=True).x.reshape(-1, 1)
 
-            # gamma needs to be updated before the baseline
-            self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
+            # beta, gamma needs to be updated before the baseline
+            self._update_theta(beta_0 = beta_0, beta_1 = beta_1,
+                               gamma_0 = gamma_0, gamma_1 = gamma_1)
             E_func.theta = self.theta
             E_g1 = E_func.Eg(E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1),
                              Lambda_1, pi_xi, f)
@@ -659,8 +656,8 @@ class QNMCEM(Learner):
                 pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta[q_l * l: q_l * (l + 1)]
-                E_b_l = E_gS.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
-                E_bb_l = block_diag(E_g0_l[:, l])
+                E_b_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
+                E_bb_l = block_diag(E_g4_l[:, l])
                 tmp = y_l - U_l.dot(beta_l)
                 phi_l = pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_b_l))) +
                                    np.trace((V_l.T.dot(V_l).dot(E_bb_l))))

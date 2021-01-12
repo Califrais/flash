@@ -183,14 +183,13 @@ class MstepFunctions:
         gamma_k = arg["gamma"][group][p:]
         pi_est = arg["pi_est"][group]
         E_g1 = arg["E_g1"](beta_k).T[group].T
-        Eb = arg["E_b"]
-        EbbT = arg["E_bbT"]
+        E_g4, E_g5 = arg["E_g4"], arg["E_g5"]
         phi = arg["phi"]
 
         T_u = np.unique(self.T)
         F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
         op1 = (delta * (F_f.dot(beta_k.flatten())
-                        + (F_r.swapaxes(0, 1)[..., np.newaxis] * Eb.T).sum(
+                        + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g5.T).sum(
                     axis=2).T).dot(gamma_k.flatten()) * ind_1
                - (E_g1 * baseline_val * ind_2)).sum(axis=1)
 
@@ -200,14 +199,14 @@ class MstepFunctions:
         op2 = np.zeros(shape=n_samples)
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
-            M_i = U_i.dot(beta_k) + V_i.dot(Eb[i]).reshape(-1, 1)
+            M_i = U_i.dot(beta_k) + V_i.dot(E_g5[i]).reshape(-1, 1)
             Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             Sigma_i = np.diag(Phi_i.flatten())
             op2[i] = (M_i * y_i).T.dot(Phi_i) - .5 * multi_dot(
                 [beta_k.T, U_i.T, Sigma_i]).dot(
-                U_i.dot(beta_k) + 2 * V_i.dot(Eb[i].reshape(-1, 1))) + np.trace(
-                multi_dot([V_i.T, Sigma_i, V_i]).dot(EbbT[i]))
+                U_i.dot(beta_k) + 2 * V_i.dot(E_g5[i].reshape(-1, 1))) + np.trace(
+                multi_dot([V_i.T, Sigma_i, V_i]).dot(E_g4[i]))
         sub_obj = (pi_est * (op1 + op2)).sum()
 
         return -sub_obj / n_samples
@@ -236,7 +235,7 @@ class MstepFunctions:
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
         E_g1 = arg["E_g1"](beta_k).T[group].T
-        Eb, EbbT = arg["E_b"], arg["E_bbT"]
+        E_g5 = arg["E_g5"]
         pi_est = arg["pi_est"][group]
         extracted_features = arg["extracted_features"]
         phi = arg["phi"]
@@ -254,7 +253,7 @@ class MstepFunctions:
             Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
             m2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
-                                        V_i.dot(Eb[i]))).flatten()
+                                        V_i.dot(E_g5[i]))).flatten()
 
         grad = (m1 - m2.T).dot(pi_est)
         grad_sub_obj = np.concatenate([grad, -grad])
@@ -313,18 +312,18 @@ class MstepFunctions:
         beta_k = arg["beta"][group]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_g6 = arg["E_g6"](gamma_k).T[group].T
-        Eb, EbbT = arg["E_b"], arg["E_bbT"]
+        E_g5 = arg["E_g5"]
         pi_est = arg["pi_est"][group]
         grad = np.zeros(nb_asso_features)
         grad[:p] = (self.X.T * (pi_est * (delta.flatten() -
                     (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
         F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
         op1 = (delta * (F_f.dot(beta_k.flatten())
-                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * Eb.T).sum(
+                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g5.T).sum(
                     axis=2).T).dot(gamma_k[p:].flatten()) * ind_1).sum(axis=1)
         op2 = ((- (F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
-                + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2)).swapaxes(1,2)
-               * baseline_val * ind_2).sum(axis=-1)
+                + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
+               .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)
         grad[p:] = ((op1 + op2) * pi_est).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
