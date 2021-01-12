@@ -553,14 +553,14 @@ class QNMCEM(Learner):
 
             if warm_start:
                 xi_init = xi_ext
-                beta_init = [beta_0, beta_1]
-                gamma_init = [gamma_0, gamma_1]
+                beta_init = [beta_0.flatten(), beta_1.flatten()]
+                gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
             else:
                 xi_init = np.zeros(2 * p)
-                beta_init = [np.zeros(L * q_l).reshape(-1, 1),
-                             np.zeros(L * q_l).reshape(-1, 1)]
-                gamma_init = [np.zeros(nb_asso_feat).reshape(-1, 1),
-                              np.zeros(nb_asso_feat).reshape(-1, 1)]
+                beta_init = [np.zeros(L * q_l),
+                             np.zeros(L * q_l)]
+                gamma_init = [np.zeros(nb_asso_feat),
+                              np.zeros(nb_asso_feat)]
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
@@ -584,7 +584,7 @@ class QNMCEM(Learner):
             beta_0_prev = beta_0.copy()
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=100,
-                args=[{**args_all, **args_0}], jac=F_func.grad_R, step="",
+                args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
             # beta_1 update
@@ -592,7 +592,7 @@ class QNMCEM(Learner):
                       "group": 1}
             beta_1 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=100,
-                args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="",
+                args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma_0 update
@@ -611,7 +611,7 @@ class QNMCEM(Learner):
             gamma_0_prev = gamma_0.copy()
             gamma_0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox, max_iter=100,
-                args=[{**args_all, **args_0}], jac=F_func.grad_Q, step="",
+                args=[{**args_all, **args_0}], jac=F_func.grad_Q, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
             # gamma_1 update
@@ -621,7 +621,7 @@ class QNMCEM(Learner):
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=100,
-                args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="",
+                args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
             # beta, gamma needs to be updated before the baseline
