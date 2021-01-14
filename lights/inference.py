@@ -458,7 +458,7 @@ class QNMCEM(Learner):
         if 're' in asso_functions:
             nb_asso_param += 1
         nb_asso_feat = L * nb_asso_param + p
-        N = 5  # Number of initial Monte Carlo sample for S
+        N = 200  # Number of initial Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -582,8 +582,9 @@ class QNMCEM(Learner):
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
             beta_0_prev = beta_0.copy()
+            copt_max_iter = 10
             beta_0 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=100,
+                fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
@@ -591,7 +592,7 @@ class QNMCEM(Learner):
             args_1 = {"E_g1": lambda v: E_g1(gamma_0, beta_0_prev, gamma_1, v),
                       "group": 1}
             beta_1 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=100,
+                fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
@@ -610,7 +611,7 @@ class QNMCEM(Learner):
                       "group": 0}
             gamma_0_prev = gamma_0.copy()
             gamma_0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[0], prox=prox, max_iter=100,
+                fun=F_func.Q_func, x0=gamma_init[0], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
@@ -620,7 +621,7 @@ class QNMCEM(Learner):
                       "E_g6": lambda v: E_g6(gamma_0_prev, beta_0, v, beta_1),
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=100,
+                fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="backtracking",
                 accelerated=True).x.reshape(-1, 1)
 
@@ -635,8 +636,7 @@ class QNMCEM(Learner):
             baseline_hazard = pd.Series(
                 data=((ind_1 * 1).T * delta).sum(axis=1) / (
                         (E_g1.T * (ind_2 * 1).T).swapaxes(0, 1)
-                        * pi_est.T).sum(axis=2).sum(axis=1),
-                index=T_u)
+                        * pi_est.T).sum(axis=2).sum(axis=1), index=T_u)
 
             # phi update
             (U_L, V_L, y_L, N_L) = ext_feat[1]
@@ -649,10 +649,10 @@ class QNMCEM(Learner):
                 E_g5_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
                 E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
-                tmp = y_l - U_l.dot(beta_l)
-                phi_l = pi_est_ * (tmp.T.dot(tmp - 2 * (V_l.dot(E_g5_l))) +
-                                   np.trace((V_l.T.dot(V_l).dot(E_g4_l))))
-                phi[l] = phi_l.sum() / N_l
+                tmp = y_l - U_l * beta_l.flatten()
+                phi_l = (pi_est_ * (tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
+                        + np.trace(V_l.T.dot(V_l).dot(E_g4_l))
+                phi[l] = phi_l / N_l
 
             self._update_theta(phi=phi, baseline_hazard=baseline_hazard,
                                long_cov=D, xi=xi_ext)
