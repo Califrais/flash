@@ -616,8 +616,8 @@ class QNMCEM(Learner):
 
             # gamma_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, beta_0, v, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(gamma_0, beta_0, v, beta_1),
-                      "E_g6": lambda v: E_g6(gamma_0, beta_0, v, beta_1),
+                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, beta_0, v, beta_1),
+                      "E_g6": lambda v: E_g6(gamma_0_prev, beta_0, v, beta_1),
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=100,
