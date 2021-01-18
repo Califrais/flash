@@ -458,7 +458,7 @@ class QNMCEM(Learner):
         if 're' in asso_functions:
             nb_asso_param += 1
         nb_asso_feat = L * nb_asso_param + p
-        N = 200  # Number of initial Monte Carlo sample for S
+        N = 10  # Number of initial Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -582,7 +582,7 @@ class QNMCEM(Learner):
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
             beta_0_prev = beta_0.copy()
-            copt_max_iter = 10
+            copt_max_iter = 100
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",

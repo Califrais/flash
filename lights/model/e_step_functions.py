@@ -236,7 +236,7 @@ class EstepFunctions:
 
         Returns
         -------
-        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, r, J, K)
+        g6 : `np.ndarray`, shape=(n_samples, K, N_MC, r, J, K)
             The values of g6 function
         """
         g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
