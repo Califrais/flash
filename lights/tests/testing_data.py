@@ -68,3 +68,5 @@ class CreateTestingData:
                            [-3, 2, 3, -3, 4, 1]])
         self.asso_functions = ['lp', 're', 'tps', 'ce']
         self.nb_asso_feat = 17
+        self.beta = [beta_0, beta_1]
+        self.gamma = [gamma_0, gamma_1]

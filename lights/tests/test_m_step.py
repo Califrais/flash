@@ -3,6 +3,7 @@
 
 import unittest
 import numpy as np
+from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.tests.testing_data import CreateTestingData
 from lights.base.base import get_ext_from_vect, get_times_infos
@@ -14,20 +15,25 @@ class Test(unittest.TestCase):
         data = CreateTestingData()
         alpha = data.fixed_effect_time_order
         L, p = data.n_long_features, data.n_time_indep_features
+        n_samples, X, delta = data.n_samples, data.X, data.delta,
+        K, r_l = 2, 2
+        r = L * r_l
         l_pen = 2.
         eta_elastic_net = .2
         fit_intercept = False
-        T = np.unique(data.T)
+        T = data.T
         T_u = np.unique(T)
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
                                      L, p, l_pen, eta_elastic_net,
                                      data.nb_asso_feat, alpha)
         self.xi_ext = np.array([0, 2, 1, 0])
-        self.pi_est = np.array([.2, .4, .7])
+        self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
-        self.E_g1 = np.array([[1, 2], [3, 5], [4, 6]])
+        self.E_g1 = np.arange(1, 13).reshape(n_samples, len(T_u), K)
         self.E_g2 = np.array([1, 4, 5])
+        self.E_g4 = .5 * np.ones(shape=(n_samples, r, r))
+        self.E_g5 = np.ones(shape=(n_samples, r))
         self.E_g8 = np.array([1, 5, 2])
 
     def test_P_func(self):
@@ -50,9 +56,18 @@ class Test(unittest.TestCase):
         """Tests the R function
         """
         self.setUp()
-        R = self.M_func.R_func(self.pi_est, self.E_g1, self.E_g2, self.E_g8,
-                               self.data.theta["baseline_hazard"], self.ind_2)
-        R_ = 21.1
+        theta= self.data.theta
+        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
+        beta, gamma = self.data.beta, self.data.gamma
+        # for group 0
+        E_g1 = lambda v: self.E_g1
+        args = {"pi_est": self.pi_est, "E_g5": self.E_g5, "E_g4": self.E_g4,
+                    "gamma": gamma, "baseline_hazard": baseline_hazard,
+                    "extracted_features": self.data.ext_feat, "phi": phi,
+                    "ind_1": self.ind_1, "ind_2": self.ind_2,
+                    "E_g1": E_g1, "group": 0}
+        R = self.M_func.R_func(beta[0], {**args})
+        R_ = 755.411
         np.testing.assert_almost_equal(R, R_, 3)
 
     def test_grad_R(self):
@@ -60,21 +75,17 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         theta = self.data.theta
-        beta_ext = get_ext_from_vect(theta["beta_0"])
-        gamma_ext = get_ext_from_vect(theta["gamma_0"])
-        baseline_hazard = theta["baseline_hazard"]
-        phi = theta["phi"]
-        ext_feat = self.data.ext_feat
-        E_g5 = np.arange(1, 136).reshape((3, 3, 15))
-        E_g6 = np.arange(1, 271).reshape((3, 2, 3, 15))
-        E_gS = np.arange(1, 19).reshape(3, 6)
-        grad_R = self.M_func.grad_R(beta_ext, gamma_ext, self.pi_est, E_g5,
-                                    E_g6, E_gS, baseline_hazard, self.ind_2,
-                                    ext_feat, phi)
-        grad_R_ = np.array([2579.433, 2694.2, 3027.733, 1956.267, 2423.667,
-                            4571.267, 4180.3, 4514, 5677.2, -2579.433, -2694.2,
-                            -3027.733, -1956.267, -2423.667, -4571.267, -4180.3,
-                            -4514, -5677.2])
+        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
+        beta, gamma = self.data.beta, self.data.gamma
+        E_g1 = lambda v: self.E_g1
+        args = {"pi_est": self.pi_est, "E_g5": self.E_g5, "E_g4": self.E_g4,
+                "gamma": gamma, "baseline_hazard": baseline_hazard,
+                "extracted_features": self.data.ext_feat, "phi": phi,
+                "ind_1": self.ind_1, "ind_2": self.ind_2,
+                "E_g1": E_g1, "group": 0}
+        grad_R = self.M_func.grad_R(beta[0], {**args})
+        grad_R_ = np.array([350.7, 494.383, 923.433, 166.467, -26.967,
+                             -1039.333, 86.433, 280.867, 908.8])
         np.testing.assert_almost_equal(grad_R, grad_R_, 3)
 
     def test_Q_func(self):
