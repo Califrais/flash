@@ -571,7 +571,7 @@ class QNMCEM(Learner):
 
             # beta_0 update
             eta_sp_gp_l1, l_pen = self.eta_sp_gp_l1, self.l_pen
-            pi_est_K = [1 - pi_est, pi_est]
+            pi_est_K = np.vstack((1 - pi_est, pi_est))
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
@@ -634,9 +634,9 @@ class QNMCEM(Learner):
 
             # baseline hazard update
             baseline_hazard = pd.Series(
-                data=((ind_1 * 1).T * delta).sum(axis=1) / (
-                        (E_g1.T * (ind_2 * 1).T).swapaxes(0, 1)
-                        * pi_est.T).sum(axis=2).sum(axis=1), index=T_u)
+                data=((ind_1 * 1).T * delta).sum(axis=1) /
+                     ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
+                         .sum(axis=2).sum(axis=1), index=T_u)
 
             # phi update
             (U_L, V_L, y_L, N_L) = ext_feat[1]
