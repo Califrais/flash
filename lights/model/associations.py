@@ -20,11 +20,13 @@ class AssociationFunctions:
         Number of longitudinal features
     """
 
-    def __init__(self, T_u, fixed_effect_time_order=5, n_long_features=5):
+    def __init__(self, asso_functions, T_u,
+                 fixed_effect_time_order=5, n_long_features=5):
         self.K = 2  # 2 latent groups
         self.J = len(T_u)
         self.n_long_features = n_long_features
         self.q_l = fixed_effect_time_order + 1
+        self.asso_functions = asso_functions
         r_l = 2
         J = self.J
 
@@ -47,15 +49,6 @@ class AssociationFunctions:
         V_l = np.c_[np.ones(J), T_u]
         iV_l = np.c_[T_u, (T_u ** 2) / 2]
         dV_l = np.c_[np.zeros(J), np.ones(J)]
-
-        self.V = np.zeros(shape=(J, L, L * r_l))
-        self.iV = np.zeros(shape=(J, L, L * r_l))
-        self.dV = np.zeros(shape=(J, L, L * r_l))
-        for j in range(J):
-            self.V[j] = block_diag((V_l[j].reshape(1, -1),) * L)
-            self.iV[j] = block_diag((iV_l[j].reshape(1, -1),) * L)
-            self.dV[j] = block_diag((dV_l[j].reshape(1, -1),) * L)
-
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
@@ -71,11 +64,21 @@ class AssociationFunctions:
             Feature corresponding to random effect
         """
         L = self.n_long_features
-        q_l = self.q_l
-        r_l = 2
+        q_l, r_l = self.q_l, 2
+        r, q = L * r_l, L * q_l
         J = self.J
-        tmp = np.zeros(shape=(J, L * r_l, L * q_l))
-        fixed_feat = np.concatenate((self.U, tmp, self.dU, self.iU), axis=1)
-        tmp = np.broadcast_to(np.eye(L * r_l, L * r_l), (J, L * r_l, L * r_l))
-        rand_feat = np.concatenate((self.V, tmp, self.dV, self.iV), axis=1)
+        asso_functions = self.asso_functions
+        nb_asso_param = len(asso_functions)
+        if 're' in asso_functions:
+            nb_asso_param += 1
+        fixed_feat = np.zeros(shape=(J, nb_asso_param * L, q))
+        rand_feat = np.zeros(shape=(J, nb_asso_param * L, r))
+        # TODO: Remove hard code of the asso_functions
+        for j in range(J):
+            tmp_U = np.vstack((self.U_l[j], np.zeros(shape=(r_l, q_l)),
+                               self.dU_l[j], self.iU_l[j]))
+            fixed_feat[j] = block_diag((tmp_U,) * L)
+            tmp_V = np.vstack((self.V_l[j], np.eye(r_l, r_l),
+                               self.dV_l[j], self.iV_l[j]))
+            fixed_feat[j] = block_diag((tmp_V,) * L)
         return fixed_feat, rand_feat

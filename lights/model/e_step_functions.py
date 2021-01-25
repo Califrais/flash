@@ -150,7 +150,8 @@ class EstepFunctions:
         alpha = self.fixed_effect_time_order
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
         beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
-        F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
+        F_f, F_r = AssociationFunctions(asso_functions, T_u,
+                                        alpha, L).get_asso_feat()
         g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
               .swapaxes(1, 3) * gamma_dep).sum(axis=-1)
         g2 = g2.swapaxes(0, 1).T

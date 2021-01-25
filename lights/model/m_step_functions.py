@@ -42,7 +42,7 @@ class MstepFunctions:
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
                  n_time_indep_features, l_pen, eta_elastic_net,
-                 nb_asso_features, fixed_effect_time_order):
+                 nb_asso_features, fixed_effect_time_order, asso_functions):
         self.fit_intercept = fit_intercept
         self.X, self.T, self.delta = X, T, delta
         self.n_long_features = n_long_features
@@ -51,6 +51,7 @@ class MstepFunctions:
         self.n_samples = n_samples
         self.nb_asso_features = nb_asso_features
         self.fixed_effect_time_order = fixed_effect_time_order
+        self.asso_functions = asso_functions
         self.ENet = ElasticNet(l_pen, eta_elastic_net)
 
     def P_pen_func(self, pi_est, xi_ext):
@@ -175,6 +176,7 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         alpha = self.fixed_effect_time_order
         delta = self.delta.reshape(-1, 1)
+        asso_functions = self.asso_functions
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
@@ -187,7 +189,8 @@ class MstepFunctions:
         phi = arg["phi"]
 
         T_u = np.unique(self.T)
-        F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
+        F_f, F_r = AssociationFunctions(asso_functions, T_u,
+                                        alpha, L).get_asso_feat()
         op1 = (delta * (F_f.dot(beta_k.flatten())
                         + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g5.T).sum(
                     axis=2).T).dot(gamma_k.flatten()) * ind_1
@@ -227,6 +230,7 @@ class MstepFunctions:
         p, L = self.n_time_indep_features, self.n_long_features
         n_samples, alpha = self.n_samples, self.fixed_effect_time_order
         delta = self.delta
+        asso_functions = self.asso_functions
         T_u = np.unique(self.T)
         q_l = alpha + 1
         arg = args[0]
@@ -241,7 +245,8 @@ class MstepFunctions:
         phi = arg["phi"]
         gamma_k = arg["gamma"][group][p:].flatten()
 
-        F_f, _ = AssociationFunctions(T_u, alpha, L).get_asso_feat()
+        F_f, _ = AssociationFunctions(asso_functions, T_u,
+                                      alpha, L).get_asso_feat()
         tmp = F_f.swapaxes(1, 2).dot(gamma_k)
         m1 = ind_1.dot(tmp).T * delta - (baseline_val * E_g1 * ind_2).dot(tmp).T
 
@@ -302,6 +307,7 @@ class MstepFunctions:
         nb_asso_features = self.nb_asso_features
         alpha = self.fixed_effect_time_order
         n_samples, delta = self.n_samples, self.delta
+        asso_functions= self.asso_functions
         T_u = np.unique(self.T)
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
@@ -316,7 +322,8 @@ class MstepFunctions:
         grad = np.zeros(nb_asso_features)
         grad[:p] = (self.X.T * (pi_est * (delta -
                     (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
-        F_f, F_r = AssociationFunctions(T_u, alpha, L).get_asso_feat()
+        F_f, F_r = AssociationFunctions(asso_functions, T_u,
+                                        alpha, L).get_asso_feat()
         op1 = (delta * (F_f.dot(beta_k.flatten())
                  + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g5.T).sum(
                     axis=2).T).T * ind_1.T * delta).sum(axis=1)

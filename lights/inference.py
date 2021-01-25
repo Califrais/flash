@@ -489,7 +489,7 @@ class QNMCEM(Learner):
             time_indep_cox_coeffs = np.zeros(p)
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
-        gamma_0 = np.zeros(nb_asso_feat)
+        gamma_0 = 1e-4 * np.ones(nb_asso_feat)
         gamma_0[:p] = time_indep_cox_coeffs
         gamma_0 = gamma_0.reshape(-1, 1)
         gamma_1 = gamma_0.copy()
@@ -509,7 +509,8 @@ class QNMCEM(Learner):
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
                                 asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen,
-                                self.eta_elastic_net, nb_asso_feat, alpha)
+                                self.eta_elastic_net, nb_asso_feat, alpha,
+                                asso_functions)
 
         S = E_func.construct_MC_samples(N)
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)

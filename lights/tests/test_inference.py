@@ -11,7 +11,7 @@ class Test(unittest.TestCase):
     def test_QNMCEM(self):
         """Tests QNMCEM Algorithm
         """
-        X, Y, T, delta = get_train_data(100)
+        X, Y, T, delta = get_train_data(20)
         qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=3, initialize=True,
                         print_every=1)
         qnmcem.fit(X, Y, T, delta)

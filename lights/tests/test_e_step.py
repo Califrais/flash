@@ -80,7 +80,6 @@ class Test(unittest.TestCase):
         f = .02 * np.arange(1, 25).reshape(3, 2, 4)
         n_samples, n_MC, K = self.n_samples, self.n_MC, 2
         Lambda_1 = self.E_func.Lambda_g(np.ones(shape=(n_samples, K, n_MC)), f)
-        print(Lambda_1[0])
         pi_xi = 1 / (1 + np.exp(np.array([-3, -4, -6])))
         Eg1 = self.E_func.Eg(g1, Lambda_1, pi_xi, f)
         Eg1_ = np.array([4.396, 12.396])
