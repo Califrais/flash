@@ -24,10 +24,11 @@ class Test(unittest.TestCase):
         T = data.T
         T_u = np.unique(T)
         J = len(T_u)
+        asso_functions = data.asso_functions
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
                                      L, p, l_pen, eta_elastic_net,
-                                     data.nb_asso_feat, alpha)
+                                     data.nb_asso_feat, alpha, asso_functions)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
@@ -128,9 +129,10 @@ class Test(unittest.TestCase):
                 "E_g1": E_g1, "E_log_g1": E_log_g1,
                 "E_g6": E_g6, "group": 0}
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
-        grad_Q_ = np.array([21.333, 103.733, 1953.667, 1625.767, 1047.967,
-                            197.867, 218.267, 238.667, 259.067, 279.467, 299.867,
-                            971, 788.8, 202.467, 2575.083, 2086.917, 1845.9 ])
+        grad_Q_ = np.array([21.333, 103.733, 1953.667, 197.867, 218.267, 971,
+                            2575.083, 1625.767, 238.667, 259.067, 788.8,
+                            2086.917, 1047.967, 279.467, 299.867, 202.467,
+                            1845.9])
         np.testing.assert_almost_equal(grad_Q, grad_Q_, 3)
 
 

@@ -80,5 +80,5 @@ class AssociationFunctions:
             fixed_feat[j] = block_diag((tmp_U,) * L)
             tmp_V = np.vstack((self.V_l[j], np.eye(r_l, r_l),
                                self.dV_l[j], self.iV_l[j]))
-            fixed_feat[j] = block_diag((tmp_V,) * L)
+            rand_feat[j] = block_diag((tmp_V,) * L)
         return fixed_feat, rand_feat
