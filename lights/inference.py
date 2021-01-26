@@ -467,7 +467,8 @@ class QNMCEM(Learner):
         J, ind_1, ind_2 = get_times_infos(T, T_u)
 
         # Initialization
-        xi_ext = np.zeros(2 * p)
+        # TODO: for debugging and update hyper-params if not useful
+        xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
 
         if self.initialize:
             # Initialize longitudinal submodels
@@ -489,6 +490,7 @@ class QNMCEM(Learner):
             time_indep_cox_coeffs = np.zeros(p)
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
+        # TODO: for debugging and update hyper-params if not useful
         gamma_0 = 1e-4 * np.ones(nb_asso_feat)
         gamma_0[:p] = time_indep_cox_coeffs
         gamma_0 = gamma_0.reshape(-1, 1)
@@ -670,7 +672,6 @@ class QNMCEM(Learner):
                                     theta=self.theta)
                 if verbose:
                     self.history.print_history()
-
             if (n_iter > max_iter) or (rel_obj < tol):
                 self._fitted = True
                 self.S = S  # useful for predictions

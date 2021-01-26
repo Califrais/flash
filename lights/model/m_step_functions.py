@@ -260,7 +260,7 @@ class MstepFunctions:
             m2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
                                         V_i.dot(E_g5[i]))).flatten()
 
-        grad = (m1 - m2.T).dot(pi_est)
+        grad = (m1 + m2.T).dot(pi_est)
         return -grad / n_samples
 
     def Q_func(self, gamma_k, *args):
