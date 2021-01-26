@@ -255,7 +255,7 @@ class MstepFunctions:
         for i in range(n_samples):
             U_i, V_i, n_i, y_i = U_list[i], V_list[i], N_list[i], y_list[i]
             y_i = y_i.flatten()
-            Phi_i = [[phi[l, 0]] * n_i[l] for l in range(L)]
+            Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
             m2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
                                         V_i.dot(E_g5[i]))).flatten()
