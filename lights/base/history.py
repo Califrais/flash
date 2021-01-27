@@ -50,7 +50,10 @@ class History:
         for key, val in kwargs.items():
             if key == 'theta':
                 for key_, val_ in val.items():
-                    history[key_].append(val_)
+                    if key_ in ["beta_0", "beta_1", "gamma_0", "gamma_1"]:
+                        history[key_].append(val_.ravel())
+                    else:
+                        history[key_].append(val_)
             else:
                 history[key].append(val)
 
