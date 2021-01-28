@@ -335,6 +335,25 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
     return xi_0, xi
 
 
+def get_vect_from_ext(v_ext):
+    """Get the time-independent coefficient vector from its extension on
+    positive and negative parts
+
+    Parameters
+    ----------
+    v_ext : `np.ndarray`, shape=(2*dim,)
+        The extended vector decomposed on positive and negative parts
+
+    Returns
+    -------
+    v : `np.ndarray`, shape=(dim,)
+        The returned vector
+    """
+    dim = len(v_ext) // 2
+    v = (v_ext[:dim] - v_ext[dim:]).flatten()
+    return v
+
+
 def clean_xi_ext(xi_ext, fit_intercept):
     """Removes potential intercept coefficients in the time-independent
     coefficient vector decomposed on positive and negative parts

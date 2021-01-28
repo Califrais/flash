@@ -3,7 +3,8 @@ import pandas as pd
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, block_diag, \
-    get_xi_from_xi_ext, logistic_grad, get_times_infos
+    get_xi_from_xi_ext, logistic_grad, get_times_infos, get_ext_from_vect, \
+    get_vect_from_ext
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
@@ -458,7 +459,7 @@ class QNMCEM(Learner):
         if 're' in asso_functions:
             nb_asso_param += 1
         nb_asso_feat = L * nb_asso_param + p
-        N = 10  # Number of initial Monte Carlo sample for S
+        N = 50  # Number of initial Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -491,9 +492,13 @@ class QNMCEM(Learner):
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         # TODO: for debugging and update hyper-params if not useful
-        gamma_0 = 1e-4 * np.ones(nb_asso_feat)
-        gamma_0[:p] = time_indep_cox_coeffs
-        gamma_0 = gamma_0.reshape(-1, 1)
+        gamma_0_indep = time_indep_cox_coeffs
+        gamma_0_indep_ext = get_ext_from_vect(gamma_0_indep)
+        gamma_0_dep = 1e-4 * np.ones(L * nb_asso_param)
+        gamma_0 = np.concatenate((gamma_0_indep, gamma_0_dep)).reshape(-1, 1)
+        gamma_1_indep = gamma_0_indep.copy()
+        gamma_1_indep_ext = gamma_0_indep_ext.copy()
+        gamma_1_dep = gamma_0_dep.copy()
         gamma_1 = gamma_0.copy()
 
         beta_0 = beta.reshape(-1, 1)
@@ -506,6 +511,7 @@ class QNMCEM(Learner):
         # Stopping criteria and bounds vector for the L-BGFS-B algorithm
         maxiter, pgtol = 60, 1e-5
         bounds_xi = [(0, None)] * 2 * p
+        bounds_gamma = [(0, None)] * 2 * p
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
@@ -557,13 +563,16 @@ class QNMCEM(Learner):
             if warm_start:
                 xi_init = xi_ext
                 beta_init = [beta_0.flatten(), beta_1.flatten()]
-                gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
+                gamma_indep_init = [gamma_0_indep_ext.flatten(),
+                                    gamma_1_indep_ext.flatten()]
+                gamma_dep_init = [gamma_0_dep.flatten(), gamma_1_dep.flatten()]
             else:
                 xi_init = np.zeros(2 * p)
                 beta_init = [np.zeros(L * q_l),
                              np.zeros(L * q_l)]
-                gamma_init = [np.zeros(nb_asso_feat),
-                              np.zeros(nb_asso_feat)]
+                gamma_indep_init = [np.zeros(p), np.zeros(p)]
+                gamma_dep_init = [np.zeros(L * nb_asso_param),
+                                  np.zeros(L * nb_asso_param)]
 
             # xi update
             xi_ext = fmin_l_bfgs_b(
@@ -601,32 +610,69 @@ class QNMCEM(Learner):
 
             # gamma_0 update
             beta_K = [beta_0, beta_1]
+            gamma_dep = [gamma_0_dep, gamma_1_dep]
+            gamma_indep = [gamma_0_indep, gamma_1_indep]
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
             prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
-                        "ind_1": ind_1, "ind_2": ind_2}
+                        "ind_1": ind_1, "ind_2": ind_2,
+                        "gamma_dep": gamma_dep,
+                        "gamma_indep": gamma_indep}
             args_0 = {"E_g1": lambda v: E_g1(v, beta_0, gamma_1, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(v, beta_0, gamma_1, beta_1),
+                      "E_log_g1": lambda v: E_log_g1(v, beta_0, gamma_1,
+                                                     beta_1),
                       "E_g6": lambda v: E_g6(v, beta_0, gamma_1, beta_1),
                       "group": 0}
             gamma_0_prev = gamma_0.copy()
-            gamma_0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[0], prox=prox, max_iter=copt_max_iter,
-                args=[{**args_all, **args_0}], jac=F_func.grad_Q, step="backtracking",
-                accelerated=True).x.reshape(-1, 1)
+            # time independence part
+            gamma_0_indep_ext = fmin_l_bfgs_b(
+                func=lambda gamma_0_indep_ext_: F_func.Q_indep_pen_func(
+                    gamma_0_indep_ext_, *[{**args_all, **args_0}]),
+                x0=gamma_indep_init[0],
+                fprime=lambda gamma_0_indep_ext_: F_func.grad_Q_indep_pen(
+                    gamma_0_indep_ext_, *[{**args_all, **args_0}]),
+                disp=False, bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[
+                0]
+            gamma_0_indep = get_vect_from_ext(gamma_0_indep_ext)
+
+            # time dependence part
+            gamma_0_dep = copt.minimize_proximal_gradient(
+                fun=F_func.Q_dep_func, x0=gamma_dep_init[0], prox=prox,
+                max_iter=copt_max_iter,
+                args=[{**args_all, **args_0}], jac=F_func.grad_Q_dep,
+                step="backtracking",
+                accelerated=True).x.flatten()
+            gamma_0 = np.concatenate((gamma_0_indep, gamma_0_dep)).reshape(-1, 1)
+
 
             # gamma_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, beta_0, v, beta_1),
                       "E_log_g1": lambda v: E_log_g1(gamma_0_prev, beta_0, v, beta_1),
                       "E_g6": lambda v: E_g6(gamma_0_prev, beta_0, v, beta_1),
                       "group": 1}
-            gamma_1 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[1], prox=prox, max_iter=copt_max_iter,
-                args=[{**args_all, **args_1}], jac=F_func.grad_Q, step="backtracking",
-                accelerated=True).x.reshape(-1, 1)
+            # time independence part
+            gamma_1_indep_ext = fmin_l_bfgs_b(
+                func=lambda gamma_1_indep_ext_: F_func.Q_indep_pen_func(
+                    gamma_1_indep_ext_, *[{**args_all, **args_1}]),
+                x0=gamma_indep_init[1],
+                fprime=lambda gamma_1_indep_ext_: F_func.grad_Q_indep_pen(
+                    gamma_1_indep_ext_, *[{**args_all, **args_1}]),
+                disp=False, bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[
+                0]
+            gamma_1_indep = get_vect_from_ext(gamma_1_indep_ext)
+
+            # time dependence part
+            gamma_1_dep = copt.minimize_proximal_gradient(
+                fun=F_func.Q_dep_func, x0=gamma_dep_init[1], prox=prox,
+                max_iter=copt_max_iter,
+                args=[{**args_all, **args_1}], jac=F_func.grad_Q_dep,
+                step="backtracking",
+                accelerated=True).x.flatten()
+            gamma_1 = np.concatenate((gamma_1_indep, gamma_1_dep)).reshape(-1,
+                                                                           1)
 
             # beta, gamma needs to be updated before the baseline
             self._update_theta(beta_0 = beta_0, beta_1 = beta_1,

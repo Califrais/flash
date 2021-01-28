@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import multi_dot
-from lights.base.base import logistic_loss, get_xi_from_xi_ext
+from lights.base.base import logistic_loss, get_xi_from_xi_ext, get_vect_from_ext
 from lights.model.regularizations import ElasticNet
 from lights.model.associations import AssociationFunctions
 
@@ -290,21 +290,120 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_Q(self, gamma_k, *args):
-        """Computes the gradient of the function Q
+    def Q_dep_func(self, gamma_dep, *args):
+        """Computes the sub objective function Q with time
+         dependence association variable, to be minimized
+        at each QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
-        gamma_k : `np.ndarray`, shape=(nb_asso_feat,)
-            Association parameters for group k
+        gamma_dep : `np.ndarray`, shape=(L * A,)
+            Time dependence association parameters for group k
+
+        Returns
+        -------
+        output : `float`
+            The value of the Q sub objective to be minimized at each QNMCEM step
+        """
+        arg = args[0]
+        group = arg["group"]
+        gamma_indep = arg["gamma_indep"][group]
+        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
+        Q = self.Q_func(gamma_k, arg)
+        return Q
+
+    def Q_indep_pen_func(self, gamma_indep_ext, *args):
+        """Computes the sub objective function Q with penalty, to be minimized
+        at each QNMCEM iteration using fmin_l_bfgs_b.
+
+        Parameters
+        ----------
+        gamma_indep_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
+            The extension version of time independence association
+            parameters for group k
+
+        Returns
+        -------
+        output : `float`
+            The value of the Q sub objective to be minimized at each QNMCEM step
+        """
+        gamma_indep = get_vect_from_ext(gamma_indep_ext)
+        arg = args[0]
+        group = arg["group"]
+        gamma_dep = arg["gamma_dep"][group]
+        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
+        pen = self.ENet.pen(gamma_indep)
+        Q = self.Q_func(gamma_k, arg)
+        sub_obj = Q + pen
+        return sub_obj
+
+    def grad_Q_indep_pen(self, gamma_indep_ext, *args):
+        """Computes the gradient of the sub objective Q along with time
+         independence association variable and penalty
+
+        Parameters
+        ----------
+        gamma_indep_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
+            The extension version of time independence association
+            parameters for group k
 
         Returns
         -------
         output : `np.ndarray`
-            The value of the Q gradient
+            The value of the Q sub objective gradient with time
+         independence association variable and penalty
+        """
+        p = self.n_time_indep_features
+        gamma_indep = get_vect_from_ext(gamma_indep_ext)
+        grad_pen = self.ENet.grad(gamma_indep)
+        grad_Q = self.grad_Q_indep(gamma_indep, *args)
+        return grad_Q + grad_pen
+
+    def grad_Q_indep(self, gamma_indep, *args):
+        """Computes the gradient of the function Q with time independence
+        association variable
+
+        Parameters
+        ----------
+        gamma_indep : `np.ndarray`, shape=(n_time_indep_features,)
+            Time independence association parameters for group k
+
+        Returns
+        -------
+        output : `np.ndarray`
+            The value of the Q gradient with time independence
+             association variable
+        """
+        n_samples, delta = self.n_samples, self.delta
+        arg = args[0]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        ind_2 = arg["ind_2"] * 1
+        group = arg["group"]
+        gamma_dep = arg["gamma_dep"][group]
+        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
+        E_g1 = arg["E_g1"](gamma_k).T[group].T
+        pi_est = arg["pi_est"][group]
+        grad = (self.X.T * (pi_est * (delta -
+                    (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
+        grad_sub_obj = np.concatenate([grad, -grad])
+        return -grad_sub_obj / n_samples
+
+    def grad_Q_dep(self, gamma_k_dep, *args):
+        """Computes the gradient of the function Q  with time dependence
+        association variable
+
+        Parameters
+        ----------
+        gamma_k_dep : `np.ndarray`, shape=(L*A,)
+            Time dependence association parameters for group k
+
+        Returns
+        -------
+        output : `np.ndarray`
+            The value of the Q gradient with time dependence
+        association variable
         """
         p, L = self.n_time_indep_features, self.n_long_features
-        nb_asso_features = self.nb_asso_features
         alpha = self.fixed_effect_time_order
         n_samples, delta = self.n_samples, self.delta
         asso_functions= self.asso_functions
@@ -313,15 +412,13 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
-        gamma_k = gamma_k.reshape(-1, 1)
+        gamma_indep = arg["gamma_indep"][group]
+        gamma_k = np.concatenate((gamma_indep, gamma_k_dep)).reshape(-1, 1)
         beta_k = arg["beta"][group]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_g6 = arg["E_g6"](gamma_k).T[group].T
         E_g5 = arg["E_g5"]
         pi_est = arg["pi_est"][group]
-        grad = np.zeros(nb_asso_features)
-        grad[:p] = (self.X.T * (pi_est * (delta -
-                    (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
         F_f, F_r = AssociationFunctions(asso_functions, T_u,
                                         alpha, L).get_asso_feat()
         op1 = (delta * (F_f.dot(beta_k.flatten())
@@ -330,5 +427,5 @@ class MstepFunctions:
         op2 = (((F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
                .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)
-        grad[p:] = ((op1 - op2) * pi_est).sum(axis=1)
+        grad = ((op1 - op2) * pi_est).sum(axis=1)
         return -grad / n_samples
