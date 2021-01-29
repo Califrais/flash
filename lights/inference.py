@@ -688,18 +688,20 @@ class QNMCEM(Learner):
                          .sum(axis=2).sum(axis=1), index=T_u)
 
             # phi update
+            beta_stack = np.hstack((beta_0, beta_1))
             (U_L, V_L, y_L, N_L) = ext_feat[1]
+            phi = np.zeros((L, 1))
             for l in range(L):
                 pi_est_ = np.concatenate([[pi_est[i]] * N_L[l][i]
                                           for i in range(n_samples)])
-                pi_est_ = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
+                pi_est_stack = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
-                beta_l = beta[q_l * l: q_l * (l + 1)]
+                beta_l = beta_stack[q_l * l: q_l * (l + 1)]
                 E_g5_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
                 E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
-                tmp = y_l - U_l * beta_l.flatten()
-                phi_l = (pi_est_ * (tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
+                tmp = y_l - U_l.dot(beta_l)
+                phi_l = (pi_est_stack * (tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
                         + np.trace(V_l.T.dot(V_l).dot(E_g4_l))
                 phi[l] = phi_l / N_l
 
