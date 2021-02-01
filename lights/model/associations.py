@@ -37,14 +37,14 @@ class AssociationFunctions:
             iU_l = np.c_[iU_l, (T_u ** (t + 1)) / (t + 1)]
             dU_l = np.c_[dU_l, t * T_u ** (t - 1)]
 
-        L = n_long_features
-        self.U = np.zeros(shape=(J, L, L * self.q_l))
-        self.iU = np.zeros(shape=(J, L, L * self.q_l))
-        self.dU = np.zeros(shape=(J, L, L * self.q_l))
-        for j in range(J):
-            self.U[j] = block_diag((U_l[j].reshape(1, -1),) * L)
-            self.iU[j] = block_diag((iU_l[j].reshape(1, -1),) * L)
-            self.dU[j] = block_diag((dU_l[j].reshape(1, -1),) * L)
+        # L = n_long_features
+        # self.U = np.zeros(shape=(J, L, L * self.q_l))
+        # self.iU = np.zeros(shape=(J, L, L * self.q_l))
+        # self.dU = np.zeros(shape=(J, L, L * self.q_l))
+        # for j in range(J):
+        #     self.U[j] = block_diag((U_l[j].reshape(1, -1),) * L)
+        #     self.iU[j] = block_diag((iU_l[j].reshape(1, -1),) * L)
+        #     self.dU[j] = block_diag((dU_l[j].reshape(1, -1),) * L)
 
         V_l = np.c_[np.ones(J), T_u]
         iV_l = np.c_[T_u, (T_u ** 2) / 2]

@@ -56,6 +56,9 @@ class EstepFunctions:
         self.n_time_indep_features = X.shape[1]
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
+        alpha, L = self.fixed_effect_time_order, self.n_long_features
+        self.F_f, self.F_r = AssociationFunctions(asso_functions, T_u,
+                                        alpha, L).get_asso_feat()
         self.g3_, self.g4_, self.g9_ = None, None, None
 
     def construct_MC_samples(self, N):
@@ -146,12 +149,9 @@ class EstepFunctions:
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
-        asso_functions, L = self.asso_functions, self.n_long_features
-        alpha = self.fixed_effect_time_order
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
         beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
-        F_f, F_r = AssociationFunctions(asso_functions, T_u,
-                                        alpha, L).get_asso_feat()
+        F_f, F_r = self.F_f, self.F_r
         g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
               .swapaxes(1, 3) * gamma_dep).sum(axis=-1)
         g2 = g2.swapaxes(0, 1).T
