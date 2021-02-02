@@ -71,12 +71,17 @@ class QNMCEM(Learner):
     initialize : `bool`, default=True
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization
+
+    copt_accelerate : `bool`, default=False
+        If `False`, we choose copt solver with accelerated proximal
+        gradient , otherwise we use proximal gradient.
+
     """
 
     def __init__(self, fit_intercept=False, l_pen=0., eta_elastic_net=.1,
                  eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,
-                 asso_functions='all', initialize=True):
+                 asso_functions='all', initialize=True, copt_accelerate=False):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -85,6 +90,7 @@ class QNMCEM(Learner):
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
         self.initialize = initialize
+        self.copt_accelerate = copt_accelerate
         self.l_pen = l_pen
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
@@ -598,7 +604,7 @@ class QNMCEM(Learner):
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",
-                accelerated=True).x.reshape(-1, 1)
+                accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0, beta_0_prev, gamma_1, v),
@@ -606,7 +612,7 @@ class QNMCEM(Learner):
             beta_1 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="backtracking",
-                accelerated=True).x.reshape(-1, 1)
+                accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_0 update
             beta_K = [beta_0, beta_1]
@@ -644,7 +650,7 @@ class QNMCEM(Learner):
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q_dep,
                 step="backtracking",
-                accelerated=True).x.flatten()
+                accelerated=self.copt_accelerate).x.flatten()
             gamma_0 = np.concatenate((gamma_0_indep, gamma_0_dep)).reshape(-1, 1)
 
 
@@ -670,7 +676,7 @@ class QNMCEM(Learner):
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q_dep,
                 step="backtracking",
-                accelerated=True).x.flatten()
+                accelerated=self.copt_accelerate).x.flatten()
             gamma_1 = np.concatenate((gamma_1_indep, gamma_1_dep)).reshape(-1,
                                                                            1)
 
