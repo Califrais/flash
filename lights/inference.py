@@ -689,9 +689,9 @@ class QNMCEM(Learner):
 
             # baseline hazard update
             baseline_hazard = pd.Series(
-                data=((ind_1 * 1).T * delta).sum(axis=1) /
-                     ind_2.T.dot(((E_g1.T * (ind_1 * 1).T).sum(axis=1)
-                                  * pi_est_K).sum(axis=0)), index=T_u)
+                data=((((ind_1 * 1).T * delta).sum(axis=1)) /
+                      ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
+                      .sum(axis=2).sum(axis=1)), index=T_u)
 
             # phi update
             beta_stack = np.hstack((beta_0, beta_1))
