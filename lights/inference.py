@@ -507,8 +507,10 @@ class QNMCEM(Learner):
         gamma_1_dep = gamma_0_dep.copy()
         gamma_1 = gamma_0.copy()
 
-        beta_0 = beta.reshape(-1, 1)
+        # TODO: Just for verifying
+        beta_0 = .1 * beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
+        phi = 3 * phi
 
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
