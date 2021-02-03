@@ -1,4 +1,5 @@
 from collections import defaultdict
+import numpy as np
 
 
 class History:
@@ -50,7 +51,12 @@ class History:
         for key, val in kwargs.items():
             if key == 'theta':
                 for key_, val_ in val.items():
-                    if key_ in ["beta_0", "beta_1", "gamma_0", "gamma_1", "phi"]:
+                    ravel = False
+                    if (type(val_) is np.ndarray):
+                        if val_.ndim == 2:
+                            if val_.shape[1] == 1:
+                                ravel = True
+                    if ravel:
                         history[key_].append(val_.ravel())
                     else:
                         history[key_].append(val_)
