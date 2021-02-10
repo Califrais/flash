@@ -75,11 +75,33 @@ class EstepFunctions:
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
         """
         D = self.theta["long_cov"]
-        C = np.linalg.cholesky(D)
+        n_samples = self.n_samples
+        (U, V, y, N) = self.extracted_features[0]
+        n_long_features = self.n_long_features
+        phi = self.theta["phi"]
+        beta = [self.theta["beta_0"], self.theta["beta_1"]]
         r = D.shape[0]
         Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
-        b = Omega.dot(C.T)
-        S = np.vstack((b, -b))
+        S = np.zeros(n_samples, 2, 2 * N, r)
+
+        for i in range(n_samples):
+            U_i, V_i, y_i, N_i = U[i], V[i], y[i], N[i]
+
+            # compute Sigma_i
+            Phi_i = [[1 / phi[l, 0]] * N_i[l]
+                     for l in range(n_long_features)]
+            Sigma_i = np.diag(np.concatenate(Phi_i))
+
+            # compute Omega_i
+            D_inv = np.linalg.inv(D)
+            A_i = np.linalg.inv(
+                V_i.transpose().dot(Sigma_i).dot(V_i) + D_inv)
+            # compute mu_i
+            mu_i = A_i.dot(V_i.transpose()).dot(Sigma_i).dot(
+                y_i - U_i.dot(beta[0])).T[..., np.newaxis]
+            C_i = np.linalg.cholesky(A_i)
+            S[i] = np.hstack((mu_i + Omega.dot(C_i.T), mu_i - Omega.dot(C_i.T)))
+
         return S
 
     def g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
