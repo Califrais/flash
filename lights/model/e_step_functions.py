@@ -71,7 +71,7 @@ class EstepFunctions:
 
         Returns
         -------
-        S : `np.ndarray`, shape=(N_MC, r)
+        S : `np.ndarray`, shape=(n_samples, K, N_MC, r)
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
         """
         D = self.theta["long_cov"]
@@ -136,7 +136,7 @@ class EstepFunctions:
         n_samples, K = self.n_samples, self.K
         p = self.n_time_indep_features
         X, T_u, J = self.X, self.T_u, self.J
-        N_MC = S.shape[0]
+        N_MC = S.shape[2]
         gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
         g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1).reshape(K, 1, J, N_MC)
         tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
@@ -174,7 +174,8 @@ class EstepFunctions:
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
         beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
         F_f, F_r = self.F_f, self.F_r
-        g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
+        g2 = ((F_f.dot(beta.T)[:, :, :, None]
+               + (F_r[..., np.newaxis, np.newaxis] * S.T).sum(axis=2))
               .swapaxes(1, 3) * gamma_dep).sum(axis=-1)
         g2 = g2.swapaxes(0, 1).T
         return g2
@@ -195,12 +196,13 @@ class EstepFunctions:
         """
         n_samples, n_long_features = self.n_samples, self.n_long_features
         U_list, V_list, y_list, N_list = self.extracted_features[0]
-        K, N_MC = self.K, S.shape[0]
+        K, N_MC = self.K, S.shape[2]
         beta_stack = np.hstack((beta_0, beta_1))
         g3 = []
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
+            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) \
+                   + S[i].dot(V_i.T).swapaxes(1, 2)
             g3.append(M_iS)
         return g3
 
@@ -217,8 +219,14 @@ class EstepFunctions:
         g4 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
             The values of g4 function
         """
-        tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
-        g4 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
+        n_samples = self.n_samples
+        K, r = self.K, self.n_long_features * 2
+        N_MC = S.shape[2]
+        g4 = np.zeros((n_samples, K, N_MC, r, r))
+        for i in range(n_samples):
+            for k in range(K):
+                g4[i, k] = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T)
+                                     for s in S[i, k]])
         return g4
 
     def g5(self, S):
@@ -234,7 +242,7 @@ class EstepFunctions:
         g5 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
             The values of gS function
         """
-        g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
+        g5 = S
         return g5
 
     def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
@@ -262,9 +270,10 @@ class EstepFunctions:
         g6 : `np.ndarray`, shape=(n_samples, K, N_MC, r, J, K)
             The values of g6 function
         """
-        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
-        g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
-        return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
+        g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1)
+        g6 = g1.swapaxes(0, -2)[..., np.newaxis] \
+             * S.swapaxes(0, 2).swapaxes(1, 2)
+        return g6.swapaxes(0, -1).swapaxes(3, 5)
 
     @staticmethod
     def Lambda_g(g, f):
