@@ -280,42 +280,6 @@ class QNMCEM(Learner):
         survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
         return survival
 
-    def f_y_given_latent(self, extracted_features, g3):
-        """Computes the density of the longitudinal processes given latent
-        variables
-
-        Parameters
-        ----------
-        extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
-            The values of g3 function
-
-        Returns
-        -------
-        f_y : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y | S, G ; theta)
-        """
-        (U_list, V_list, y_list, N_list) = extracted_features[0]
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        phi = self.theta["phi"]
-        N_MC = g3[0].shape[2]
-        K = 2  # 2 latent groups
-        f_y = np.ones(shape=(n_samples, K, N_MC))
-        for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
-            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
-                         range(n_long_features)]
-            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i)))
-                      * np.exp(
-                        np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
-        return f_y
-
     def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
@@ -360,8 +324,7 @@ class QNMCEM(Learner):
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
-        f_y = self.f_y_given_latent(extracted_features, g3)
-        f = (intensity ** delta).T * survival * f_y
+        f = (intensity ** delta).T * survival
         return f
 
     def predict_marker(self, X, Y, prediction_times=None):
