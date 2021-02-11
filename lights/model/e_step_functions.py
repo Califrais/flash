@@ -61,7 +61,7 @@ class EstepFunctions:
                                         alpha, L).get_asso_feat()
         self.g3_, self.g4_, self.g9_ = None, None, None
 
-    def construct_MC_samples(self, N):
+    def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
 
         Parameters
@@ -79,10 +79,10 @@ class EstepFunctions:
         (U, V, y, N) = self.extracted_features[0]
         n_long_features = self.n_long_features
         phi = self.theta["phi"]
-        beta = [self.theta["beta_0"], self.theta["beta_1"]]
+        beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"]))
         r = D.shape[0]
-        Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N)
-        S = np.zeros(n_samples, 2, 2 * N, r)
+        Omega = np.random.multivariate_normal(np.zeros(r), np.eye(r), N_MC)
+        S = np.zeros((n_samples, 2, 2 * N_MC, r))
 
         for i in range(n_samples):
             U_i, V_i, y_i, N_i = U[i], V[i], y[i], N[i]
@@ -97,10 +97,11 @@ class EstepFunctions:
             A_i = np.linalg.inv(
                 V_i.transpose().dot(Sigma_i).dot(V_i) + D_inv)
             # compute mu_i
-            mu_i = A_i.dot(V_i.transpose()).dot(Sigma_i).dot(
-                y_i - U_i.dot(beta[0])).T[..., np.newaxis]
+            mu_i = (A_i.dot(V_i.transpose()).dot(Sigma_i).dot(
+                y_i - U_i.dot(beta))).T[..., np.newaxis]
             C_i = np.linalg.cholesky(A_i)
-            S[i] = np.hstack((mu_i + Omega.dot(C_i.T), mu_i - Omega.dot(C_i.T)))
+            tmp = C_i.dot(Omega.T)
+            S[i] = (mu_i + np.hstack((tmp, -tmp))).swapaxes(1, 2)
 
         return S
 
