@@ -11,6 +11,7 @@ from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 import copt
+from numpy.linalg import multi_dot
 
 
 class QNMCEM(Learner):
@@ -130,7 +131,7 @@ class QNMCEM(Learner):
         return self._fitted
 
     @staticmethod
-    def _log_lik(pi_xi, f):
+    def _log_lik(pi_xi, f_longitudianl, f_survival):
         """Computes the approximation of the likelihood of the lights model
 
         Parameters
@@ -148,10 +149,11 @@ class QNMCEM(Learner):
             The approximated log-likelihood computed on the given data
         """
         pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
-        prb = np.log((pi_xi_ * f.mean(axis=-1)).sum(axis=-1)).mean()
+        prb = np.log((pi_xi_ * f_longitudianl *
+                      f_survival.mean(axis=-1)).sum(axis=-1)).mean()
         return prb
 
-    def _func_obj(self, pi_xi, f):
+    def _func_obj(self, pi_xi, f_longitudianl, f_survival):
         """The global objective to be minimized by the QNMCEM algorithm
         (including penalization)
 
@@ -172,7 +174,7 @@ class QNMCEM(Learner):
         p, L = self.n_time_indep_features, self.n_long_features
         eta, l_pen = self.eta_sp_gp_l1, self.l_pen
         theta = self.theta
-        log_lik = self._log_lik(pi_xi, f)
+        log_lik = self._log_lik(pi_xi, f_longitudianl, f_survival)
         # xi elastic net penalty
         xi = theta["xi"]
         xi_pen = self.ENet.pen(xi)
@@ -280,7 +282,46 @@ class QNMCEM(Learner):
         survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
         return survival
 
-    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
+    def longitudinal_density(self, extracted_features):
+        """Computes the log-likelihood of the multivariate linear mixed model
+
+        Parameters
+        ----------
+        extracted_features : `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        Returns
+        -------
+        output : `float`
+            The value of the log-likelihood
+        """
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples, n_long_features = len(U_list), len(U_L)
+        theta = self.theta
+        D, phi = theta["long_cov"], theta["phi"]
+        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
+        beta_stack = np.hstack((beta_0, beta_1))
+
+        log_lik = np.zeros((n_samples, 2))
+        for i in range(n_samples):
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
+            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
+            tmp_1 = multi_dot([V_i, D, V_i.T]) + inv_Sigma_i
+            tmp_2 = y_i - U_i.dot(beta_stack)
+
+            op1 = n_i * np.log(2 * np.pi)
+            op2 = np.log(np.linalg.det(tmp_1))
+            op3 = np.diag(multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2]))
+
+            log_lik[i] = np.exp(-.5 * (op1 + op2 + op3))
+
+        return log_lik
+
+    def survival_density(self, X, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
         Parameters
@@ -318,7 +359,6 @@ class QNMCEM(Learner):
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         g1 = E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1, False)
-        g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
@@ -364,10 +404,11 @@ class QNMCEM(Learner):
             # predictions for alive subjects only
             delta_prediction = np.zeros(n_samples)
             T_u = self.T_u
-            f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
-                                         delta_prediction, self.S)
+            f_survival = self.survival_density(X, ext_feat, prediction_times,
+                                               T_u, delta_prediction, self.S)
+            f_longitudinal = self.longitudinal_density(ext_feat)
             pi_xi = self._get_proba(X)
-            marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
+            marker = self._get_post_proba(pi_xi, f_survival.mean(axis=-1))
             return marker
         else:
             raise ValueError('You must fit the model first')
@@ -492,10 +533,11 @@ class QNMCEM(Learner):
                                 asso_functions)
 
         S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
-        Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+        f_survival = self.survival_density(X, ext_feat, T, self.T_u, delta, S)
+        Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f_survival)
         pi_xi = self._get_proba(X)
-        obj = self._func_obj(pi_xi, f)
+        f_longitudinal = self.longitudinal_density(ext_feat)
+        obj = self._func_obj(pi_xi, f_longitudinal, f_survival)
 
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
@@ -506,23 +548,23 @@ class QNMCEM(Learner):
 
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
-            E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f)
-            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
+            E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f_survival)
+            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f_survival)
 
             def E_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
                     E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
-                    Lambda_1, pi_xi, f)
+                    Lambda_1, pi_xi, f_survival)
 
             def E_log_g1(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
                     np.log(E_func.g1(S, gamma_0_, beta_0_, gamma_1_, beta_1_)),
-                    Lambda_1, pi_xi, f)
+                    Lambda_1, pi_xi, f_survival)
 
             def E_g6(gamma_0_, beta_0_, gamma_1_, beta_1_):
                 return E_func.Eg(
                     E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
-                    Lambda_1, pi_xi, f)
+                    Lambda_1, pi_xi, f_survival)
 
             if False:  # TODO: condition to be defined
                 N *= 1.1
@@ -650,7 +692,7 @@ class QNMCEM(Learner):
                                gamma_0 = gamma_0, gamma_1 = gamma_1)
             E_func.theta = self.theta
             E_g1 = E_func.Eg(E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1),
-                             Lambda_1, pi_xi, f)
+                             Lambda_1, pi_xi, f_survival)
 
             # baseline hazard update
             baseline_hazard = pd.Series(
@@ -681,10 +723,10 @@ class QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
-
+            f_survival = self.survival_density(X, ext_feat, T, T_u, delta, S)
+            f_longitudinal = self.longitudinal_density(ext_feat)
             prev_obj = obj
-            obj = self._func_obj(pi_xi, f)
+            obj = self._func_obj(pi_xi, f_longitudinal, f_survival)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
@@ -697,7 +739,7 @@ class QNMCEM(Learner):
                 break
             else:
                 # Update for next iteration
-                Lambda_1 = E_func.Lambda_g(np.ones((n_samples, 2, 2 * N)), f)
+                Lambda_1 = E_func.Lambda_g(np.ones((n_samples, 2, 2 * N)), f_survival)
 
         self._end_solve()
 
