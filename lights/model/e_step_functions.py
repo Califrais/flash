@@ -60,6 +60,9 @@ class EstepFunctions:
         self.F_f, self.F_r = AssociationFunctions(asso_functions, T_u,
                                         alpha, L).get_asso_feat()
         self.g3_, self.g4_, self.g9_ = None, None, None
+        self.new_iter = True
+        self.beta_update = True
+        self.gamma_update = True
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -137,11 +140,12 @@ class EstepFunctions:
         n_samples, K = self.n_samples, self.K
         p = self.n_time_indep_features
         X, T_u, J = self.X, self.T_u, self.J
-        N_MC = S.shape[2]
-        gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
         g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1)
-        tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
-        g1 = np.exp(tmp + g2).swapaxes(0, 1).swapaxes(2, 3)
+        if self.gamma_update:
+            gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
+            self.X_dot_gamma = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
+
+        g1 = np.exp(self.X_dot_gamma + g2).swapaxes(0, 1).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
@@ -173,12 +177,20 @@ class EstepFunctions:
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
         gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
-        beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
         F_f, F_r = self.F_f, self.F_r
-        g2 = ((F_f.dot(beta.T)[:, :, :, None, None]
-               + (F_r[:, :, :, None, None, None] * S.T).sum(axis=2).swapaxes(2, 3))
-              .swapaxes(2, 3).swapaxes(1, 4) * gamma_dep).sum(axis=-1)
-        g2 = g2.swapaxes(0, 2).swapaxes(1, 2).T
+        if self.new_iter:
+            self.F_r_dot_S = (F_r[:, :, :, None, None, None] * S.T)\
+                .sum(axis=2).swapaxes(2, 3)
+            self.new_iter = False
+
+        if self.beta_update:
+            beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
+            self.F_f_dot_beta = F_f.dot(beta.T)[:, :, :, None, None]
+            self.longitudinal = (self.F_f_dot_beta + self.F_r_dot_S)\
+                .swapaxes(2, 3).swapaxes(1, 4)
+
+        g2 = (self.longitudinal * gamma_dep).sum(axis=-1).swapaxes(0, 2)\
+            .swapaxes(1, 2).T
         return g2
 
     def g3(self, S, beta_0, beta_1):

@@ -620,6 +620,8 @@ class QNMCEM(Learner):
                 fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="backtracking",
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
+            E_func.beta_update = False
+            E_func.gamma_update = True
 
             # gamma_0 update
             beta_K = [beta_0, beta_1]
@@ -723,6 +725,9 @@ class QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
+            E_func.new_iter = True
+            E_func.beta_update = True
+            E_func.gamma_update = False
             f_survival = self.survival_density(X, ext_feat, T, T_u, delta, S)
             f_longitudinal = self.longitudinal_density(ext_feat)
             prev_obj = obj
