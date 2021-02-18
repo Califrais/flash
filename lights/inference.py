@@ -131,6 +131,16 @@ class QNMCEM(Learner):
         return self._fitted
 
     @staticmethod
+    def _rel_theta(theta, pre_theta, eps):
+        rel = 0
+        for key_ in theta.keys():
+            tmp = np.linalg.norm(theta[key_] - pre_theta[key_]) / \
+                  (np.linalg.norm(theta[key_]) + eps)
+            rel = max(rel, tmp)
+        return rel
+
+
+    @staticmethod
     def _log_lik(pi_xi, f_longitudianl, f_survival):
         """Computes the approximation of the likelihood of the lights model
 
@@ -538,6 +548,8 @@ class QNMCEM(Learner):
         pi_xi = self._get_proba(X)
         f_longitudinal = self.longitudinal_density(ext_feat)
         obj = self._func_obj(pi_xi, f_longitudinal, f_survival)
+        pre_theta = self.theta.copy()
+        rel_theta_list = [0] * 4
 
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
@@ -566,9 +578,10 @@ class QNMCEM(Learner):
                     E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                     Lambda_1, pi_xi, f_survival)
 
-            if False:  # TODO: condition to be defined
+            con = (np.mean(rel_theta_list[1:]) / np.std(rel_theta_list[1:])) > \
+                  (np.mean(rel_theta_list[:3]) / np.std(rel_theta_list[:3]))
+            if con:
                 N *= 1.1
-                fctr *= .1
 
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
@@ -733,6 +746,10 @@ class QNMCEM(Learner):
             prev_obj = obj
             obj = self._func_obj(pi_xi, f_longitudinal, f_survival)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+            rel_theta = self._rel_theta(self.theta, pre_theta, 1e-2)
+            rel_theta_list.pop(0)
+            rel_theta_list.append(rel_theta)
+            pre_theta = self.theta.copy()
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
                                     theta=self.theta)
