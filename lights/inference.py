@@ -581,7 +581,7 @@ class QNMCEM(Learner):
             con = (np.mean(rel_theta_list[1:]) / np.std(rel_theta_list[1:])) > \
                   (np.mean(rel_theta_list[:3]) / np.std(rel_theta_list[:3]))
             if con:
-                N *= 1.1
+                N = int(N * 1.2)
 
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
