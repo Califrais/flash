@@ -180,7 +180,6 @@ def plot_history(learner, name, ax=None, **kwargs):
         DataFrame
     """
     history_keys = learner.get_history_keys()
-    p = learner.n_time_indep_features
     if 'gamma' not in name:
         if name not in history_keys:
             raise ValueError("`%s` not stored in history, "
@@ -205,8 +204,10 @@ def plot_history(learner, name, ax=None, **kwargs):
     history.index = n_iter
 
     if name in ['gamma_0_indep', 'gamma_1_indep']:
+        p = learner.n_time_indep_features
         history.iloc[:, :p].plot(ax=ax, **kwargs)
     elif name in ['gamma_0_dep', 'gamma_1_dep']:
+        p = learner.n_time_indep_features
         history.iloc[:, p:].plot(ax=ax, **kwargs)
     else:
         history.plot(ax=ax, **kwargs)
