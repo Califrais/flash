@@ -130,6 +130,15 @@ class QNMCEM(Learner):
         return self._fitted
 
     @staticmethod
+    def _rel_theta(theta, pre_theta, eps):
+        rel = 0
+        for key_ in theta.keys():
+            tmp = np.linalg.norm(theta[key_] - pre_theta[key_]) / \
+                  (np.linalg.norm(theta[key_]) + eps)
+            rel = max(rel, tmp)
+        return rel
+
+    @staticmethod
     def _log_lik(pi_xi, f):
         """Computes the approximation of the likelihood of the lights model
 
@@ -465,7 +474,7 @@ class QNMCEM(Learner):
         if 're' in asso_functions:
             nb_asso_param += 1
         nb_asso_feat = L * nb_asso_param + p
-        N = 50  # Number of initial Monte Carlo sample for S
+        N = 10  # Number of initial Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -506,11 +515,8 @@ class QNMCEM(Learner):
         gamma_1_indep_ext = gamma_0_indep_ext.copy()
         gamma_1_dep = gamma_0_dep.copy()
         gamma_1 = gamma_0.copy()
-
-        # TODO: Just for verifying
-        beta_0 = .1 * beta.reshape(-1, 1)
+        beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
-        phi = 3 * phi
 
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
@@ -533,6 +539,8 @@ class QNMCEM(Learner):
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
         obj = self._func_obj(pi_xi, f)
+        pre_theta = self.theta.copy()
+        rel_theta_list = [0] * 4
 
         # Store init values
         self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
@@ -560,10 +568,6 @@ class QNMCEM(Learner):
                 return E_func.Eg(
                     E_func.g6(S, gamma_0_, beta_0_, gamma_1_, beta_1_),
                     Lambda_1, pi_xi, f)
-
-            if False:  # TODO: condition to be defined
-                N *= 1.1
-                fctr *= .1
 
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
@@ -602,7 +606,7 @@ class QNMCEM(Learner):
             args_0 = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, beta_1),
                       "group": 0}
             beta_0_prev = beta_0.copy()
-            copt_max_iter = 100
+            copt_max_iter = 10
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",
@@ -723,6 +727,10 @@ class QNMCEM(Learner):
             prev_obj = obj
             obj = self._func_obj(pi_xi, f)
             rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+            rel_theta = self._rel_theta(self.theta, pre_theta, 1e-2)
+            rel_theta_list.pop(0)
+            rel_theta_list.append(rel_theta)
+            pre_theta = self.theta.copy()
             if n_iter % print_every == 0:
                 self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
                                     theta=self.theta)
