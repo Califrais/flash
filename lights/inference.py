@@ -736,7 +736,7 @@ class QNMCEM(Learner):
                                     theta=self.theta)
                 if verbose:
                     self.history.print_history()
-            if (n_iter > max_iter) or (rel_theta < tol):
+            if (n_iter + 1 > max_iter) or (rel_theta < tol):
                 self._fitted = True
                 self.S = S  # useful for predictions
                 break

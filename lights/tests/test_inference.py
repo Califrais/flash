@@ -15,6 +15,7 @@ class Test(unittest.TestCase):
         qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=10, initialize=True,
                         print_every=1, asso_functions=["lp", "re", "tps"])
         qnmcem.fit(X, Y, T, delta)
+        C_index = qnmcem.score(X, Y, T, delta)
 
 
 if __name__ == "main":
