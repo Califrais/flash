@@ -22,7 +22,7 @@ class QNMCEM(Learner):
         If `True`, include an intercept in the model for the time independent
         features
 
-    l_pen : `float`, default=0
+    l_pen : `list`, default=[0, 0, 0]
         Level of penalization for the ElasticNet and the Sparse Group l1
 
     eta_elastic_net: `float`, default=0.1
@@ -78,7 +78,7 @@ class QNMCEM(Learner):
 
     """
 
-    def __init__(self, fit_intercept=False, l_pen=0., eta_elastic_net=.1,
+    def __init__(self, fit_intercept=False, l_pen=[0., 0., 0.], eta_elastic_net=.1,
                  eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False):
@@ -598,7 +598,7 @@ class QNMCEM(Learner):
             pi_est_K = np.vstack((1 - pi_est, pi_est))
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-            prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
+            prox = SparseGroupL1(l_pen[1], eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat, "phi": phi,
@@ -625,7 +625,7 @@ class QNMCEM(Learner):
             gamma_dep = [gamma_0_dep, gamma_1_dep]
             gamma_indep = [gamma_0_indep, gamma_1_indep]
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-            prox = SparseGroupL1(l_pen, eta_sp_gp_l1, groups).prox
+            prox = SparseGroupL1(l_pen[2], eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
