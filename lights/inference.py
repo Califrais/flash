@@ -130,10 +130,17 @@ class QNMCEM(Learner):
         return self._fitted
 
     @staticmethod
-    def _rel_theta(theta, pre_theta, eps):
+    def _rel_theta(theta, prev_theta, eps):
+        """
+        #TODO
+        :param theta:
+        :param prev_theta:
+        :param eps:
+        :return:
+        """
         rel = 0
         for key_ in theta.keys():
-            tmp = np.linalg.norm(theta[key_] - pre_theta[key_]) / \
+            tmp = np.linalg.norm(theta[key_] - prev_theta[key_]) / \
                   (np.linalg.norm(theta[key_]) + eps)
             rel = max(rel, tmp)
         return rel
@@ -538,12 +545,17 @@ class QNMCEM(Learner):
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
-        obj = self._func_obj(pi_xi, f)
+
+        #TODO Van Tuan
+        if compute_obj:
+            obj = self._func_obj(pi_xi, f)
+            self.history.update(n_iter=0, obj=obj, rel_obj=np.inf)
+
         pre_theta = self.theta.copy()
         rel_theta_list = [0] * 4
 
         # Store init values
-        self.history.update(n_iter=0, obj=obj, rel_obj=np.inf, theta=self.theta)
+        self.history.update(n_iter=0, theta=self.theta)
         if verbose:
             self.history.print_history()
 
@@ -724,16 +736,19 @@ class QNMCEM(Learner):
             S = E_func.construct_MC_samples(N)
             f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
 
-            prev_obj = obj
-            obj = self._func_obj(pi_xi, f)
-            rel_obj = abs(obj - prev_obj) / abs(prev_obj)
-            rel_theta = self._rel_theta(self.theta, pre_theta, 1e-2)
+            if compute_obj:
+                prev_obj = obj
+                obj = self._func_obj(pi_xi, f)
+                rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+                if n_iter % print_every == 0:
+                    self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj)
+
+            rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             rel_theta_list.pop(0)
             rel_theta_list.append(rel_theta)
-            pre_theta = self.theta.copy()
+            prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj,
-                                    theta=self.theta)
+                self.history.update(n_iter=n_iter, theta=self.theta)
                 if verbose:
                     self.history.print_history()
             if (n_iter + 1 > max_iter) or (rel_theta < tol):
