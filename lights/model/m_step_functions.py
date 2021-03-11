@@ -29,8 +29,8 @@ class MstepFunctions:
     n_long_features : `int`
         Number of longitudinal features
 
-    l_pen : `float`, default=0
-        Level of penalization for the ElasticNet and the Sparse Group l1
+    l_pen_EN : `float`, default=0.
+        Level of penalization for the ElasticNet
 
     eta_elastic_net: `float`, default=0.1
         The ElasticNet mixing parameter, with 0 <= eta_elastic_net <= 1.
@@ -41,7 +41,7 @@ class MstepFunctions:
     """
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
-                 n_time_indep_features, l_pen, eta_elastic_net,
+                 n_time_indep_features, l_pen_EN, eta_elastic_net,
                  nb_asso_features, fixed_effect_time_order, asso_functions):
         self.fit_intercept = fit_intercept
         self.X, self.T, self.delta = X, T, delta
@@ -52,7 +52,7 @@ class MstepFunctions:
         self.nb_asso_features = nb_asso_features
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
-        self.ENet = ElasticNet(l_pen[0], eta_elastic_net)
+        self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         T_u = np.unique(self.T)
         alpha, L = self.fixed_effect_time_order, self.n_long_features
         self.F_f, self.F_r = AssociationFunctions(asso_functions, T_u,

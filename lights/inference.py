@@ -22,8 +22,14 @@ class QNMCEM(Learner):
         If `True`, include an intercept in the model for the time independent
         features
 
-    l_pen : `list`, default=[0, 0, 0]
-        Level of penalization for the ElasticNet and the Sparse Group l1
+    l_pen_EN : `float`, default=0.
+        Level of penalization for the ElasticNet
+
+    l_pen_SGL_beta : `float`, default=0.
+        Level of penalization for the Sparse Group l1 on beta
+
+    l_pen_SGL_gamma : `float`, default=0.
+        Level of penalization for the Sparse Group l1 on gamma
 
     eta_elastic_net: `float`, default=0.1
         The ElasticNet mixing parameter, with 0 <= eta_elastic_net <= 1.
@@ -81,9 +87,10 @@ class QNMCEM(Learner):
 
     """
 
-    def __init__(self, fit_intercept=False, l_pen=[0., 0., 0.], eta_elastic_net=.1,
-                 eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
-                 tol=1e-5, warm_start=True, fixed_effect_time_order=5,
+    def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
+                 l_pen_SGL_gamma=0., eta_elastic_net=.1, eta_sp_gp_l1=.1,
+                 max_iter=100, verbose=True, print_every=10, tol=1e-5,
+                 warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
                  compute_obj = False):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
@@ -95,10 +102,12 @@ class QNMCEM(Learner):
         self.asso_functions = asso_functions
         self.initialize = initialize
         self.copt_accelerate = copt_accelerate
-        self.l_pen = l_pen
+        self.l_pen_EN = l_pen_EN
+        self.l_pen_SGL_beta = l_pen_SGL_beta
+        self.l_pen_SGL_gamma = l_pen_SGL_gamma
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
-        self.ENet = ElasticNet(l_pen, eta_elastic_net)
+        self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.compute_obj = compute_obj
 
@@ -191,7 +200,9 @@ class QNMCEM(Learner):
             The value of the global objective to be minimized
         """
         p, L = self.n_time_indep_features, self.n_long_features
-        eta, l_pen = self.eta_sp_gp_l1, self.l_pen
+        eta_sp_gp_l1 = self.eta_sp_gp_l1
+        l_pen_SGL_beta = self.l_pen_SGL_beta
+        l_pen_SGL_gamma = self.l_pen_SGL_gamma
         theta = self.theta
         log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
@@ -200,7 +211,7 @@ class QNMCEM(Learner):
         # beta sparse group l1 penalty
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-        SGL1 = SparseGroupL1(l_pen, eta, groups)
+        SGL1 = SparseGroupL1(l_pen_SGL_beta, eta_sp_gp_l1, groups)
         beta_0_pen = SGL1.pen(beta_0)
         beta_1_pen = SGL1.pen(beta_1)
         # gamma sparse group l1 penalty
@@ -209,7 +220,7 @@ class QNMCEM(Learner):
         gamma_0_dep = gamma_0[p:]
         gamma_0_pen = self.ENet.pen(gamma_0_indep)
         groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-        SGL1 = SparseGroupL1(l_pen, eta, groups)
+        SGL1 = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups)
         gamma_0_pen += SGL1.pen(gamma_0_dep)
         gamma_1_indep = gamma_1[:p]
         gamma_1_dep = gamma_1[p:]
@@ -542,7 +553,7 @@ class QNMCEM(Learner):
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
                                 asso_functions, self.theta)
-        F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen,
+        F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen_EN,
                                 self.eta_elastic_net, nb_asso_feat, alpha,
                                 asso_functions)
 
@@ -610,11 +621,12 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # beta_0 update
-            eta_sp_gp_l1, l_pen = self.eta_sp_gp_l1, self.l_pen
+            eta_sp_gp_l1 = self.eta_sp_gp_l1
+            l_pen_SGL_beta = self.l_pen_SGL_beta
             pi_est_K = np.vstack((1 - pi_est, pi_est))
             gamma_K = [gamma_0, gamma_1]
             groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-            prox = SparseGroupL1(l_pen[1], eta_sp_gp_l1, groups).prox
+            prox = SparseGroupL1(l_pen_SGL_beta, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat, "phi": phi,
@@ -641,7 +653,8 @@ class QNMCEM(Learner):
             gamma_dep = [gamma_0_dep, gamma_1_dep]
             gamma_indep = [gamma_0_indep, gamma_1_indep]
             groups = np.arange(0, len(gamma_0) - p).reshape(L, -1).tolist()
-            prox = SparseGroupL1(l_pen[2], eta_sp_gp_l1, groups).prox
+            l_pen_SGL_gamma = self.l_pen_SGL_gamma
+            prox = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
