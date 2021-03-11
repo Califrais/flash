@@ -72,8 +72,6 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
         for _ in range(n_folds)
     ]
 
-    # TODO Sim: adapt to randomized search
-
     n_grid_elastic_net = grid_elastic_net.shape[0]
     scores = np.empty((n_grid_elastic_net, n_folds))
     if verbose is not None:
@@ -100,6 +98,3 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
     std_scores = scores.std(1)
     idx_best = avg_scores.argmax()
     l_pen_best = grid_elastic_net[idx_best]
-    idx_chosen = max([i for i, j in enumerate(
-        list(avg_scores >= avg_scores.max() - std_scores[idx_best])) if j])
-    l_pen_chosen = grid_elastic_net[idx_chosen]
