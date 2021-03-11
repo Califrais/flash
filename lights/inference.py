@@ -76,12 +76,16 @@ class QNMCEM(Learner):
         If `False`, we choose copt solver with accelerated proximal
         gradient , otherwise we use proximal gradient.
 
+    compute_obj : `bool`, default=False
+        If `False`, we do not compute the log likelihood.
+
     """
 
     def __init__(self, fit_intercept=False, l_pen=[0., 0., 0.], eta_elastic_net=.1,
                  eta_sp_gp_l1=.1, max_iter=100, verbose=True, print_every=10,
                  tol=1e-5, warm_start=True, fixed_effect_time_order=5,
-                 asso_functions='all', initialize=True, copt_accelerate=False):
+                 asso_functions='all', initialize=True, copt_accelerate=False,
+                 compute_obj = False):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -96,6 +100,7 @@ class QNMCEM(Learner):
         self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.ENet = ElasticNet(l_pen, eta_elastic_net)
         self._fitted = False
+        self.compute_obj = compute_obj
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -546,12 +551,11 @@ class QNMCEM(Learner):
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
 
-        #TODO Van Tuan
-        if compute_obj:
+        if self.compute_obj:
             obj = self._func_obj(pi_xi, f)
             self.history.update(n_iter=0, obj=obj, rel_obj=np.inf)
 
-        pre_theta = self.theta.copy()
+        prev_theta = self.theta.copy()
         rel_theta_list = [0] * 4
 
         # Store init values
@@ -736,7 +740,7 @@ class QNMCEM(Learner):
             S = E_func.construct_MC_samples(N)
             f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
 
-            if compute_obj:
+            if self.compute_obj:
                 prev_obj = obj
                 obj = self._func_obj(pi_xi, f)
                 rel_obj = abs(obj - prev_obj) / abs(prev_obj)
