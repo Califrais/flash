@@ -12,6 +12,7 @@ from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 import copt
 import warnings
+from numpy.linalg import multi_dot
 
 
 class QNMCEM(Learner):
@@ -86,6 +87,10 @@ class QNMCEM(Learner):
     compute_obj : `bool`, default=False
         If `False`, we do not compute the log likelihood.
 
+    MC_sep: `bool`, default=False
+        If `False`, we use the same set of MC samples for all subject,
+        otherwise we sample a seperate set of MC samples for each subject
+
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
@@ -93,7 +98,7 @@ class QNMCEM(Learner):
                  max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj = False):
+                 compute_obj = False, MC_sep = False):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -111,6 +116,7 @@ class QNMCEM(Learner):
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.compute_obj = compute_obj
+        self.MC_sep = MC_sep
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -352,6 +358,43 @@ class QNMCEM(Learner):
                         np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
         return f_y
 
+    def longitudinal_density(self, extracted_features):
+        """Computes the log-likelihood of the multivariate linear mixed model
+        Parameters
+        ----------
+        extracted_features : `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+        Returns
+        -------
+        output : `float`
+            The value of the log-likelihood
+        """
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples, n_long_features = len(U_list), len(U_L)
+        theta = self.theta
+        D, phi = theta["long_cov"], theta["phi"]
+        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
+        beta_stack = np.hstack((beta_0, beta_1))
+
+        log_lik = np.zeros((n_samples, 2))
+        for i in range(n_samples):
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
+            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
+            tmp_1 = multi_dot([V_i, D, V_i.T]) + inv_Sigma_i
+            tmp_2 = y_i - U_i.dot(beta_stack)
+
+            op1 = n_i * np.log(2 * np.pi)
+            op2 = np.log(np.linalg.det(tmp_1))
+            op3 = np.diag(multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2]))
+
+            log_lik[i] = np.exp(-.5 * (op1 + op2 + op3))
+
+        return log_lik
+
     def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
@@ -396,8 +439,11 @@ class QNMCEM(Learner):
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
-        f_y = self.f_y_given_latent(extracted_features, g3)
-        f = (intensity ** delta).T * survival * f_y
+        if self.MC_sep:
+            f = (intensity ** delta).T * survival
+        else:
+            f_y = self.f_y_given_latent(extracted_features, g3)
+            f = (intensity ** delta).T * survival * f_y
         return f
 
     def predict_marker(self, X, Y, prediction_times=None):
@@ -556,7 +602,7 @@ class QNMCEM(Learner):
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
-                                asso_functions, self.theta)
+                                asso_functions, self.theta, self.MC_sep)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen_EN,
                                 self.eta_elastic_net, nb_asso_feat, alpha,
                                 asso_functions)
