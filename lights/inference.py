@@ -81,11 +81,12 @@ class QNMCEM(Learner):
         use arbitrarily chosen fixed initialization
 
     copt_accelerate : `bool`, default=False
-        If `False`, we choose copt solver with accelerated proximal
-        gradient , otherwise we use proximal gradient.
+        If `True`, we choose copt solver with accelerated proximal
+        gradient (FISTA), otherwise we use regular ISTA.
 
     compute_obj : `bool`, default=False
-        If `False`, we do not compute the log likelihood.
+        If `True`, we compute the global objective to be minimized by the QNMCEM
+         algorithm and store it in history.
 
     MC_sep: `bool`, default=False
         If `False`, we use the same set of MC samples for all subject,
@@ -98,7 +99,7 @@ class QNMCEM(Learner):
                  max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj = False, MC_sep = False):
+                 compute_obj=False, MC_sep=False):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -135,9 +136,6 @@ class QNMCEM(Learner):
             "gamma_1": np.empty(1)
         }
 
-        if (warm_start & copt_accelerate):
-            warnings.simplefilter("Warm start can diminish acceleration effective")
-
     @property
     def asso_functions(self):
         return self._asso_functions
@@ -148,6 +146,18 @@ class QNMCEM(Learner):
             raise ValueError("``asso_functions`` must be either 'all', or a "
                              "`list` in ['lp', 're', 'tps', 'ce']")
         self._asso_functions = val
+
+    @property
+    def copt_accelerate(self):
+        return self._copt_accelerate
+
+    @copt_accelerate.setter
+    def copt_accelerate(self, val):
+        if self.warm_start:
+            warnings.warn("Careful using simultaneously ``warm_start`` and "
+                          "``copt_accelerate``: warmstart can diminish FISTA "
+                          "acceleration effectiveness")
+        self._copt_accelerate = val
 
     @property
     def fitted(self):
