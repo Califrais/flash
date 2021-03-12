@@ -11,6 +11,7 @@ from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 import copt
+import warnings
 
 
 class QNMCEM(Learner):
@@ -127,6 +128,9 @@ class QNMCEM(Learner):
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
+
+        if (warm_start & copt_accelerate):
+            warnings.simplefilter("Warm start can diminish acceleration effective")
 
     @property
     def asso_functions(self):
