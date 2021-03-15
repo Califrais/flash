@@ -179,7 +179,7 @@ class QNMCEM(Learner):
         return rel
 
     @staticmethod
-    def _log_lik(pi_xi, f):
+    def _log_lik(pi_xi, f_mean):
         """Computes the approximation of the likelihood of the lights model
 
         Parameters
@@ -188,8 +188,8 @@ class QNMCEM(Learner):
             Probability estimates for being on the high-risk group given
             time-independent features
 
-        f : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of f(Y, T, delta| S, G ; theta)
+        f_mean : `np.ndarray`, shape=(n_samples, K)
+            The mean value of f(Y, T, delta| S, G ; theta) over the S
 
         Returns
         -------
@@ -197,10 +197,10 @@ class QNMCEM(Learner):
             The approximated log-likelihood computed on the given data
         """
         pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
-        prb = np.log((pi_xi_ * f.mean(axis=-1)).sum(axis=-1)).mean()
+        prb = np.log((pi_xi_ * f_mean).sum(axis=-1)).mean()
         return prb
 
-    def _func_obj(self, pi_xi, f):
+    def _func_obj(self, pi_xi, f_mean):
         """The global objective to be minimized by the QNMCEM algorithm
         (including penalization)
 
@@ -210,8 +210,8 @@ class QNMCEM(Learner):
             Probability estimates for being on the high-risk group given
             time-independent features
 
-        f : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of f(Y, T, delta| S, G ; theta)
+        f_mean : `np.ndarray`, shape=(n_samples, K)
+            The mean value of f(Y, T, delta| S, G ; theta) over S
 
         Returns
         -------
@@ -223,7 +223,7 @@ class QNMCEM(Learner):
         l_pen_SGL_beta = self.l_pen_SGL_beta
         l_pen_SGL_gamma = self.l_pen_SGL_gamma
         theta = self.theta
-        log_lik = self._log_lik(pi_xi, f)
+        log_lik = self._log_lik(pi_xi, f_mean)
         # xi elastic net penalty
         xi = theta["xi"]
         xi_pen = self.ENet.pen(xi)
@@ -367,7 +367,7 @@ class QNMCEM(Learner):
                         np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
         return f_y
 
-    def longitudinal_density(self, extracted_features):
+    def mlmm_density(self, extracted_features):
         """Computes the log-likelihood of the multivariate linear mixed model
 
         Parameters
@@ -455,7 +455,7 @@ class QNMCEM(Learner):
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
         f = (intensity ** delta).T * survival
-        if self.MC_sep:
+        if not self.MC_sep:
             f_y = self.f_y_given_latent(extracted_features, g3)
             f *= f_y
         return f
@@ -627,7 +627,12 @@ class QNMCEM(Learner):
         pi_xi = self._get_proba(X)
 
         if self.compute_obj:
-            obj = self._func_obj(pi_xi, f)
+            if self.MC_sep:
+                f_mlmm = self.mlmm_density(ext_feat)
+                f_mean = f_mlmm * f.mean(axis=-1)
+            else:
+                f_mean = f.mean(axis=-1)
+            obj = self._func_obj(pi_xi, f_mean)
             self.history.update(n_iter=0, obj=obj, rel_obj=np.inf)
 
         prev_theta = self.theta.copy()
@@ -827,7 +832,12 @@ class QNMCEM(Learner):
 
             if self.compute_obj:
                 prev_obj = obj
-                obj = self._func_obj(pi_xi, f)
+                if self.MC_sep:
+                    f_mlmm = self.mlmm_density(ext_feat)
+                    f_mean = f_mlmm * f.mean(axis=-1)
+                else:
+                    f_mean = f.mean(axis=-1)
+                obj = self._func_obj(pi_xi, f_mean)
                 rel_obj = abs(obj - prev_obj) / abs(prev_obj)
                 if n_iter % print_every == 0:
                     self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj)
