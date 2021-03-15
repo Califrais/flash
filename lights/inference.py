@@ -406,7 +406,7 @@ class QNMCEM(Learner):
 
         return log_lik
 
-    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
+    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S, MC_sep):
         """Estimates the data density given latent variables
 
         Parameters
@@ -432,6 +432,10 @@ class QNMCEM(Learner):
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
+        MC_sep: `bool`, default=False
+        If `False`, we use the same set of MC samples for all subject,
+        otherwise we sample a seperate set of MC samples for each subject
+
         Returns
         -------
         f : `np.ndarray`, shape=(n_samples, K, N_MC)
@@ -440,7 +444,7 @@ class QNMCEM(Learner):
         theta, alpha = self.theta, self.fixed_effect_time_order
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         E_func = EstepFunctions(X, T, T_u, delta, extracted_features, alpha,
-                                self.asso_functions, theta)
+                                self.asso_functions, theta, MC_sep)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         g1 = E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1, False)
@@ -494,7 +498,7 @@ class QNMCEM(Learner):
             delta_prediction = np.zeros(n_samples)
             T_u = self.T_u
             f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
-                                         delta_prediction, self.S)
+                                         delta_prediction, self.S, self.MC_sep)
             pi_xi = self._get_proba(X)
             marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
             return marker
@@ -618,7 +622,7 @@ class QNMCEM(Learner):
                                 asso_functions)
 
         S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
+        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S, self.MC_sep)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
 
@@ -819,7 +823,7 @@ class QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
+            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S, self.MC_sep)
 
             if self.compute_obj:
                 prev_obj = obj
