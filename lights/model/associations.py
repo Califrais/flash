@@ -20,8 +20,8 @@ class AssociationFunctions:
         Number of longitudinal features
     """
 
-    def __init__(self, asso_functions, T_u,
-                 fixed_effect_time_order=5, n_long_features=5):
+    def __init__(self, asso_functions, T_u, fixed_effect_time_order=5,
+                 n_long_features=5):
         self.K = 2  # 2 latent groups
         self.J = len(T_u)
         self.n_long_features = n_long_features
@@ -40,27 +40,28 @@ class AssociationFunctions:
         V_l = np.c_[np.ones(J), T_u]
         iV_l = np.c_[T_u, (T_u ** 2) / 2]
         dV_l = np.c_[np.zeros(J), np.ones(J)]
-        self.fixed_feat = {"lp" : U_l,
-                           "re" : np.zeros(shape=(J, r_l, q_l)),
-                           "tps" : dU_l,
-                           "ce" : iU_l}
-        self.rand_feat = {"lp" :  V_l,
-                           "re" : [np.eye(r_l, r_l)] * J,
-                           "tps" : dV_l,
-                           "ce" : iV_l}
+        self.fixed_feat = {"lp": U_l,
+                           "re": np.zeros(shape=(J, r_l, q_l)),
+                           "tps": dU_l,
+                           "ce": iU_l}
+        self.rand_feat = {"lp": V_l,
+                          "re": [np.eye(r_l, r_l)] * J,
+                          "tps": dV_l,
+                          "ce": iV_l}
         self.U_l, self.iU_l, self.dU_l = U_l, iU_l, dU_l
         self.V_l, self.iV_l, self.dV_l = V_l, iV_l, dV_l
 
     def get_asso_feat(self):
-        """
-        Produces matrices of stacked association fixed and random features
+        """Produces matrices of stacked associations for fixed and random
+        features
+
         Returns
         -------
         fixed_feat : `np.ndarray`, shape=(J, A*r, q)
-            Feature corresponding to fixed effect
+            Feature corresponding to fixed effects
 
         rand_feat : `np.ndarray`, shape=(J, A*r, r)
-            Feature corresponding to random effect
+            Feature corresponding to random effects
         """
         L = self.n_long_features
         q_l, r_l = self.q_l, 2

@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
+import copt
+import warnings
 from scipy.optimize import fmin_l_bfgs_b
+from numpy.linalg import multi_dot
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, block_diag, \
     get_xi_from_xi_ext, logistic_grad, get_times_infos, get_ext_from_vect, \
@@ -10,9 +13,6 @@ from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
-import copt
-import warnings
-from numpy.linalg import multi_dot
 
 
 class QNMCEM(Learner):
@@ -91,7 +91,6 @@ class QNMCEM(Learner):
     MC_sep: `bool`, default=False
         If `False`, we use the same set of MC samples for all subject,
         otherwise we sample a seperate set of MC samples for each subject
-
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
@@ -370,6 +369,7 @@ class QNMCEM(Learner):
 
     def longitudinal_density(self, extracted_features):
         """Computes the log-likelihood of the multivariate linear mixed model
+
         Parameters
         ----------
         extracted_features : `tuple, tuple`,
@@ -377,6 +377,7 @@ class QNMCEM(Learner):
             Each tuple is a combination of fixed-effect design features,
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
+
         Returns
         -------
         output : `float`
@@ -449,11 +450,10 @@ class QNMCEM(Learner):
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2)
+        f = (intensity ** delta).T * survival
         if self.MC_sep:
-            f = (intensity ** delta).T * survival
-        else:
             f_y = self.f_y_given_latent(extracted_features, g3)
-            f = (intensity ** delta).T * survival * f_y
+            f *= f_y
         return f
 
     def predict_marker(self, X, Y, prediction_times=None):
@@ -608,7 +608,7 @@ class QNMCEM(Learner):
         # Stopping criteria and bounds vector for the L-BGFS-B algorithm
         maxiter, pgtol = 60, 1e-5
         bounds_xi = [(0, None)] * 2 * p
-        bounds_gamma = [(0, None)] * 2 * p
+        bounds_gamma_time_indep = [(0, None)] * 2 * p
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
@@ -696,16 +696,20 @@ class QNMCEM(Learner):
             beta_0_prev = beta_0.copy()
             copt_max_iter = 10
             beta_0 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[0], prox=prox, max_iter=copt_max_iter,
-                args=[{**args_all, **args_0}], jac=F_func.grad_R, step="backtracking",
+                fun=F_func.R_func, x0=beta_init[0], prox=prox,
+                max_iter=copt_max_iter,
+                args=[{**args_all, **args_0}], jac=F_func.grad_R,
+                step="backtracking",
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0, beta_0_prev, gamma_1, v),
                       "group": 1}
             beta_1 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[1], prox=prox, max_iter=copt_max_iter,
-                args=[{**args_all, **args_1}], jac=F_func.grad_R,  step="backtracking",
+                fun=F_func.R_func, x0=beta_init[1], prox=prox,
+                max_iter=copt_max_iter,
+                args=[{**args_all, **args_1}], jac=F_func.grad_R,
+                step="backtracking",
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_0 update
@@ -735,7 +739,8 @@ class QNMCEM(Learner):
                 x0=gamma_indep_init[0],
                 fprime=lambda gamma_0_indep_ext_: F_func.grad_Q_indep_pen(
                     gamma_0_indep_ext_, *[{**args_all, **args_0}]),
-                disp=False, bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[
+                disp=False, bounds=bounds_gamma_time_indep, maxiter=maxiter,
+                pgtol=pgtol)[
                 0]
             gamma_0_indep = get_vect_from_ext(gamma_0_indep_ext)
 
@@ -746,12 +751,13 @@ class QNMCEM(Learner):
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q_dep,
                 step="backtracking",
                 accelerated=self.copt_accelerate).x.flatten()
-            gamma_0 = np.concatenate((gamma_0_indep, gamma_0_dep)).reshape(-1, 1)
-
+            gamma_0 = np.concatenate((gamma_0_indep, gamma_0_dep)).reshape(-1,
+                                                                           1)
 
             # gamma_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, beta_0, v, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, beta_0, v, beta_1),
+                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, beta_0, v,
+                                                     beta_1),
                       "E_g6": lambda v: E_g6(gamma_0_prev, beta_0, v, beta_1),
                       "group": 1}
             # time independence part
@@ -761,7 +767,8 @@ class QNMCEM(Learner):
                 x0=gamma_indep_init[1],
                 fprime=lambda gamma_1_indep_ext_: F_func.grad_Q_indep_pen(
                     gamma_1_indep_ext_, *[{**args_all, **args_1}]),
-                disp=False, bounds=bounds_gamma, maxiter=maxiter, pgtol=pgtol)[
+                disp=False, bounds=bounds_gamma_time_indep, maxiter=maxiter,
+                pgtol=pgtol)[
                 0]
             gamma_1_indep = get_vect_from_ext(gamma_1_indep_ext)
 
@@ -776,8 +783,8 @@ class QNMCEM(Learner):
                                                                            1)
 
             # beta, gamma needs to be updated before the baseline
-            self._update_theta(beta_0 = beta_0, beta_1 = beta_1,
-                               gamma_0 = gamma_0, gamma_1 = gamma_1)
+            self._update_theta(beta_0=beta_0, beta_1=beta_1,
+                               gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
             E_g1 = E_func.Eg(E_func.g1(S, gamma_0, beta_0, gamma_1, beta_1),
                              Lambda_1, pi_xi, f)
@@ -802,7 +809,8 @@ class QNMCEM(Learner):
                 E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
                 tmp = y_l - U_l.dot(beta_l)
-                phi_l = (pi_est_stack * (tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
+                phi_l = (pi_est_stack * (
+                            tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
                         + np.trace(V_l.T.dot(V_l).dot(E_g4_l))
                 phi[l] = phi_l / N_l
 
