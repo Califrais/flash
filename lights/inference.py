@@ -189,7 +189,7 @@ class QNMCEM(Learner):
             time-independent features
 
         f_mean : `np.ndarray`, shape=(n_samples, K)
-            The mean value of f(Y, T, delta| S, G ; theta) over the S
+            The mean value of f(Y, T, delta| S, G ; theta) over S
 
         Returns
         -------
@@ -627,11 +627,9 @@ class QNMCEM(Learner):
         pi_xi = self._get_proba(X)
 
         if self.compute_obj:
+            f_mean = f.mean(axis=-1)
             if self.MC_sep:
-                f_mlmm = self.mlmm_density(ext_feat)
-                f_mean = f_mlmm * f.mean(axis=-1)
-            else:
-                f_mean = f.mean(axis=-1)
+                f_mean *= self.mlmm_density(ext_feat)
             obj = self._func_obj(pi_xi, f_mean)
             self.history.update(n_iter=0, obj=obj, rel_obj=np.inf)
 
@@ -832,11 +830,9 @@ class QNMCEM(Learner):
 
             if self.compute_obj:
                 prev_obj = obj
+                f_mean = f.mean(axis=-1)
                 if self.MC_sep:
-                    f_mlmm = self.mlmm_density(ext_feat)
-                    f_mean = f_mlmm * f.mean(axis=-1)
-                else:
-                    f_mean = f.mean(axis=-1)
+                    f_mean *= self.mlmm_density(ext_feat)
                 obj = self._func_obj(pi_xi, f_mean)
                 rel_obj = abs(obj - prev_obj) / abs(prev_obj)
                 if n_iter % print_every == 0:
