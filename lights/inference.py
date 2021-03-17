@@ -761,12 +761,12 @@ class QNMCEM(Learner):
             gamma_0_x = get_vect_from_ext(gamma_0_x_ext).reshape(-1, 1)
 
             # time dependence part
-            args_0 = {"E_g1": lambda v: E_g1(v, gamma_0_x_prev, beta_0,
+            args_0 = {"E_g1": lambda v: E_g1(v, gamma_0_x, beta_0,
                                              gamma_1, gamma_1_x, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(v, gamma_0_x_prev, beta_0,
+                      "E_log_g1": lambda v: E_log_g1(v, gamma_0_x, beta_0,
                                                      gamma_1, gamma_1_x,
                                                      beta_1),
-                      "E_g6": lambda v: E_g6(v, gamma_0_x_prev, beta_0,
+                      "E_g6": lambda v: E_g6(v, gamma_0_x, beta_0,
                                              gamma_1, gamma_1_x, beta_1),
                       "group": 0}
             gamma_0 = copt.minimize_proximal_gradient(
@@ -799,11 +799,11 @@ class QNMCEM(Learner):
 
             # time dependence part
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x_prev, beta_1),
+                                               beta_0, v, gamma_1_x, beta_1),
                       "E_log_g1": lambda v: E_log_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x_prev, beta_1),
+                                               beta_0, v, gamma_1_x, beta_1),
                       "E_g6": lambda v: E_g6(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x_prev, beta_1),
+                                               beta_0, v, gamma_1_x, beta_1),
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
