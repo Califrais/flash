@@ -177,14 +177,13 @@ class MstepFunctions:
         output : `float`
             The value of the R function
         """
-        p, L = self.n_time_indep_features, self.n_long_features
         delta = self.delta.reshape(-1, 1)
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
-        gamma_k = arg["gamma"][group][p:]
+        gamma_k = arg["gamma"][group]
         pi_est = arg["pi_est"][group]
         E_g1 = arg["E_g1"](beta_k).T[group].T
         E_g4, E_g5 = arg["E_g4"], arg["E_g5"]
@@ -226,9 +225,8 @@ class MstepFunctions:
         output : `np.ndarray`
             The value of the R gradient
         """
-        p, L = self.n_time_indep_features, self.n_long_features
         n_samples, alpha = self.n_samples, self.fixed_effect_time_order
-        delta = self.delta
+        delta, L = self.delta, self.n_long_features
         q_l = alpha + 1
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
@@ -240,7 +238,7 @@ class MstepFunctions:
         pi_est = arg["pi_est"][group]
         extracted_features = arg["extracted_features"]
         phi = arg["phi"]
-        gamma_k = arg["gamma"][group][p:].flatten()
+        gamma_k = arg["gamma"][group].flatten()
         tmp = self.F_f.swapaxes(1, 2).dot(gamma_k)
         m1 = ind_1.dot(tmp).T * delta - (baseline_val * E_g1 * ind_2).dot(tmp).T
 
@@ -262,8 +260,8 @@ class MstepFunctions:
 
         Parameters
         ----------
-        gamma_k : `np.ndarray`, shape=(nb_asso_feat,)
-            Association parameters for group k
+        gamma_k : `np.ndarray`, shape=(L * A,) or (n_time_indep_features,)
+            Association parameters (time dependence or independence) for group k
 
         Returns
         -------
@@ -284,14 +282,14 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def Q_dep_func(self, gamma_dep, *args):
+    def Q_dep_func(self, gamma_k, *args):
         """Computes the sub objective function Q with time
          dependence association variable, to be minimized
         at each QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
-        gamma_dep : `np.ndarray`, shape=(L * A,)
+        gamma_k : `np.ndarray`, shape=(L * A,)
             Time dependence association parameters for group k
 
         Returns
@@ -300,19 +298,16 @@ class MstepFunctions:
             The value of the Q sub objective to be minimized at each QNMCEM step
         """
         arg = args[0]
-        group = arg["group"]
-        gamma_indep = arg["gamma_indep"][group]
-        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
         Q = self.Q_func(gamma_k, arg)
         return Q
 
-    def Q_indep_pen_func(self, gamma_indep_ext, *args):
+    def Q_indep_pen_func(self, gamma_x_k_ext, *args):
         """Computes the sub objective function Q with penalty, to be minimized
         at each QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
-        gamma_indep_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
+        gamma_x_k_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
             The extension version of time independence association
             parameters for group k
 
@@ -321,23 +316,20 @@ class MstepFunctions:
         output : `float`
             The value of the Q sub objective to be minimized at each QNMCEM step
         """
-        gamma_indep = get_vect_from_ext(gamma_indep_ext)
+        gamma_x_k = get_vect_from_ext(gamma_x_k_ext)
         arg = args[0]
-        group = arg["group"]
-        gamma_dep = arg["gamma_dep"][group]
-        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
-        pen = self.ENet.pen(gamma_indep)
-        Q = self.Q_func(gamma_k, arg)
+        pen = self.ENet.pen(gamma_x_k)
+        Q = self.Q_func(gamma_x_k, arg)
         sub_obj = Q + pen
         return sub_obj
 
-    def grad_Q_indep_pen(self, gamma_indep_ext, *args):
+    def grad_Q_indep_pen(self, gamma_x_k_ext, *args):
         """Computes the gradient of the sub objective Q along with time
          independence association variable and penalty
 
         Parameters
         ----------
-        gamma_indep_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
+        gamma_x_k_ext : `np.ndarray`, shape=(2 * n_time_indep_features,)
             The extension version of time independence association
             parameters for group k
 
@@ -347,19 +339,18 @@ class MstepFunctions:
             The value of the Q sub objective gradient with time
          independence association variable and penalty
         """
-        p = self.n_time_indep_features
-        gamma_indep = get_vect_from_ext(gamma_indep_ext)
-        grad_pen = self.ENet.grad(gamma_indep)
-        grad_Q = self.grad_Q_indep(gamma_indep, *args)
+        gamma_x_k = get_vect_from_ext(gamma_x_k_ext)
+        grad_pen = self.ENet.grad(gamma_x_k)
+        grad_Q = self.grad_Q_indep(gamma_x_k, *args)
         return grad_Q + grad_pen
 
-    def grad_Q_indep(self, gamma_indep, *args):
+    def grad_Q_indep(self, gamma_x_k, *args):
         """Computes the gradient of the function Q with time independence
         association variable
 
         Parameters
         ----------
-        gamma_indep : `np.ndarray`, shape=(n_time_indep_features,)
+        gamma_x_k : `np.ndarray`, shape=(n_time_indep_features,)
             Time independence association parameters for group k
 
         Returns
@@ -373,16 +364,14 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_2 = arg["ind_2"] * 1
         group = arg["group"]
-        gamma_dep = arg["gamma_dep"][group]
-        gamma_k = np.concatenate((gamma_indep, gamma_dep)).reshape(-1, 1)
-        E_g1 = arg["E_g1"](gamma_k).T[group].T
+        E_g1 = arg["E_g1"](gamma_x_k.reshape(-1, 1)).T[group].T
         pi_est = arg["pi_est"][group]
         grad = (self.X.T * (pi_est * (delta -
                     (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
 
-    def grad_Q_dep(self, gamma_k_dep, *args):
+    def grad_Q_dep(self, gamma_k, *args):
         """Computes the gradient of the function Q  with time dependence
         association variable
 
@@ -402,8 +391,7 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
-        gamma_indep = arg["gamma_indep"][group]
-        gamma_k = np.concatenate((gamma_indep, gamma_k_dep)).reshape(-1, 1)
+        gamma_k = gamma_k.reshape(-1, 1)
         beta_k = arg["beta"][group]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_g6 = arg["E_g6"](gamma_k).T[group].T

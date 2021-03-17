@@ -121,7 +121,8 @@ class EstepFunctions:
 
         return S
 
-    def g1(self, S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True):
+    def g1(self, S, gamma_0, gamma_0_x, beta_0,
+           gamma_1, gamma_1_x, beta_1, broadcast=True):
         """Computes g1
 
         Parameters
@@ -129,14 +130,20 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
+
+        gamma_0_x : `np.ndarray`, shape=(p,)
+            Time-independent feature  parameters for low-risk group
 
         beta_0 : `np.ndarray`, shape=(q,)
             Fixed effect parameters for low-risk group
 
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
+
+        gamma_1_x : `np.ndarray`, shape=(p,)
+            Time-independent feature  parameters for high-risk group
 
         beta_1 : `np.ndarray`, shape=(q,)
             Fixed effect parameters for high-risk group
@@ -159,8 +166,8 @@ class EstepFunctions:
             N_MC = S.shape[0]
             g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1)\
                 .reshape(K, 1, J, N_MC)
-        gamma_indep = np.hstack((gamma_0[:p], gamma_1[:p]))
-        tmp = X.dot(gamma_indep).T.reshape(K, n_samples, 1, 1)
+        gamma_x = np.hstack((gamma_0_x, gamma_1_x))
+        tmp = X.dot(gamma_x).T.reshape(K, n_samples, 1, 1)
         g1 = np.exp(tmp + g2).swapaxes(0, 1).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
@@ -174,13 +181,13 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
 
         beta_0 : `np.ndarray`, shape=(q,)
             Fixed effect parameters for low-risk group
 
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
 
         beta_1 : `np.ndarray`, shape=(q,)
@@ -192,18 +199,18 @@ class EstepFunctions:
             The values of g2 function
         """
         T_u, p, K = self.T_u, self.n_time_indep_features, self.K
-        gamma_dep = np.vstack((gamma_0[p:], gamma_1[p:])).reshape(K, -1)
-        beta = np.vstack((beta_0, beta_1)).reshape(K, -1)
+        gamma = np.hstack((gamma_0, gamma_1)).T
+        beta = np.hstack((beta_0, beta_1)).T
         F_f, F_r = self.F_f, self.F_r
         if self.MC_sep:
             g2 = ((F_f.dot(beta.T)[:, :, :, None, None]
                    + (F_r[:, :, :, None, None, None] * S.T).sum(
                         axis=2).swapaxes(2, 3))
-                  .swapaxes(2, 3).swapaxes(1, 4) * gamma_dep).sum(axis=-1)
+                  .swapaxes(2, 3).swapaxes(1, 4) * gamma).sum(axis=-1)
             g2 = g2.swapaxes(0, 2).swapaxes(1, 2).T
         else:
             g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
-                  .swapaxes(1, 3) * gamma_dep).sum(axis=-1)
+                  .swapaxes(1, 3) * gamma).sum(axis=-1)
             g2 = g2.swapaxes(0, 1).T
         return g2
 
@@ -283,7 +290,7 @@ class EstepFunctions:
             g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
         return g5
 
-    def g6(self, S, gamma_0, beta_0, gamma_1, beta_1):
+    def g6(self, S, gamma_0, gamma_0_x, beta_0, gamma_1, gamma_1_x, beta_1):
         """Computes g6
 
         Parameters
@@ -291,14 +298,20 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
+
+        gamma_0_x : `np.ndarray`, shape=(p,)
+            Time-independent feature  parameters for low-risk group
 
         beta_0 : `np.ndarray`, shape=(q,)
             Fixed effect parameters for low-risk group
 
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
+
+        gamma_1_x : `np.ndarray`, shape=(p,)
+            Time-independent feature  parameters for high-risk group
 
         beta_1 : `np.ndarray`, shape=(q,)
             Fixed effect parameters for high-risk group
@@ -309,12 +322,14 @@ class EstepFunctions:
             The values of g6 function
         """
         if self.MC_sep:
-            g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1)
+            g1 = self.g1(S, gamma_0, gamma_0_x, beta_0,
+                         gamma_1, gamma_1_x, beta_1)
             g6 = g1.swapaxes(0, -2)[..., np.newaxis] \
                  * S.swapaxes(0, 2).swapaxes(1, 2)
             return g6.T.swapaxes(0, 2).swapaxes(2, 3).swapaxes(4, 5)
         else:
-            g1 = self.g1(S, gamma_0, beta_0, gamma_1, beta_1, broadcast=True)
+            g1 = self.g1(S, gamma_0, gamma_0_x, beta_0,
+                         gamma_1, gamma_1_x, beta_1, broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
 
