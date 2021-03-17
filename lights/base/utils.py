@@ -180,20 +180,13 @@ def plot_history(learner, name, ax=None, **kwargs):
         DataFrame
     """
     history_keys = learner.get_history_keys()
-    if 'gamma' not in name:
-        if name not in history_keys:
-            raise ValueError("`%s` not stored in history, "
-                             "must be in %s" % (name, history_keys))
+    if name not in history_keys:
+        raise ValueError("`%s` not stored in history, "
+                         "must be in %s" % (name, history_keys))
 
     if not ax:
         ax = plt.gca()
-
-    if name in ['gamma_0_dep', 'gamma_0_indep']:
-        history = learner.get_history('gamma_0')
-    elif name in ['gamma_1_dep', 'gamma_1_indep']:
-        history = learner.get_history('gamma_1')
-    else:
-        history = learner.get_history(name)
+    history = learner.get_history(name)
 
     if isinstance(history[0], float):
         history = pd.DataFrame(history)
@@ -202,16 +195,7 @@ def plot_history(learner, name, ax=None, **kwargs):
 
     n_iter = learner.get_history("n_iter")
     history.index = n_iter
-
-    if name in ['gamma_0_indep', 'gamma_1_indep']:
-        p = learner.n_time_indep_features
-        history.iloc[:, :p].plot(ax=ax, **kwargs)
-    elif name in ['gamma_0_dep', 'gamma_1_dep']:
-        p = learner.n_time_indep_features
-        history.iloc[:, p:].plot(ax=ax, **kwargs)
-    else:
-        history.plot(ax=ax, **kwargs)
-
+    history.plot(ax=ax, **kwargs)
 
 def visualize_vect_learning(learner, name, symbol = None, true_coeffs = None,
                             legend_est = None, legend_true = None):

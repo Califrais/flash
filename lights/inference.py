@@ -625,6 +625,7 @@ class QNMCEM(Learner):
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
 
+        # Store init values
         if self.compute_obj:
             if self.MC_sep:
                 f_mlmm = self.mlmm_density(ext_feat)
@@ -632,13 +633,14 @@ class QNMCEM(Learner):
             else:
                 f_mean = f.mean(axis=-1)
             obj = self._func_obj(pi_xi, f_mean)
-            self.history.update(n_iter=0, obj=obj, rel_obj=np.inf)
+            self.history.update(n_iter=0, obj=obj,
+                                rel_obj=np.inf, theta=self.theta)
+        else:
+            self.history.update(n_iter=0, theta=self.theta)
 
         prev_theta = self.theta.copy()
         rel_theta_list = [0] * 4
 
-        # Store init values
-        self.history.update(n_iter=0, theta=self.theta)
         if verbose:
             self.history.print_history()
 
@@ -853,24 +855,24 @@ class QNMCEM(Learner):
             S = E_func.construct_MC_samples(N)
             f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S, self.MC_sep)
 
-            if self.compute_obj:
-                prev_obj = obj
-                if self.MC_sep:
-                    f_mlmm = self.mlmm_density(ext_feat)
-                    f_mean = f_mlmm * f.mean(axis=-1)
-                else:
-                    f_mean = f.mean(axis=-1)
-                obj = self._func_obj(pi_xi, f_mean)
-                rel_obj = abs(obj - prev_obj) / abs(prev_obj)
-                if n_iter % print_every == 0:
-                    self.history.update(n_iter=n_iter, obj=obj, rel_obj=rel_obj)
-
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             rel_theta_list.pop(0)
             rel_theta_list.append(rel_theta)
             prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
-                self.history.update(n_iter=n_iter, theta=self.theta)
+                if self.compute_obj:
+                    prev_obj = obj
+                    if self.MC_sep:
+                        f_mlmm = self.mlmm_density(ext_feat)
+                        f_mean = f_mlmm * f.mean(axis=-1)
+                    else:
+                        f_mean = f.mean(axis=-1)
+                    obj = self._func_obj(pi_xi, f_mean)
+                    rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+                    self.history.update(n_iter=n_iter, theta=self.theta,
+                                        obj=obj, rel_obj=rel_obj)
+                else:
+                    self.history.update(n_iter=n_iter, theta=self.theta)
                 if verbose:
                     self.history.print_history()
             if (n_iter + 1 > max_iter) or (rel_theta < tol):
