@@ -52,7 +52,7 @@ class History:
             if key == 'theta':
                 for key_, val_ in val.items():
                     ravel = False
-                    if (type(val_) is np.ndarray):
+                    if type(val_) is np.ndarray:
                         if val_.ndim == 2:
                             if val_.shape[1] == 1:
                                 ravel = True
