@@ -42,14 +42,13 @@ class MstepFunctions:
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
                  n_time_indep_features, l_pen_EN, eta_elastic_net,
-                 nb_asso_features, fixed_effect_time_order, asso_functions):
+                 fixed_effect_time_order, asso_functions):
         self.fit_intercept = fit_intercept
         self.X, self.T, self.delta = X, T, delta
         self.n_long_features = n_long_features
         self.n_time_indep_features = n_time_indep_features
         n_samples = len(T)
         self.n_samples = n_samples
-        self.nb_asso_features = nb_asso_features
         self.fixed_effect_time_order = fixed_effect_time_order
         self.asso_functions = asso_functions
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
@@ -282,26 +281,7 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def Q_dep_func(self, gamma_k, *args):
-        """Computes the sub objective function Q with time
-         dependence association variable, to be minimized
-        at each QNMCEM iteration using fmin_l_bfgs_b.
-
-        Parameters
-        ----------
-        gamma_k : `np.ndarray`, shape=(L * A,)
-            Time dependence association parameters for group k
-
-        Returns
-        -------
-        output : `float`
-            The value of the Q sub objective to be minimized at each QNMCEM step
-        """
-        arg = args[0]
-        Q = self.Q_func(gamma_k, arg)
-        return Q
-
-    def Q_indep_pen_func(self, gamma_x_k_ext, *args):
+    def Q_x_pen_func(self, gamma_x_k_ext, *args):
         """Computes the sub objective function Q with penalty, to be minimized
         at each QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -323,7 +303,7 @@ class MstepFunctions:
         sub_obj = Q + pen
         return sub_obj
 
-    def grad_Q_indep_pen(self, gamma_x_k_ext, *args):
+    def grad_Q_x_pen(self, gamma_x_k_ext, *args):
         """Computes the gradient of the sub objective Q along with time
          independence association variable and penalty
 
@@ -341,10 +321,10 @@ class MstepFunctions:
         """
         gamma_x_k = get_vect_from_ext(gamma_x_k_ext)
         grad_pen = self.ENet.grad(gamma_x_k)
-        grad_Q = self.grad_Q_indep(gamma_x_k, *args)
+        grad_Q = self.grad_Q_x(gamma_x_k, *args)
         return grad_Q + grad_pen
 
-    def grad_Q_indep(self, gamma_x_k, *args):
+    def grad_Q_x(self, gamma_x_k, *args):
         """Computes the gradient of the function Q with time independence
         association variable
 
@@ -371,7 +351,7 @@ class MstepFunctions:
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
 
-    def grad_Q_dep(self, gamma_k, *args):
+    def grad_Q(self, gamma_k, *args):
         """Computes the gradient of the function Q  with time dependence
         association variable
 

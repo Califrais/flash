@@ -561,7 +561,6 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        nb_asso_feat = L * nb_asso_param + p
         N = 10  # Number of initial Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
@@ -618,8 +617,7 @@ class QNMCEM(Learner):
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
                                 asso_functions, self.theta, self.MC_sep)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen_EN,
-                                self.eta_elastic_net, nb_asso_feat, alpha,
-                                asso_functions)
+                                self.eta_elastic_net, alpha, asso_functions)
 
         S = E_func.construct_MC_samples(N)
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S,
@@ -753,10 +751,10 @@ class QNMCEM(Learner):
             gamma_0_x_prev = gamma_0_x.copy()
             # time independence part
             gamma_0_x_ext = fmin_l_bfgs_b(
-                func=lambda gamma_0_x_ext_: F_func.Q_indep_pen_func(
+                func=lambda gamma_0_x_ext_: F_func.Q_x_pen_func(
                     gamma_0_x_ext_, *[{**args_all, **args_0_x}]),
                 x0=gamma_x_init[0],
-                fprime=lambda gamma_0_x_ext_: F_func.grad_Q_indep_pen(
+                fprime=lambda gamma_0_x_ext_: F_func.grad_Q_x_pen(
                     gamma_0_x_ext_, *[{**args_all, **args_0_x}]),
                 disp=False, bounds=bounds_gamma_time_indep, maxiter=maxiter,
                 pgtol=pgtol)[0]
@@ -772,9 +770,9 @@ class QNMCEM(Learner):
                                              gamma_1, gamma_1_x, beta_1),
                       "group": 0}
             gamma_0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_dep_func, x0=gamma_init[0], prox=prox,
+                fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=copt_max_iter,
-                args=[{**args_all, **args_0}], jac=F_func.grad_Q_dep,
+                args=[{**args_all, **args_0}], jac=F_func.grad_Q,
                 step="backtracking",
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
@@ -789,10 +787,10 @@ class QNMCEM(Learner):
                       "group": 1}
             # time independence part
             gamma_1_x_ext = fmin_l_bfgs_b(
-                func=lambda gamma_1_x_ext_: F_func.Q_indep_pen_func(
+                func=lambda gamma_1_x_ext_: F_func.Q_x_pen_func(
                     gamma_1_x_ext_, *[{**args_all, **args_1_x}]),
                 x0=gamma_x_init[1],
-                fprime=lambda gamma_1_indep_ext_: F_func.grad_Q_indep_pen(
+                fprime=lambda gamma_1_indep_ext_: F_func.grad_Q_x_pen(
                     gamma_1_indep_ext_, *[{**args_all, **args_1_x}]),
                 disp=False, bounds=bounds_gamma_time_indep, maxiter=maxiter,
                 pgtol=pgtol)[
@@ -808,9 +806,9 @@ class QNMCEM(Learner):
                                                beta_0, v, gamma_1_x_prev, beta_1),
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_dep_func, x0=gamma_init[1], prox=prox,
+                fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=copt_max_iter,
-                args=[{**args_all, **args_1}], jac=F_func.grad_Q_dep,
+                args=[{**args_all, **args_1}], jac=F_func.grad_Q,
                 step="backtracking",
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
