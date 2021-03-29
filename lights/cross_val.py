@@ -5,7 +5,7 @@ from lights.inference import QNMCEM
 
 def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
                    adaptative_grid_el=True, grid_size=30,
-                   grid_elastic_net=np.array([0]), shuffle=True,
+                   grid_params=[(0, 0, 0)], shuffle=True,
                    verbose=True, metric='C-index', tol=1e-5, warm_start=True,
                    eta_elastic_net=.1, eta_sp_gp_l1=.1):
     """Apply n_folds randomized search cross-validation using the given
@@ -43,8 +43,8 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
     grid_size : `int`, default=30
         Grid size if adaptative_grid_el=`True`
 
-    grid_elastic_net : `np.ndarray`, default=np.array([0])
-        Grid of ElasticNet strength parameters to be run through, if
+    grid_params : list of tuples, default=[(0, 0, 0)]
+        Grid of strength parameters to be run through, if
         adaptative_grid_el=`False`
 
     shuffle : `bool`, default=True
@@ -65,6 +65,8 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
         gamma_max = 1. / np.log(10.) * np.log(
             1. / (1. - eta_elastic_net) * (.5 / n_samples)
             * np.absolute(X).sum(axis=0).max())
+
+        # TODO: Update KKT conditions for all hyper-params
         grid_elastic_net = np.logspace(gamma_max - 4, gamma_max, grid_size)
 
     learners = [
@@ -72,14 +74,14 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
         for _ in range(n_folds)
     ]
 
-    n_grid_elastic_net = grid_elastic_net.shape[0]
-    scores = np.empty((n_grid_elastic_net, n_folds))
+    n_grid = len(grid_params)
+    scores = np.empty((n_grid, n_folds))
     if verbose is not None:
         verbose = verbose
-    for idx_elasticNet, l_pen_0 in enumerate(grid_elastic_net):
+    for idx, params in enumerate(grid_params):
         if verbose:
-            print("Testing l_pen=%.2e" % l_pen_0, "on fold ",
-                  end="")
+            print("Testing l_pen_EN=%.2e, l_pen_SGL_beta=%.2e, "
+                  "l_pen_SGL_gamma=%.2e" % params, "on fold ", end="")
         for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
             if verbose:
                 print(" " + str(n_fold), end="")
@@ -87,14 +89,14 @@ def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,
             T_train, T_test = Y[idx_train], T[idx_test]
             delta_train, delta_test = delta[idx_train], delta[idx_test]
             learner = learners[n_fold]
-            learner.l_pen = l_pen_0
+            learner.l_pen_EN, l_pen_SGL_beta, l_pen_SGL_gamma = params
             learner.fit(X_train, T_train, delta_train)
-            scores[idx_elasticNet, n_fold] = learner.score(
+            scores[idx, n_fold] = learner.score(
                 X_test, T_test, delta_test, metric)
         if verbose:
-            print(": avg_score=%.2e" % scores[idx_elasticNet, :].mean())
+            print(": avg_score=%.2e" % scores[idx, :].mean())
 
     avg_scores = scores.mean(1)
     std_scores = scores.std(1)
     idx_best = avg_scores.argmax()
-    l_pen_best = grid_elastic_net[idx_best]
+    params_best = grid_params[idx_best]
