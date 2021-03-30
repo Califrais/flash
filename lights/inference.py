@@ -707,12 +707,12 @@ class QNMCEM(Learner):
                                              gamma_1, gamma_1_x, beta_1),
                       "group": 0}
             beta_0_prev = beta_0.copy()
-            copt_max_iter = 10
+            copt_max_iter = 1
             beta_0 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R,
-                step="backtracking",
+                step=lambda x: 2e-3,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
@@ -723,7 +723,7 @@ class QNMCEM(Learner):
                 fun=F_func.R_func, x0=beta_init[1], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,
-                step="backtracking",
+                step=lambda x: 2e-3,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_0 update
@@ -773,7 +773,7 @@ class QNMCEM(Learner):
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
-                step="backtracking",
+                step=lambda x: 2e-3,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_1 update
@@ -809,7 +809,7 @@ class QNMCEM(Learner):
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q,
-                step="backtracking",
+                step=lambda x: 2e-3,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta, gamma needs to be updated before the baseline
