@@ -176,38 +176,28 @@ class MstepFunctions:
         output : `float`
             The value of the R function
         """
-        delta = self.delta.reshape(-1, 1)
         arg = args[0]
-        baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
-        gamma_k = arg["gamma"][group]
         pi_est = arg["pi_est"][group]
-        E_g1 = arg["E_g1"](beta_k).T[group].T
         E_g4, E_g5 = arg["E_g4"], arg["E_g5"]
         phi = arg["phi"]
-
-        op1 = (delta * (self.F_f.dot(beta_k.flatten())
-                        + (self.F_r.swapaxes(0, 1)[..., np.newaxis]
-                        * E_g5.T).sum(axis=2).T).dot(gamma_k.flatten()) * ind_1
-               - (E_g1 * baseline_val * ind_2)).sum(axis=1)
 
         extracted_features = arg["extracted_features"]
         U_list, V_list, y_list, N_list = extracted_features[0]
         n_samples, n_long_features = self.n_samples, self.n_long_features
-        op2 = np.zeros(shape=n_samples)
+        op = np.zeros(shape=n_samples)
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
             M_i = U_i.dot(beta_k) + V_i.dot(E_g5[i]).reshape(-1, 1)
             Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(n_long_features)]
             Phi_i = np.concatenate(Phi_i).reshape(-1, 1)
             Sigma_i = np.diag(Phi_i.flatten())
-            op2[i] = (M_i * y_i).T.dot(Phi_i) - .5 * multi_dot(
+            op[i] = (M_i * y_i).T.dot(Phi_i) - .5 * multi_dot(
                 [beta_k.T, U_i.T, Sigma_i]).dot(
                 U_i.dot(beta_k) + 2 * V_i.dot(E_g5[i].reshape(-1, 1))) + np.trace(
                 multi_dot([V_i.T, Sigma_i, V_i]).dot(E_g4[i]))
-        sub_obj = (pi_est * (op1 + op2)).sum()
+        sub_obj = (pi_est * op).sum()
 
         return -sub_obj / n_samples
 
@@ -228,30 +218,24 @@ class MstepFunctions:
         delta, L = self.delta, self.n_long_features
         q_l = alpha + 1
         arg = args[0]
-        baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
         group = arg["group"]
         beta_k = beta_k.reshape(-1, 1)
-        E_g1 = arg["E_g1"](beta_k).T[group].T
         E_g5 = arg["E_g5"]
         pi_est = arg["pi_est"][group]
         extracted_features = arg["extracted_features"]
         phi = arg["phi"]
-        gamma_k = arg["gamma"][group].flatten()
-        tmp = self.F_f.swapaxes(1, 2).dot(gamma_k)
-        m1 = ind_1.dot(tmp).T * delta - (baseline_val * E_g1 * ind_2).dot(tmp).T
 
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-        m2 = np.zeros((n_samples, L * q_l))
+        m = np.zeros((n_samples, L * q_l))
         for i in range(n_samples):
             U_i, V_i, n_i, y_i = U_list[i], V_list[i], N_list[i], y_list[i]
             y_i = y_i.flatten()
             Phi_i = [[1 / phi[l, 0]] * n_i[l] for l in range(L)]
             Phi_i = np.diag(np.concatenate(Phi_i))
-            m2[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
+            m[i] = U_i.T.dot(Phi_i.dot(y_i - U_i.dot(beta_k.flatten()) -
                                         V_i.dot(E_g5[i]))).flatten()
 
-        grad = (m1 + m2.T).dot(pi_est)
+        grad =  m.T.dot(pi_est)
         return -grad / n_samples
 
     def Q_func(self, gamma_k, *args):
