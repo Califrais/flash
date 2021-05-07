@@ -446,8 +446,8 @@ class QNMCEM(Learner):
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_0_x, gamma_1_x = theta["gamma_0_x"], theta["gamma_1_x"]
-        g1 = E_func.g1(S, gamma_0, gamma_0_x, beta_0,
-                       gamma_1, gamma_1_x, beta_1, False)
+        E_func.compute_AssociationFunctions(S)
+        g1 = E_func.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x, False)
         g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
@@ -649,23 +649,19 @@ class QNMCEM(Learner):
             E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f)
             E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
 
-            def E_g1(gamma_0_, gamma_0_x_, beta_0_,
-                     gamma_1_, gamma_1_x_, beta_1_):
+            def E_g1(gamma_0_, gamma_0_x_, gamma_1_, gamma_1_x_):
                 return E_func.Eg(
-                    E_func.g1(S, gamma_0_, gamma_0_x_, beta_0_, gamma_1_,
-                              gamma_1_x_, beta_1_), Lambda_1, pi_xi, f)
+                    E_func.g1(S, gamma_0_, gamma_0_x_, gamma_1_,
+                              gamma_1_x_), Lambda_1, pi_xi, f)
 
-            def E_log_g1(gamma_0_, gamma_0_x_, beta_0_,
-                         gamma_1_, gamma_1_x_, beta_1_):
+            def E_log_g1(gamma_0_, gamma_0_x_, gamma_1_, gamma_1_x_):
                 return E_func.Eg(
-                    np.log(E_func.g1(S, gamma_0_, gamma_0_x_, beta_0_, gamma_1_,
-                                     gamma_1_x_, beta_1_)), Lambda_1, pi_xi, f)
+                    np.log(E_func.g1(S, gamma_0_, gamma_0_x_, gamma_1_,
+                                     gamma_1_x_)), Lambda_1, pi_xi, f)
 
-            def E_g6(gamma_0_, gamma_0_x_, beta_0_,
-                     gamma_1_, gamma_1_x_, beta_1_):
+            def E_g6(gamma_0_, gamma_0_x_, gamma_1_, gamma_1_x_):
                 return E_func.Eg(
-                    E_func.g6(S, gamma_0_, gamma_0_x_, beta_0_, gamma_1_,
-                              gamma_1_x_, beta_1_),
+                    E_func.g6(S, gamma_0_, gamma_0_x_, gamma_1_, gamma_1_x_),
                     Lambda_1, pi_xi, f)
 
             # M-Step
@@ -701,11 +697,8 @@ class QNMCEM(Learner):
             prox = SparseGroupL1(l_pen_SGL_beta, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat, "phi": phi,
-                        "ind_1": ind_1, "ind_2": ind_2}
-            args_0 = {"E_g1": lambda v: E_g1(gamma_0, gamma_0_x, v,
-                                             gamma_1, gamma_1_x, beta_1),
-                      "group": 0}
+                        "extracted_features": ext_feat, "phi": phi}
+            args_0 = {"group": 0}
             beta_0_prev = beta_0.copy()
             copt_max_iter = 1
             beta_0 = copt.minimize_proximal_gradient(
@@ -716,15 +709,15 @@ class QNMCEM(Learner):
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
-            args_1 = {"E_g1": lambda v: E_g1(gamma_0, gamma_0_x, beta_0_prev,
-                                             gamma_1, gamma_1_x, v),
-                      "group": 1}
+            args_1 = {"group": 1}
             beta_1 = copt.minimize_proximal_gradient(
                 fun=F_func.R_func, x0=beta_init[1], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,
                 step=lambda x: 2e-3,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
+
+            self._update_theta(beta_0=beta_0, beta_1=beta_1)
 
             # gamma_0 update
             beta_K = [beta_0, beta_1]
@@ -737,15 +730,15 @@ class QNMCEM(Learner):
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
-                        "ind_1": ind_1, "ind_2": ind_2,
+                        "ind_1": ind_1 * 1, "ind_2": ind_2 * 1,
                         "gamma": gamma,
                         "gamma_x": gamma_x}
-            args_0_x = {"E_g1": lambda v: E_g1(gamma_0, v, beta_0,
-                                               gamma_1, gamma_1_x, beta_1),
-                        "E_log_g1": lambda v: E_log_g1(gamma_0, v, beta_0,
-                                                       gamma_1, gamma_1_x, beta_1),
-                        "E_g6": lambda v: E_g6(gamma_0, v, beta_0,
-                                               gamma_1, gamma_1_x, beta_1),
+            E_func.compute_AssociationFunctions(S)
+            F_func.grad_Q_fixed_stuff(beta_K, E_g5, args_all["ind_1"])
+            args_0_x = {"E_g1": lambda v: E_g1(gamma_0, v, gamma_1, gamma_1_x),
+                        "E_log_g1": lambda v: E_log_g1(gamma_0, v, gamma_1,
+                                                       gamma_1_x),
+                        "E_g6": lambda v: E_g6(gamma_0, v, gamma_1, gamma_1_x),
                         "group": 0}
             gamma_0_prev = gamma_0.copy()
             gamma_0_x_prev = gamma_0_x.copy()
@@ -761,13 +754,10 @@ class QNMCEM(Learner):
             gamma_0_x = get_vect_from_ext(gamma_0_x_ext).reshape(-1, 1)
 
             # time dependence part
-            args_0 = {"E_g1": lambda v: E_g1(v, gamma_0_x, beta_0,
-                                             gamma_1, gamma_1_x, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(v, gamma_0_x, beta_0,
-                                                     gamma_1, gamma_1_x,
-                                                     beta_1),
-                      "E_g6": lambda v: E_g6(v, gamma_0_x, beta_0,
-                                             gamma_1, gamma_1_x, beta_1),
+            args_0 = {"E_g1": lambda v: E_g1(v, gamma_0_x, gamma_1, gamma_1_x),
+                      "E_log_g1": lambda v: E_log_g1(v, gamma_0_x, gamma_1,
+                                                     gamma_1_x),
+                      "E_g6": lambda v: E_g6(v, gamma_0_x, gamma_1, gamma_1_x),
                       "group": 0}
             gamma_0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
@@ -777,13 +767,12 @@ class QNMCEM(Learner):
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_1 update
-            gamma_1_x_prev = gamma_1_x.copy()
             args_1_x = {"E_g1": lambda v: E_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, gamma_1, v, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, gamma_1, v, beta_1),
+                                               gamma_1, v),
+                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev,
+                                            gamma_0_x_prev, gamma_1, v),
                       "E_g6": lambda v: E_g6(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, gamma_1, v, beta_1),
+                                            gamma_1, v),
                       "group": 1}
             # time independence part
             gamma_1_x_ext = fmin_l_bfgs_b(
@@ -799,11 +788,11 @@ class QNMCEM(Learner):
 
             # time dependence part
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x, beta_1),
-                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x, beta_1),
+                                               v, gamma_1_x),
+                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev,
+                                            gamma_0_x_prev, v, gamma_1_x),
                       "E_g6": lambda v: E_g6(gamma_0_prev, gamma_0_x_prev,
-                                               beta_0, v, gamma_1_x, beta_1),
+                                            v, gamma_1_x),
                       "group": 1}
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
@@ -813,13 +802,11 @@ class QNMCEM(Learner):
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta, gamma needs to be updated before the baseline
-            self._update_theta(beta_0=beta_0, beta_1=beta_1,
-                               gamma_0=gamma_0, gamma_1=gamma_1,
+            self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1,
                                gamma_0_x=gamma_0_x, gamma_1_x=gamma_1_x)
             E_func.theta = self.theta
-            E_g1 = E_func.Eg(E_func.g1(S, gamma_0, gamma_0_x, beta_0,
-                                       gamma_1, gamma_1_x, beta_1),
-                             Lambda_1, pi_xi, f)
+            E_g1 = E_func.Eg(E_func.g1(S, gamma_0, gamma_0_x, gamma_1,
+                                       gamma_1_x), Lambda_1, pi_xi, f)
 
             # baseline hazard update
             baseline_hazard = pd.Series(

@@ -2,7 +2,7 @@ import numpy as np
 from lights.base.base import block_diag
 
 
-class AssociationFunctions:
+class AssociationFunctionFeatures:
     """A class to define all the association functions
 
     Parameters
@@ -78,7 +78,7 @@ class AssociationFunctions:
             tmp_V = np.array([]).reshape(0, r_l)
             for asso_function in asso_functions:
                 tmp_U = np.vstack((tmp_U, self.fixed_feat[asso_function][j]))
-                tmp_V = np.vstack((tmp_V, self.fixed_feat[asso_function][j]))
+                tmp_V = np.vstack((tmp_V, self.rand_feat[asso_function][j]))
             fixed_feat[j] = block_diag((tmp_U,) * L)
             rand_feat[j] = block_diag((tmp_V,) * L)
         return fixed_feat, rand_feat

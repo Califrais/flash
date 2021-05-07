@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import multi_dot
 from lights.base.base import logistic_loss, get_xi_from_xi_ext, get_vect_from_ext
 from lights.model.regularizations import ElasticNet
-from lights.model.associations import AssociationFunctions
+from lights.model.associations import AssociationFunctionFeatures
 
 
 class MstepFunctions:
@@ -42,7 +42,7 @@ class MstepFunctions:
 
     def __init__(self, fit_intercept, X, T, delta, n_long_features,
                  n_time_indep_features, l_pen_EN, eta_elastic_net,
-                 fixed_effect_time_order, asso_functions):
+                 fixed_effect_time_order, asso_functions_list):
         self.fit_intercept = fit_intercept
         self.X, self.T, self.delta = X, T, delta
         self.n_long_features = n_long_features
@@ -50,12 +50,12 @@ class MstepFunctions:
         n_samples = len(T)
         self.n_samples = n_samples
         self.fixed_effect_time_order = fixed_effect_time_order
-        self.asso_functions = asso_functions
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         T_u = np.unique(self.T)
         alpha, L = self.fixed_effect_time_order, self.n_long_features
-        self.F_f, self.F_r = AssociationFunctions(asso_functions, T_u,
+        self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list, T_u,
                                         alpha, L).get_asso_feat()
+        self.grad_Q_fixed = None
 
     def P_pen_func(self, pi_est, xi_ext):
         """Computes the sub objective function P with penalty, to be minimized
@@ -256,7 +256,7 @@ class MstepFunctions:
         group = arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
+        ind_1, ind_2 = arg["ind_1"], arg["ind_2"]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_log_g1 = arg["E_log_g1"](gamma_k).T[group].T
         pi_est = arg["pi_est"][group]
@@ -326,7 +326,7 @@ class MstepFunctions:
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_2 = arg["ind_2"] * 1
+        ind_2 = arg["ind_2"]
         group = arg["group"]
         E_g1 = arg["E_g1"](gamma_x_k.reshape(-1, 1)).T[group].T
         pi_est = arg["pi_est"][group]
@@ -334,6 +334,27 @@ class MstepFunctions:
                     (E_g1 * baseline_val * ind_2).sum(axis=1)))).sum(axis=1)
         grad_sub_obj = np.concatenate([grad, -grad])
         return -grad_sub_obj / n_samples
+
+    def grad_Q_fixed_stuff(self, beta, E_g5, ind_1):
+        """
+        Compute a fixed stuff of gradient of Q function
+
+        Parameters
+        ----------
+        beta : `list`,
+            Fixed effect parameters for both groups
+
+        E_g5 : `np.ndarray`, shape=(n_samples, r)
+            The values of g5 function
+
+        ind_1 : `np.ndarray`, shape=(n_samples, J)
+            The indicator matrix for comparing event times (T == T_u)
+        """
+        beta = np.hstack((beta[0].reshape(-1, 1), beta[1].reshape(-1, 1)))
+        self.grad_Q_fixed = (self.delta * ((self.F_f.dot(beta)
+                            + (self.F_r.swapaxes(0, 1)[..., np.newaxis]
+                            * E_g5.T).sum(axis=2).T[..., np.newaxis]).T
+                        .swapaxes(0, 1)) * ind_1.T).sum(axis=2).swapaxes(0, 1)
 
     def grad_Q(self, gamma_k, *args):
         """Computes the gradient of the function Q  with time dependence
@@ -353,18 +374,14 @@ class MstepFunctions:
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
         baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_1, ind_2 = arg["ind_1"] * 1, arg["ind_2"] * 1
-        group = arg["group"]
+        ind_2, group = arg["ind_2"], arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
         beta_k = arg["beta"][group]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_g6 = arg["E_g6"](gamma_k).T[group].T
-        E_g5 = arg["E_g5"]
         pi_est = arg["pi_est"][group]
         F_f, F_r = self.F_f, self.F_r
-        op1 = (delta * (F_f.dot(beta_k.flatten())
-                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g5.T).sum(
-                    axis=2).T).T * ind_1.T * delta).sum(axis=1)
+        op1 = self.grad_Q_fixed[group]
         op2 = (((F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
                .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)

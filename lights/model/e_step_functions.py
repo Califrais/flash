@@ -1,5 +1,5 @@
 import numpy as np
-from lights.model.associations import AssociationFunctions
+from lights.model.associations import AssociationFunctionFeatures
 from lights.base.base import get_times_infos
 
 
@@ -50,7 +50,7 @@ class EstepFunctions:
     """
 
     def __init__(self, X, T, T_u, delta, extracted_features,
-                 fixed_effect_time_order, asso_functions, theta, MC_sep):
+                 fixed_effect_time_order, asso_functions_list, theta, MC_sep):
         self.K = 2  # 2 latent groups
         self.X, self.T, self.delta = X, T, delta
         self.T_u, self.n_samples = T_u, len(T)
@@ -59,12 +59,31 @@ class EstepFunctions:
         self.n_long_features = len(extracted_features[1][0])
         self.n_time_indep_features = X.shape[1]
         self.fixed_effect_time_order = fixed_effect_time_order
-        self.asso_functions = asso_functions
         alpha, L = self.fixed_effect_time_order, self.n_long_features
-        self.F_f, self.F_r = AssociationFunctions(asso_functions, T_u,
-                                        alpha, L).get_asso_feat()
+        self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
+                                                T_u, alpha, L).get_asso_feat()
         self.MC_sep = MC_sep
         self.g3_, self.g4_, self.g9_ = None, None, None
+        self.asso_funcs = None
+
+    def compute_AssociationFunctions(self, S):
+        """
+        Compute the value of association functions
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r) or (n_samples, K, N_MC, r)
+            Set of constructed Monte Carlo samples, with N_MC = 2 * N
+
+        """
+        beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
+        if self.MC_sep:
+            self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None, None]
+                   + (self.F_r[:, :, :, None, None, None] * S.T).sum(
+                        axis=2).swapaxes(2, 3)).swapaxes(2, 3).swapaxes(1, 4)
+        else:
+            self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
+                  self.F_r.dot(S.T)[:, :, None, :])
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -121,8 +140,7 @@ class EstepFunctions:
 
         return S
 
-    def g1(self, S, gamma_0, gamma_0_x, beta_0,
-           gamma_1, gamma_1_x, beta_1, broadcast=True):
+    def g1(self, S, gamma_0, gamma_0_x, gamma_1, gamma_1_x, broadcast=True):
         """Computes g1
 
         Parameters
@@ -158,13 +176,12 @@ class EstepFunctions:
             The values of g1 function
         """
         n_samples, K = self.n_samples, self.K
-        p = self.n_time_indep_features
         X, T_u, J = self.X, self.T_u, self.J
         if self.MC_sep:
-            g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1)
+            g2 = self.g2(gamma_0, gamma_1)
         else:
             N_MC = S.shape[0]
-            g2 = self.g2(S, gamma_0, beta_0, gamma_1, beta_1)\
+            g2 = self.g2(gamma_0, gamma_1)\
                 .reshape(K, 1, J, N_MC)
         gamma_x = np.hstack((gamma_0_x, gamma_1_x))
         tmp = X.dot(gamma_x).T.reshape(K, n_samples, 1, 1)
@@ -173,44 +190,27 @@ class EstepFunctions:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
 
-    def g2(self, S, gamma_0, beta_0, gamma_1, beta_1):
+    def g2(self, gamma_0, gamma_1):
         """Computes g2
 
         Parameters
         ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
         gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
 
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
         gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
 
         Returns
         -------
         g2 : `np.ndarray`, shape=(K, J, N_MC) or (K, n_samples, J, N_MC)
             The values of g2 function
         """
-        T_u, p, K = self.T_u, self.n_time_indep_features, self.K
         gamma = np.hstack((gamma_0, gamma_1)).T
-        beta = np.hstack((beta_0, beta_1)).T
-        F_f, F_r = self.F_f, self.F_r
+        g2 = (self.asso_funcs * gamma).sum(axis=-1)
         if self.MC_sep:
-            g2 = ((F_f.dot(beta.T)[:, :, :, None, None]
-                   + (F_r[:, :, :, None, None, None] * S.T).sum(
-                        axis=2).swapaxes(2, 3))
-                  .swapaxes(2, 3).swapaxes(1, 4) * gamma).sum(axis=-1)
             g2 = g2.swapaxes(0, 2).swapaxes(1, 2).T
         else:
-            g2 = ((F_f.dot(beta.T)[:, :, :, None] + F_r.dot(S.T)[:, :, None, :])
-                  .swapaxes(1, 3) * gamma).sum(axis=-1)
             g2 = g2.swapaxes(0, 1).T
         return g2
 
@@ -290,7 +290,7 @@ class EstepFunctions:
             g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
         return g5
 
-    def g6(self, S, gamma_0, gamma_0_x, beta_0, gamma_1, gamma_1_x, beta_1):
+    def g6(self, S, gamma_0, gamma_0_x, gamma_1, gamma_1_x):
         """Computes g6
 
         Parameters
@@ -304,17 +304,11 @@ class EstepFunctions:
         gamma_0_x : `np.ndarray`, shape=(p,)
             Time-independent feature  parameters for low-risk group
 
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
         gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
 
         gamma_1_x : `np.ndarray`, shape=(p,)
             Time-independent feature  parameters for high-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
 
         Returns
         -------
@@ -322,14 +316,13 @@ class EstepFunctions:
             The values of g6 function
         """
         if self.MC_sep:
-            g1 = self.g1(S, gamma_0, gamma_0_x, beta_0,
-                         gamma_1, gamma_1_x, beta_1)
+            g1 = self.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x)
             g6 = g1.swapaxes(0, -2)[..., np.newaxis] \
                  * S.swapaxes(0, 2).swapaxes(1, 2)
             return g6.T.swapaxes(0, 2).swapaxes(2, 3).swapaxes(4, 5)
         else:
-            g1 = self.g1(S, gamma_0, gamma_0_x, beta_0,
-                         gamma_1, gamma_1_x, beta_1, broadcast=True)
+            g1 = self.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x,
+                         broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
 
