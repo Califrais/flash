@@ -152,7 +152,7 @@ class QNMCEM(Learner):
 
     @copt_accelerate.setter
     def copt_accelerate(self, val):
-        if self.warm_start:
+        if val and self.warm_start:
             warnings.warn("Careful using simultaneously ``warm_start`` and "
                           "``copt_accelerate``: warmstart can diminish FISTA "
                           "acceleration effectiveness")
