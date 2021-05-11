@@ -12,11 +12,12 @@ class Test(unittest.TestCase):
         """Tests QNMCEM Algorithm
         """
         X, Y, T, delta = get_train_data(20)
-        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=10, initialize=True,
+        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=10, initialize=False,
                         print_every=1, asso_functions=["lp", "re", "tps"],
                         MC_sep=True, compute_obj=True)
         qnmcem.fit(X, Y, T, delta)
         C_index = qnmcem.score(X, Y, T, delta)
+        print(C_index)
 
 
 if __name__ == "main":

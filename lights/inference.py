@@ -82,11 +82,11 @@ class QNMCEM(Learner):
 
     copt_accelerate : `bool`, default=False
         If `True`, we choose copt solver with accelerated proximal
-        gradient (FISTA), otherwise we use regular ISTA.
+        gradient (FISTA), otherwise we use regular ISTA
 
     compute_obj : `bool`, default=False
         If `True`, we compute the global objective to be minimized by the QNMCEM
-         algorithm and store it in history.
+         algorithm and store it in history
 
     MC_sep: `bool`, default=False
         If `False`, we use the same set of MC samples for all subject,
@@ -570,7 +570,6 @@ class QNMCEM(Learner):
         J, ind_1, ind_2 = get_times_infos(T, T_u)
 
         # Initialization
-        # TODO: for debugging and update hyper-params if not useful
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
 
         if self.initialize:
@@ -593,15 +592,15 @@ class QNMCEM(Learner):
             time_indep_cox_coeffs = np.zeros(p)
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
-        # TODO: for debugging and update hyper-params if not useful
+        beta_0 = beta.reshape(-1, 1)
+        beta_1 = beta_0.copy()
+
         gamma_0_x = time_indep_cox_coeffs.reshape(-1, 1)
         gamma_0_x_ext = get_ext_from_vect(gamma_0_x)
         gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
         gamma_1_x = gamma_0_x.copy()
         gamma_1_x_ext = gamma_0_x_ext.copy()
         gamma_1 = gamma_0.copy()
-        beta_0 = beta.reshape(-1, 1)
-        beta_1 = beta_0.copy()
 
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1,
@@ -635,13 +634,11 @@ class QNMCEM(Learner):
                                 rel_obj=np.inf, theta=self.theta)
         else:
             self.history.update(n_iter=0, theta=self.theta)
-
-        prev_theta = self.theta.copy()
-        rel_theta_list = [0] * 4
-
         if verbose:
             self.history.print_history()
 
+        prev_theta = self.theta.copy()
+        stopping_criterion_count = 0
         for n_iter in range(1, max_iter + 1):
 
             # E-Step
@@ -705,7 +702,7 @@ class QNMCEM(Learner):
                 fun=F_func.R_func, x0=beta_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R,
-                step=lambda x: 2e-3,
+                step=lambda x: 2e-3, #todo ??
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
@@ -841,8 +838,6 @@ class QNMCEM(Learner):
             f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S, self.MC_sep)
 
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
-            rel_theta_list.pop(0)
-            rel_theta_list.append(rel_theta)
             prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
                 if self.compute_obj:
@@ -858,7 +853,12 @@ class QNMCEM(Learner):
                     self.history.update(n_iter=n_iter, theta=self.theta)
                 if verbose:
                     self.history.print_history()
-            if (n_iter + 1 > max_iter) or (rel_theta < tol):
+            if rel_theta < tol:
+                stopping_criterion_count += 1
+            else:
+                stopping_criterion_count = 0
+
+            if (n_iter + 1 > max_iter) or (stopping_criterion_count == 3):
                 self._fitted = True
                 self.S = S  # useful for predictions
                 break
@@ -893,6 +893,7 @@ class QNMCEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            return c_index_score(T, self.predict_marker(X, Y), delta)
+            c_index = c_index_score(T, self.predict_marker(X, Y), delta)
+            return max(c_index, 1 - c_index)
         else:
             raise ValueError('You must fit the model first')
