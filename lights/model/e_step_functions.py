@@ -83,7 +83,7 @@ class EstepFunctions:
                         axis=2).swapaxes(2, 3)).swapaxes(2, 3).swapaxes(1, 4)
         else:
             self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
-                  self.F_r.dot(S.T)[:, :, None, :])
+                  self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
