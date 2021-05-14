@@ -91,6 +91,9 @@ class QNMCEM(Learner):
     MC_sep: `bool`, default=False
         If `False`, we use the same set of MC samples for all subject,
         otherwise we sample a seperate set of MC samples for each subject
+
+    copt_solver_step : function or `str`='backtracking', default='backtracking'
+        Step size for optimization algorithm used in Copt colver
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
@@ -98,7 +101,8 @@ class QNMCEM(Learner):
                  max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj=False, MC_sep=False):
+                 compute_obj=False, MC_sep=False,
+                 copt_solver_step='backtracking'):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -134,6 +138,7 @@ class QNMCEM(Learner):
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
+        self.copt_step = copt_solver_step
 
     @property
     def asso_functions(self):
@@ -702,7 +707,7 @@ class QNMCEM(Learner):
                 fun=F_func.R_func, x0=beta_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R,
-                step=lambda x: 2e-3, #todo ??
+                step=self.copt_step,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta_1 update
@@ -711,7 +716,7 @@ class QNMCEM(Learner):
                 fun=F_func.R_func, x0=beta_init[1], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,
-                step=lambda x: 2e-3,
+                step=self.copt_step,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             self._update_theta(beta_0=beta_0, beta_1=beta_1)
@@ -760,7 +765,7 @@ class QNMCEM(Learner):
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
-                step=lambda x: 2e-3,
+                step=self.copt_step,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_1 update
@@ -795,7 +800,7 @@ class QNMCEM(Learner):
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q,
-                step=lambda x: 2e-3,
+                step=self.copt_step,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # beta, gamma needs to be updated before the baseline
