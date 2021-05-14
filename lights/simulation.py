@@ -483,6 +483,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         a_, b_ = baseline_hawkes_uniform_bounds
         baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
 
+        empty_long_idx = []
         for i in range(n_samples):
             # seed=seed+i: get reproducible but different times
             hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
@@ -506,6 +507,12 @@ class SimuJointLongitudinalSurvival(Simulation):
                                   index=times_i[l])]
             Y.loc[i] = y_i
 
+            if list(map(len, times_i)) == [0] * n_long_features:
+                empty_long_idx.append(i)
+        X = np.delete(X, empty_long_idx, axis=0)
+        Y = Y.drop(index = empty_long_idx)
+        delta = np.delete(delta, empty_long_idx)
+        T = np.delete(T, empty_long_idx)
         self.long_features = Y
 
         return X, Y, T.astype(int), delta
