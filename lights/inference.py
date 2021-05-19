@@ -169,12 +169,24 @@ class QNMCEM(Learner):
 
     @staticmethod
     def _rel_theta(theta, prev_theta, eps):
-        """
-        #TODO
-        :param theta:
-        :param prev_theta:
-        :param eps:
-        :return:
+        """Computes the relative difference of the current estimated parameters
+        with the previous one.
+
+        Parameters
+        ----------
+        theta : `dictionary`
+            Dictionary of current estimated parameters
+
+        pre_theta : `dictionary`
+            Dictionary of previous iteration estimated parameters
+
+        eps : float
+            The value of epsilon
+
+        Returns
+        -------
+        rel : `float`
+            The computed relative difference
         """
         rel = 0
         for key_ in theta.keys():
