@@ -92,8 +92,8 @@ class QNMCEM(Learner):
         If `False`, we use the same set of MC samples for all subject,
         otherwise we sample a seperate set of MC samples for each subject
 
-    copt_solver_step : function or `str`='backtracking', default='backtracking'
-        Step size for optimization algorithm used in Copt colver
+    copt_step : function or `str`='backtracking', default='backtracking'
+        Step size for optimization algorithm used in copt solver
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
@@ -102,7 +102,7 @@ class QNMCEM(Learner):
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
                  compute_obj=False, MC_sep=False,
-                 copt_solver_step='backtracking'):
+                 copt_step='backtracking'):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -121,6 +121,7 @@ class QNMCEM(Learner):
         self._fitted = False
         self.compute_obj = compute_obj
         self.MC_sep = MC_sep
+        self.copt_step = copt_step
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -138,7 +139,6 @@ class QNMCEM(Learner):
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
-        self.copt_step = copt_solver_step
 
     @property
     def asso_functions(self):
