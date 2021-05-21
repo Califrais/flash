@@ -255,7 +255,7 @@ class MstepFunctions:
         arg = args[0]
         group = arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
-        baseline_val = arg["baseline_hazard"].values.flatten()
+        baseline_val = arg["baseline_hazard"].flatten()
         ind_1, ind_2 = arg["ind_1"], arg["ind_2"]
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_log_g1 = arg["E_log_g1"](gamma_k).T[group].T
@@ -325,7 +325,7 @@ class MstepFunctions:
         """
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
-        baseline_val = arg["baseline_hazard"].values.flatten()
+        baseline_val = arg["baseline_hazard"].flatten()
         ind_2 = arg["ind_2"]
         group = arg["group"]
         E_g1 = arg["E_g1"](gamma_x_k.reshape(-1, 1)).T[group].T
@@ -373,7 +373,7 @@ class MstepFunctions:
         """
         n_samples, delta = self.n_samples, self.delta
         arg = args[0]
-        baseline_val = arg["baseline_hazard"].values.flatten()
+        baseline_val = arg["baseline_hazard"].flatten()
         ind_2, group = arg["ind_2"], arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
         beta_k = arg["beta"][group]

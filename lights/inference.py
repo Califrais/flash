@@ -134,7 +134,7 @@ class QNMCEM(Learner):
             "long_cov": np.empty(1),
             "phi": np.empty(1),
             "xi": np.empty(1),
-            "baseline_hazard": pd.Series(),
+            "baseline_hazard": np.empty(1),
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
@@ -466,7 +466,7 @@ class QNMCEM(Learner):
         E_func.compute_AssociationFunctions(S)
         g1 = E_func.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x, False)
         g3 = E_func.g3(S, beta_0, beta_1)
-        baseline_val = baseline_hazard.values.flatten()
+        baseline_val = baseline_hazard.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
@@ -599,6 +599,7 @@ class QNMCEM(Learner):
             phi = mlmm.phi
             est = initialize_asso_params(X, T, delta)
             time_indep_cox_coeffs, baseline_hazard = est
+            baseline_hazard = baseline_hazard.values
         else:
             # Fixed initialization
             q = q_l * L
@@ -607,7 +608,7 @@ class QNMCEM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((L, 1))
             time_indep_cox_coeffs = np.zeros(p)
-            baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
+            baseline_hazard = .5 * np.ones(J)
 
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
@@ -823,10 +824,9 @@ class QNMCEM(Learner):
                                        gamma_1_x), Lambda_1, pi_xi, f)
 
             # baseline hazard update
-            baseline_hazard = pd.Series(
-                data=((((ind_1 * 1).T * delta).sum(axis=1)) /
+            baseline_hazard = ((((ind_1 * 1).T * delta).sum(axis=1)) /
                       ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
-                      .sum(axis=2).sum(axis=1)), index=T_u)
+                      .sum(axis=2).sum(axis=1))
 
             # phi update
             beta_stack = np.hstack((beta_0, beta_1))
