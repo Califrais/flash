@@ -351,8 +351,8 @@ class MstepFunctions:
             The indicator matrix for comparing event times (T == T_u)
         """
         beta = np.hstack((beta[0].reshape(-1, 1), beta[1].reshape(-1, 1)))
-        self.grad_Q_fixed = (self.delta * ((self.F_f.dot(beta)
-                            + (self.F_r.swapaxes(0, 1)[..., np.newaxis]
+        self.grad_Q_fixed = (self.delta * ((self.F_f.swapaxes(0, 1).dot(beta)
+                            + (self.F_r[..., np.newaxis]
                             * E_g5.T).sum(axis=2).T[..., np.newaxis]).T
                         .swapaxes(0, 1)) * ind_1.T).sum(axis=2).swapaxes(0, 1)
 
@@ -382,8 +382,8 @@ class MstepFunctions:
         pi_est = arg["pi_est"][group]
         F_f, F_r = self.F_f, self.F_r
         op1 = self.grad_Q_fixed[group]
-        op2 = (((F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
-                + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
+        op2 = (((F_f.swapaxes(0, 1).dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
+                + (F_r[..., np.newaxis] * E_g6.T).sum(axis=2))
                .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)
         grad = ((op1 - op2) * pi_est).sum(axis=1)
         return -grad / n_samples

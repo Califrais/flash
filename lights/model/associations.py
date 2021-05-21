@@ -71,14 +71,14 @@ class AssociationFunctionFeatures:
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        fixed_feat = np.zeros(shape=(J, nb_asso_param * L, q))
-        rand_feat = np.zeros(shape=(J, nb_asso_param * L, r))
+        fixed_feat = np.zeros(shape=(nb_asso_param * L, J , q))
+        rand_feat = np.zeros(shape=(nb_asso_param * L, J, r))
         for j in range(J):
             tmp_U = np.array([]).reshape(0, q_l)
             tmp_V = np.array([]).reshape(0, r_l)
             for asso_function in asso_functions:
                 tmp_U = np.vstack((tmp_U, self.fixed_feat[asso_function][j]))
                 tmp_V = np.vstack((tmp_V, self.rand_feat[asso_function][j]))
-            fixed_feat[j] = block_diag((tmp_U,) * L)
-            rand_feat[j] = block_diag((tmp_V,) * L)
+            fixed_feat[:, j] = block_diag((tmp_U,) * L)
+            rand_feat[:, j] = block_diag((tmp_V,) * L)
         return fixed_feat, rand_feat

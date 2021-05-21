@@ -63,7 +63,6 @@ class EstepFunctions:
         self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
                                                 T_u, alpha, L).get_asso_feat()
         self.MC_sep = MC_sep
-        self.g3_, self.g4_, self.g9_ = None, None, None
         self.asso_funcs = None
 
     def compute_AssociationFunctions(self, S):
@@ -77,10 +76,17 @@ class EstepFunctions:
 
         """
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
+        n_samples, J, K = self.n_samples, self.J, self.K
+        Ar = self.F_f.shape[0]
         if self.MC_sep:
-            self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None, None]
-                   + (self.F_r[:, :, :, None, None, None] * S.T).sum(
-                        axis=2).swapaxes(2, 3)).swapaxes(2, 3).swapaxes(1, 4)
+            N_MC = S.shape[2]
+            asso_funcs = np.zeros((n_samples, J , N_MC, K, Ar))
+            for k in range(K):
+                for s in range(N_MC):
+                    asso_funcs[:, :, s, k] = (self.F_f.dot(beta[k])).T \
+                                             + self.F_r.dot(S.T[:, s, k]).T
+
+            self.asso_funcs = asso_funcs
         else:
             self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
                   self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
@@ -178,14 +184,19 @@ class EstepFunctions:
         n_samples, K = self.n_samples, self.K
         X, T_u, J = self.X, self.T_u, self.J
         if self.MC_sep:
+            N_MC = S.shape[2]
             g2 = self.g2(gamma_0, gamma_1)
         else:
             N_MC = S.shape[0]
-            g2 = self.g2(gamma_0, gamma_1)\
+            g2 = self.g2(gamma_0, gamma_1) \
                 .reshape(K, 1, J, N_MC)
-        gamma_x = np.hstack((gamma_0_x, gamma_1_x))
-        tmp = X.dot(gamma_x).T.reshape(K, n_samples, 1, 1)
-        g1 = np.exp(tmp + g2).swapaxes(0, 1).swapaxes(2, 3)
+        gamma_x = [gamma_0_x, gamma_1_x]
+        g1 = np.zeros((n_samples, K, N_MC, J))
+        for k in range(K):
+            tmp = X.dot(gamma_x[k])
+            for s in range(N_MC):
+                g1[:, k, s, :] = np.exp(tmp + g2[:, :, s, k])
+
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
@@ -206,10 +217,15 @@ class EstepFunctions:
         g2 : `np.ndarray`, shape=(K, J, N_MC) or (K, n_samples, J, N_MC)
             The values of g2 function
         """
-        gamma = np.hstack((gamma_0, gamma_1)).T
-        g2 = (self.asso_funcs * gamma).sum(axis=-1)
+        gamma = [gamma_0.flatten(), gamma_1.flatten()]
+        n_samples, J, K = self.n_samples, self.J, self.K
+
         if self.MC_sep:
-            g2 = g2.swapaxes(0, 2).swapaxes(1, 2).T
+            N_MC = self.asso_funcs.shape[2]
+            g2 = np.zeros((n_samples, J, N_MC, K))
+            for k in range(K):
+                for s in range(N_MC):
+                    g2[:, :, s, k] = self.asso_funcs[:, :, s, k].dot(gamma[k])
         else:
             g2 = g2.swapaxes(0, 1).T
         return g2
@@ -231,13 +247,15 @@ class EstepFunctions:
         n_samples, n_long_features = self.n_samples, self.n_long_features
         U_list, V_list, y_list, N_list = self.extracted_features[0]
         K = self.K
-        beta_stack = np.hstack((beta_0, beta_1))
+        beta = [beta_0, beta_1]
         g3 = []
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
             if self.MC_sep:
-                M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) \
-                       + S[i].dot(V_i.T).swapaxes(1, 2)
+                N_MC = S.shape[2]
+                M_iS = np.zeros((K, sum(n_i), N_MC))
+                for k in range(K):
+                    M_iS[k] = U_i.dot(beta[k]) + V_i.dot(S[i, k].T)
             else:
                 M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g3.append(M_iS)
