@@ -93,7 +93,7 @@ toml==0.10.2
 tornado==6.1
 tqdm==4.54.1
 traitlets==4.3.3
-urllib3==1.25.9
+urllib3==1.26.5
 wcwidth==0.2.4
 webencodings==0.5.1
 widgetsnbextension==3.5.1
