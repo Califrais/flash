@@ -703,20 +703,15 @@ class QNMCEM(Learner):
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
             # beta_0 update
-            eta_sp_gp_l1 = self.eta_sp_gp_l1
-            l_pen_SGL_beta = self.l_pen_SGL_beta
             pi_est_K = np.vstack((1 - pi_est, pi_est))
             gamma_K = [gamma_0, gamma_1]
-            groups = np.arange(0, len(beta_0)).reshape(L, -1).tolist()
-            prox = SparseGroupL1(l_pen_SGL_beta, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
                         "gamma": gamma_K, "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat, "phi": phi}
             args_0 = {"group": 0}
-            beta_0_prev = beta_0.copy()
             copt_max_iter = 1
             beta_0 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[0], prox=prox,
+                fun=F_func.R_func, x0=beta_init[0], prox=None,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_R,
                 step=self.copt_step,
@@ -725,7 +720,7 @@ class QNMCEM(Learner):
             # beta_1 update
             args_1 = {"group": 1}
             beta_1 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[1], prox=prox,
+                fun=F_func.R_func, x0=beta_init[1], prox=None,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_1}], jac=F_func.grad_R,
                 step=self.copt_step,
@@ -738,6 +733,7 @@ class QNMCEM(Learner):
             gamma = [gamma_0, gamma_1]
             gamma_x = [gamma_0_x, gamma_1_x]
             groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
+            eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL_gamma = self.l_pen_SGL_gamma
             prox = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
