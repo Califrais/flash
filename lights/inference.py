@@ -702,29 +702,29 @@ class QNMCEM(Learner):
                 fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_),
                 disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
 
-            # beta_0 update
+            # beta update
+            K = 2
             pi_est_K = np.vstack((1 - pi_est, pi_est))
-            gamma_K = [gamma_0, gamma_1]
-            args_all = {"pi_est": pi_est_K, "E_g5": E_g5, "E_g4": E_g4,
-                        "gamma": gamma_K, "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat, "phi": phi}
-            args_0 = {"group": 0}
-            copt_max_iter = 1
-            beta_0 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[0], prox=None,
-                max_iter=copt_max_iter,
-                args=[{**args_all, **args_0}], jac=F_func.grad_R,
-                step=self.copt_step,
-                accelerated=self.copt_accelerate).x.reshape(-1, 1)
+            (U_list, V_list, y_list, _) = ext_feat[0]
+            num = np.zeros((K, L * q_l))
+            den = np.zeros((K, L * q_l, L * q_l))
+            if self.MC_sep:
+                None
+                #TODO: Update later
+            else:
+                for i in range(n_samples):
+                    U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
+                    tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g5[i])))
+                    tmp_den = U_i.T.dot(U_i)
+                    for k in range(K):
+                        num[k] += pi_est_K[k, i] * tmp_num
+                        den[k] += pi_est_K[k, i] * tmp_den
 
-            # beta_1 update
-            args_1 = {"group": 1}
-            beta_1 = copt.minimize_proximal_gradient(
-                fun=F_func.R_func, x0=beta_init[1], prox=None,
-                max_iter=copt_max_iter,
-                args=[{**args_all, **args_1}], jac=F_func.grad_R,
-                step=self.copt_step,
-                accelerated=self.copt_accelerate).x.reshape(-1, 1)
+            # beta_0
+            beta_0 = np.linalg.inv(den[0]).dot(num[0]).reshape(-1, 1)
+
+            # beta_1
+            beta_0 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
 
             self._update_theta(beta_0=beta_0, beta_1=beta_1)
 
@@ -736,6 +736,7 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL_gamma = self.l_pen_SGL_gamma
             prox = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups).prox
+            copt_max_iter = 1
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
