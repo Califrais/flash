@@ -1,7 +1,9 @@
 import numpy as np
 from lights.model.associations import AssociationFunctionFeatures
 from lights.base.base import get_times_infos
-
+import numba as nb
+from llvmlite import binding
+binding.set_option('SVML', '-vector-library=SVML')
 
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
@@ -328,7 +330,16 @@ class EstepFunctions:
             all Monte Carlo samples. Each element could be real or matrices
             depending on Im(\tilde{g}_i)
         """
-        Lambda_g = np.mean((g.T * f.T).T, axis=2)
+        if len(g.shape) == 3:
+            Lambda_g = Lambda_g_3_nb(g, f)
+        elif len(g.shape) == 4:
+            Lambda_g = Lambda_g_4_nb(g, f)
+        elif len(g.shape) == 5:
+            Lambda_g = Lambda_g_5_nb(g, f)
+        elif len(g.shape) == 6:
+            Lambda_g = Lambda_g_6_nb(g, f)
+        else:
+            raise ValueError("The shape of g function is not supported")
         return Lambda_g
 
     def Eg(self, g, Lambda_1, pi_xi, f):
@@ -361,3 +372,51 @@ class EstepFunctions:
         Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
                 Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
         return Eg.T
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_3_nb(g, f):
+    n_samples, K, N_MC = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                res[i, k] += (g[i, k, j] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_4_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    res[i, k, m] += (g[i, k, j, m] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_5_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    for n in nb.prange(g.shape[4]):
+                        res[i, k, m, n] += \
+                                        (g[i, k, j, m, n] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_6_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    for n in nb.prange(g.shape[4]):
+                        for t in nb.prange(g.shape[5]):
+                            res[i, k, m, n, t] += \
+                                (g[i, k, j, m, n, t] * f[i, k, j]) / N_MC
+    return res
