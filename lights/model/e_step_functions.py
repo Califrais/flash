@@ -165,13 +165,13 @@ class EstepFunctions:
         """
         n_samples, K = self.n_samples, self.K
         X, T_u, J = self.X, self.T_u, self.J
+        g2 = self.g2(gamma_0, gamma_1)
         if self.MC_sep:
-            g2 = self.g2(gamma_0, gamma_1)
+            g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)
         else:
-            N_MC = S.shape[0]
-            g2 = self.g2(gamma_0, gamma_1)\
-                .reshape(K, 1, J, N_MC)
-        g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)
+            tmp = self.g2(gamma_0, gamma_1)
+            g2 = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
+            g1 = np.exp(g2).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
