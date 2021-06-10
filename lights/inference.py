@@ -92,8 +92,8 @@ class QNMCEM(Learner):
         If `False`, we use the same set of MC samples for all subject,
         otherwise we sample a seperate set of MC samples for each subject
 
-    copt_step : function or `str`='backtracking', default='backtracking'
-        Step size for optimization algorithm used in copt solver
+    copt_solver_step : function or `str`='backtracking', default='backtracking'
+        Step size for optimization algorithm used in Copt colver
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
@@ -102,7 +102,7 @@ class QNMCEM(Learner):
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
                  compute_obj=False, MC_sep=False,
-                 copt_step='backtracking'):
+                 copt_solver_step='backtracking'):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -121,7 +121,6 @@ class QNMCEM(Learner):
         self._fitted = False
         self.compute_obj = compute_obj
         self.MC_sep = MC_sep
-        self.copt_step = copt_step
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -139,6 +138,7 @@ class QNMCEM(Learner):
             "gamma_0": np.empty(1),
             "gamma_1": np.empty(1)
         }
+        self.copt_step = copt_solver_step
 
     @property
     def asso_functions(self):
@@ -654,11 +654,11 @@ class QNMCEM(Learner):
 
             def E_log_g1(gamma_0_, gamma_1_):
                 return E_func.Eg(np.log(E_func.g1(S, gamma_0_, gamma_1_)),
-                    Lambda_1, pi_xi, f)
+                                 Lambda_1, pi_xi, f)
 
             def E_g6(gamma_0_, gamma_1_):
                 return E_func.Eg(E_func.g6(S, gamma_0_, gamma_1_),
-                    Lambda_1, pi_xi, f)
+                                 Lambda_1, pi_xi, f)
 
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
@@ -696,12 +696,8 @@ class QNMCEM(Learner):
                         num[k] += pi_est_K[k, i] * tmp_num
                         den[k] += pi_est_K[k, i] * tmp_den
 
-            # beta_0
             beta_0 = np.linalg.inv(den[0]).dot(num[0]).reshape(-1, 1)
-
-            # beta_1
-            beta_0 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
-
+            beta_1 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
             self._update_theta(beta_0=beta_0, beta_1=beta_1)
 
             # gamma_0 update
@@ -711,7 +707,7 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL_gamma = self.l_pen_SGL_gamma
             prox = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups).prox
-            copt_max_iter = 1
+            copt_max_iter = 10
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
