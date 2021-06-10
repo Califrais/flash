@@ -1,7 +1,9 @@
 import numpy as np
 from lights.model.associations import AssociationFunctionFeatures
 from lights.base.base import get_times_infos
-
+import numba as nb
+from llvmlite import binding
+binding.set_option('SVML', '-vector-library=SVML')
 
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
@@ -140,7 +142,7 @@ class EstepFunctions:
 
         return S
 
-    def g1(self, S, gamma_0, gamma_0_x, gamma_1, gamma_1_x, broadcast=True):
+    def g1(self, S, gamma_0, gamma_1, broadcast=True):
         """Computes g1
 
         Parameters
@@ -151,20 +153,8 @@ class EstepFunctions:
         gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
 
-        gamma_0_x : `np.ndarray`, shape=(p,)
-            Time-independent feature  parameters for low-risk group
-
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
         gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
-
-        gamma_1_x : `np.ndarray`, shape=(p,)
-            Time-independent feature  parameters for high-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
 
         broadcast : `boolean`, default=True
             Indicates to expand the dimension of g1 or not
@@ -177,15 +167,13 @@ class EstepFunctions:
         """
         n_samples, K = self.n_samples, self.K
         X, T_u, J = self.X, self.T_u, self.J
+        g2 = self.g2(gamma_0, gamma_1)
         if self.MC_sep:
-            g2 = self.g2(gamma_0, gamma_1)
+            g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)
         else:
-            N_MC = S.shape[0]
-            g2 = self.g2(gamma_0, gamma_1)\
-                .reshape(K, 1, J, N_MC)
-        gamma_x = np.hstack((gamma_0_x, gamma_1_x))
-        tmp = X.dot(gamma_x).T.reshape(K, n_samples, 1, 1)
-        g1 = np.exp(tmp + g2).swapaxes(0, 1).swapaxes(2, 3)
+            tmp = self.g2(gamma_0, gamma_1)
+            g2 = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
+            g1 = np.exp(g2).swapaxes(2, 3)
         if broadcast:
             g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
         return g1
@@ -290,7 +278,7 @@ class EstepFunctions:
             g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
         return g5
 
-    def g6(self, S, gamma_0, gamma_0_x, gamma_1, gamma_1_x):
+    def g6(self, S, gamma_0, gamma_1):
         """Computes g6
 
         Parameters
@@ -301,14 +289,8 @@ class EstepFunctions:
         gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
 
-        gamma_0_x : `np.ndarray`, shape=(p,)
-            Time-independent feature  parameters for low-risk group
-
         gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
-
-        gamma_1_x : `np.ndarray`, shape=(p,)
-            Time-independent feature  parameters for high-risk group
 
         Returns
         -------
@@ -316,13 +298,12 @@ class EstepFunctions:
             The values of g6 function
         """
         if self.MC_sep:
-            g1 = self.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x)
+            g1 = self.g1(S, gamma_0, gamma_1)
             g6 = g1.swapaxes(0, -2)[..., np.newaxis] \
                  * S.swapaxes(0, 2).swapaxes(1, 2)
             return g6.T.swapaxes(0, 2).swapaxes(2, 3).swapaxes(4, 5)
         else:
-            g1 = self.g1(S, gamma_0, gamma_0_x, gamma_1, gamma_1_x,
-                         broadcast=True)
+            g1 = self.g1(S, gamma_0, gamma_1, broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
 
@@ -349,7 +330,16 @@ class EstepFunctions:
             all Monte Carlo samples. Each element could be real or matrices
             depending on Im(\tilde{g}_i)
         """
-        Lambda_g = np.mean((g.T * f.T).T, axis=2)
+        if len(g.shape) == 3:
+            Lambda_g = Lambda_g_3_nb(g, f)
+        elif len(g.shape) == 4:
+            Lambda_g = Lambda_g_4_nb(g, f)
+        elif len(g.shape) == 5:
+            Lambda_g = Lambda_g_5_nb(g, f)
+        elif len(g.shape) == 6:
+            Lambda_g = Lambda_g_6_nb(g, f)
+        else:
+            raise ValueError("The shape of g function is not supported")
         return Lambda_g
 
     def Eg(self, g, Lambda_1, pi_xi, f):
@@ -382,3 +372,51 @@ class EstepFunctions:
         Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
                 Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
         return Eg.T
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_3_nb(g, f):
+    n_samples, K, N_MC = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                res[i, k] += (g[i, k, j] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_4_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    res[i, k, m] += (g[i, k, j, m] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_5_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    for n in nb.prange(g.shape[4]):
+                        res[i, k, m, n] += \
+                                        (g[i, k, j, m, n] * f[i, k, j]) / N_MC
+    return res
+
+@nb.njit(parallel=True, fastmath=True)
+def Lambda_g_6_nb(g, f):
+    n_samples, K, N_MC,  = f.shape
+    res = np.zeros(g.shape[:2] + g.shape[3:])
+    for i in nb.prange(n_samples):
+        for k in nb.prange(K):
+            for j in nb.prange(N_MC):
+                for m in nb.prange(g.shape[3]):
+                    for n in nb.prange(g.shape[4]):
+                        for t in nb.prange(g.shape[5]):
+                            res[i, k, m, n, t] += \
+                                (g[i, k, j, m, n, t] * f[i, k, j]) / N_MC
+    return res
