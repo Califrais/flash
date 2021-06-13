@@ -55,7 +55,7 @@ class ULMM(Learner):
         # Fixed initialization
         q = q_l * n_long_features
         r = r_l * n_long_features
-        beta = np.zeros((q, 1))
+        beta = np.zeros((q))
         D = np.diag(np.ones(r))
         phi = np.ones((n_long_features, 1))
 
