@@ -758,7 +758,7 @@ class QNMCEM(Learner):
                 pi_est_stack = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta_stack[q_l * l: q_l * (l + 1)]
-                E_g5_l = E_g5.reshape(n_samples, L, q_l)[:, l].reshape(-1, 1)
+                E_g5_l = E_g5.reshape(n_samples, L, r_l)[:, l].reshape(-1, 1)
                 E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
                 tmp = y_l - U_l.dot(beta_l)
