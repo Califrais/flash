@@ -380,7 +380,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         pi_xi = logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
         G = (u < pi_xi).astype(int)
-        self.latent_class = G
 
         # Simulation of the random effects components
         r_l = 2  # Affine random effects
@@ -452,7 +451,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
                                 (scale * shape * np.exp(iota_11))) / tmp
-        self.event_times = T_star
 
         m = T_star.mean()
         # Simulation of the censoring
@@ -484,14 +482,17 @@ class SimuJointLongitudinalSurvival(Simulation):
         baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
 
         empty_long_idx = []
+        N_il = np.zeros((n_samples, n_long_features))
+        # TODO : delete N_il after tests
         for i in range(n_samples):
-            # seed=seed+i: get reproducible but different times
+            # seed = seed + i: get reproducible but different times
             hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
                                           baseline=baseline, verbose=False,
                                           end_time=t_max[i], seed=seed + i)
             hawkes.simulate()
             self.hawkes += [hawkes]
             times_i = hawkes.timestamps
+
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
@@ -501,12 +502,15 @@ class SimuJointLongitudinalSurvival(Simulation):
 
                 b_l = b[i, 2 * l:2 * l + 2]
                 n_il = len(times_i[l])
+                N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
                 y_i += [pd.Series(U_il.dot(beta_l) + U_il.dot(b_l) + eps_il,
                                   index=times_i[l])]
+
             Y.loc[i] = y_i
 
+            # Make sure all simulated samples have longitudinal measurements
             if list(map(len, times_i)) == [0] * n_long_features:
                 empty_long_idx.append(i)
 
@@ -515,6 +519,13 @@ class SimuJointLongitudinalSurvival(Simulation):
         Y = Y.drop(index=empty_long_idx)
         delta = np.delete(delta, empty_long_idx)
         T = np.delete(T, empty_long_idx)
+        G = np.delete(G, empty_long_idx)
+        T_star = np.delete(T_star, empty_long_idx)
+        #TODO : find a way to always simulate n_samples !!
+
+        self.event_times = T_star
         self.long_features = Y
+        self.latent_class = G
+        self.N_il = N_il
 
         return X, Y, T.astype(int), delta

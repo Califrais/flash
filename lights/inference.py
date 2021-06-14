@@ -568,7 +568,7 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        N = 10  # Number of initial Monte Carlo sample for S
+        N = 10  # Number of Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -596,12 +596,10 @@ class QNMCEM(Learner):
             beta = np.zeros((q, 1))
             D = np.diag(np.ones(r))
             phi = np.ones((L, 1))
-            time_indep_cox_coeffs = np.zeros(p)
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
-
         gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
         gamma_1 = gamma_0.copy()
 
@@ -610,9 +608,8 @@ class QNMCEM(Learner):
                            phi=phi, baseline_hazard=baseline_hazard)
 
         # Stopping criteria and bounds vector for the L-BGFS-B algorithm
-        maxiter, pgtol = 60, 1e-5
+        maxiter, pgtol = 10, 1e-5
         bounds_xi = [(0, None)] * 2 * p
-        bounds_gamma_time_indep = [(0, None)] * 2 * p
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
