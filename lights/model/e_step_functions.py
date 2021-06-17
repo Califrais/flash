@@ -166,7 +166,6 @@ class EstepFunctions:
             The values of g1 function
         """
         n_samples, K = self.n_samples, self.K
-        X, T_u, J = self.X, self.T_u, self.J
         g2 = self.g2(gamma_0, gamma_1)
         if self.MC_sep:
             g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)

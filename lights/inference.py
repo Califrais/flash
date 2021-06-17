@@ -27,10 +27,7 @@ class QNMCEM(Learner):
     l_pen_EN : `float`, default=0.
         Level of penalization for the ElasticNet
 
-    l_pen_SGL_beta : `float`, default=0.
-        Level of penalization for the Sparse Group l1 on beta
-
-    l_pen_SGL_gamma : `float`, default=0.
+    l_pen_SGL : `float`, default=0.
         Level of penalization for the Sparse Group l1 on gamma
 
     eta_elastic_net: `float`, default=0.1
@@ -96,8 +93,8 @@ class QNMCEM(Learner):
         Step size for optimization algorithm used in Copt colver
     """
 
-    def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL_beta=0.,
-                 l_pen_SGL_gamma=0., eta_elastic_net=.1, eta_sp_gp_l1=.1,
+    def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
+                 eta_elastic_net=.1, eta_sp_gp_l1=.1,
                  max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
@@ -113,8 +110,7 @@ class QNMCEM(Learner):
         self.initialize = initialize
         self.copt_accelerate = copt_accelerate
         self.l_pen_EN = l_pen_EN
-        self.l_pen_SGL_beta = l_pen_SGL_beta
-        self.l_pen_SGL_gamma = l_pen_SGL_gamma
+        self.l_pen_SGL = l_pen_SGL
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
@@ -237,7 +233,7 @@ class QNMCEM(Learner):
         """
         p, L = self.n_time_indep_features, self.n_long_features
         eta_sp_gp_l1 = self.eta_sp_gp_l1
-        l_pen_SGL_gamma = self.l_pen_SGL_gamma
+        l_pen_SGL = self.l_pen_SGL
         theta = self.theta
         log_lik = self._log_lik(pi_xi, f_mean)
         # xi elastic net penalty
@@ -247,7 +243,7 @@ class QNMCEM(Learner):
         # gamma sparse group l1 penalty
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
-        SGL1 = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups)
+        SGL1 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups)
         gamma_0_pen = SGL1.pen(gamma_0)
         gamma_1_pen = SGL1.pen(gamma_1)
         pen = xi_pen + gamma_0_pen + gamma_1_pen
@@ -702,8 +698,8 @@ class QNMCEM(Learner):
             gamma = [gamma_0, gamma_1]
             groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
             eta_sp_gp_l1 = self.eta_sp_gp_l1
-            l_pen_SGL_gamma = self.l_pen_SGL_gamma
-            prox = SparseGroupL1(l_pen_SGL_gamma, eta_sp_gp_l1, groups).prox
+            l_pen_SGL = self.l_pen_SGL
+            prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
             copt_max_iter = 10
             args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
                         "phi": phi, "beta": beta_K,
