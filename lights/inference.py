@@ -35,8 +35,8 @@ class QNMCEM(Learner):
 
     eta_elastic_net: `float`, default=0.1
         The ElasticNet mixing parameter, with 0 <= eta_elastic_net <= 1.
-        For eta_elastic_net = 0 this is ridge (L2) regularization
-        For eta_elastic_net = 1 this is lasso (L1) regularization
+        For eta_elastic_net = 1 this is ridge (L2) regularization
+        For eta_elastic_net = 0 this is lasso (L1) regularization
         For 0 < eta_elastic_net < 1, the regularization is a linear combination
         of L1 and L2
 
@@ -568,7 +568,7 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        N = 10  # Number of Monte Carlo sample for S
+        N = 500  # Number of Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
