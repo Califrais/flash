@@ -151,7 +151,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
-    fixed_effect_mean_low_risk : `tuple`, default=(1, .3)
+    fixed_effect_mean_low_risk : `tuple`, default=(-.6, .2)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the low risk group
 
@@ -244,7 +244,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5, decay: float = 3.,
                  n_long_features: int = 10, cov_corr_long: float = .001,
-                 fixed_effect_mean_low_risk: tuple = (1, .3),
+                 fixed_effect_mean_low_risk: tuple = (-.6, .2),
                  fixed_effect_mean_high_risk: tuple = (1, .5),
                  corr_fixed_effect: float = .01, std_error: float = 2.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
