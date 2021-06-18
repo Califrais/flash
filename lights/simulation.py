@@ -431,10 +431,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         tmp_0 = np.add.reduceat(gamma_0, idx_2)
         tmp_1 = np.add.reduceat(gamma_1, idx_2)
 
-        iota_01 = X_dot_xi[G == 0] + b[G == 0].dot(tmp_0)
+        iota_01 = b[G == 0].dot(tmp_0)
         iota_01 += gamma_0[idx_34].dot(beta_0)
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(gamma_0[idx_4])
-        iota_11 = X_dot_xi[G == 1] + b[G == 1].dot(tmp_1)
+        iota_11 = b[G == 1].dot(tmp_1)
         iota_11 += gamma_1[idx_34].dot(beta_1)
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
         self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
@@ -516,6 +516,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Remove simulated samples whose longitudinal measurements are empty
         X = np.delete(X, empty_long_idx, axis=0)
+        N_il = np.delete(N_il, empty_long_idx, axis=0)
         Y = Y.drop(index=empty_long_idx)
         delta = np.delete(delta, empty_long_idx)
         T = np.delete(T, empty_long_idx)
