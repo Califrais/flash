@@ -564,7 +564,7 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        N = 500  # Number of Monte Carlo sample for S
+        N = 10  # Number of Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -638,6 +638,7 @@ class QNMCEM(Learner):
 
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
+            self.pi_est = pi_est
             E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f)
             E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
 
