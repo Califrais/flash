@@ -501,6 +501,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                     beta_l = beta_1[2 * l:2 * l + 2]
 
                 b_l = b[i, 2 * l:2 * l + 2]
+                if t_max[i] not in times_i[l]:
+                    times_i[l] = np.append(times_i[l], t_max[i])
                 n_il = len(times_i[l])
                 N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
