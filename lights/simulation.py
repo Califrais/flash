@@ -512,23 +512,4 @@ class SimuJointLongitudinalSurvival(Simulation):
 
             Y.loc[i] = y_i
 
-            # Make sure all simulated samples have longitudinal measurements
-            if list(map(len, times_i)) == [0] * n_long_features:
-                empty_long_idx.append(i)
-
-        # Remove simulated samples whose longitudinal measurements are empty
-        X = np.delete(X, empty_long_idx, axis=0)
-        N_il = np.delete(N_il, empty_long_idx, axis=0)
-        Y = Y.drop(index=empty_long_idx)
-        delta = np.delete(delta, empty_long_idx)
-        T = np.delete(T, empty_long_idx)
-        G = np.delete(G, empty_long_idx)
-        T_star = np.delete(T_star, empty_long_idx)
-        #TODO : find a way to always simulate n_samples !!
-
-        self.event_times = T_star
-        self.long_features = Y
-        self.latent_class = G
-        self.N_il = N_il
-
         return X, Y, T.astype(int), delta
