@@ -13,6 +13,7 @@ from lights.init.cox import initialize_asso_params
 from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
+from scipy.stats import multivariate_normal, norm
 
 
 class QNMCEM(Learner):
@@ -360,13 +361,16 @@ class QNMCEM(Learner):
         K = 2  # 2 latent groups
         f_y = np.ones(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), y_list[i], g3[i]
-            inv_Phi_i = [[phi[l, 0]] * N_list[i][l] for l in
-                         range(n_long_features)]
-            inv_Phi_i = np.concatenate(inv_Phi_i).reshape(-1, 1)
-            f_y[i] = (1 / (np.sqrt(((2 * np.pi) ** n_i) * np.prod(inv_Phi_i)))
-                      * np.exp(
-                        np.sum(-0.5 * ((y_i - M_iS) ** 2) / inv_Phi_i, axis=1)))
+            n_i, y_i, M_iS = sum(N_list[i]), np.array(y_list[i]).flatten(), g3[i]
+            inv_Phi_i = []
+            for l in range(n_long_features):
+                inv_Phi_i += [phi[l, 0]] * N_list[i][l]
+            cov = np.diag(inv_Phi_i)
+            for k in range(K):
+                for s in range(N_MC):
+                    mean = M_iS[k, :, s]
+                    f_y[i, k, s] = multivariate_normal.pdf(y_i, mean, cov)
+
         return f_y
 
     def mlmm_density(self, extracted_features):
