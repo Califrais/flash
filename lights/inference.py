@@ -568,7 +568,7 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        N = 10  # Number of Monte Carlo sample for S
+        N = 50  # Number of Monte Carlo sample for S
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -598,6 +598,9 @@ class QNMCEM(Learner):
             phi = np.ones((L, 1))
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
+        #TODO: just for testing, remove later
+        phi = np.array([16, 16, 16]).reshape(-1, 1)
+        D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
         gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
