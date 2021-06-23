@@ -511,5 +511,9 @@ class SimuJointLongitudinalSurvival(Simulation):
                                   index=times_i[l])]
 
             Y.loc[i] = y_i
+        self.event_times = T_star
+        self.long_features = Y
+        self.latent_class = G
+        self.N_il = N_il
 
         return X, Y, T.astype(int), delta
