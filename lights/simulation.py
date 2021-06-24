@@ -485,7 +485,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         a_, b_ = baseline_hawkes_uniform_bounds
         baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
 
-        empty_long_idx = []
         N_il = np.zeros((n_samples, n_long_features))
         # TODO : delete N_il after tests
         for i in range(n_samples):
