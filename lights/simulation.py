@@ -402,22 +402,26 @@ class SimuJointLongitudinalSurvival(Simulation):
         nb_asso_param = 4
         nb_asso_features = n_long_features * nb_asso_param
 
-        def simu_sparse_asso_features(k):
-            gamma = np.zeros(nb_asso_features)
-            low_limit = k * int(sparsity * n_long_features / 2) + 1
-            high_limit = (k + 1) * int(sparsity * n_long_features / 2)
-            S_k = np.arange(low_limit, high_limit + 1)
-            for l in range(n_long_features):
-                if l + 1 <= 2 * int(sparsity * n_long_features / 2):
-                    gamma[nb_asso_param * l:
-                          nb_asso_param * (l + 1)] += coeff_val_asso
-                if l + 1 in S_k:
-                    gamma[nb_asso_param * l:
-                          nb_asso_param * (l + 1)] += coeff_val_asso
+        def simu_sparse_asso_features():
+
+            K = 2
+            nb_nonactive_group = n_long_features - int(sparsity * n_long_features)
+            # set of nonactive group for 2 classes
+            S_k = np.array_split(np.random.choice(n_long_features,
+                                K * nb_nonactive_group, replace=False), K)
+            # number of active features in each group
+            nb_active_features = int(sparsity * nb_asso_param)
+            gamma = []
+            for k in range(K):
+                gamma_k = np.zeros(nb_asso_features)
+                for l in range(n_long_features):
+                    if l not in S_k[k]:
+                        gamma_k[nb_asso_param * l:
+                          nb_asso_param * l + nb_active_features] = coeff_val_asso
+                gamma.append(gamma_k)
             return gamma
 
-        gamma_0 = simu_sparse_asso_features(0)
-        gamma_1 = simu_sparse_asso_features(1)
+        gamma_0, gamma_1 = simu_sparse_asso_features()
         self.asso_coeffs = [gamma_0, gamma_1]
 
         # Simulation of true times
@@ -481,7 +485,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         a_, b_ = baseline_hawkes_uniform_bounds
         baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
 
-        empty_long_idx = []
         N_il = np.zeros((n_samples, n_long_features))
         # TODO : delete N_il after tests
         for i in range(n_samples):
@@ -511,5 +514,9 @@ class SimuJointLongitudinalSurvival(Simulation):
                                   index=times_i[l])]
 
             Y.loc[i] = y_i
+        self.event_times = T_star
+        self.long_features = Y
+        self.latent_class = G
+        self.N_il = N_il
 
         return X, Y, T.astype(int), delta
