@@ -19,7 +19,8 @@ class Test(unittest.TestCase):
         self.S, self.n_MC = data.S, data.S.shape[0]
         self.E_func = EstepFunctions(data.X, data.T, data.T_u, data.delta,
                                      data.ext_feat, alpha, asso_functions,
-                                     theta)
+                                     theta, MC_sep=False)
+        self.E_func.compute_AssociationFunctions(self.S)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
         self.data = data
         self.g5_0_1 = np.array(
@@ -37,22 +38,20 @@ class Test(unittest.TestCase):
         """
         self.setUp()
         theta = self.data.theta
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        g1 = self.E_func.g1(self.S, gamma_0, beta_0, gamma_1, beta_1, broadcast=False)
-        g1_0_1 = np.exp(np.array([356/3, 335/3, 227/3, 275/3]))
-        g1_1_3 = np.exp(np.array([147, 172.5, 145.5, 61.5]))
-        np.testing.assert_almost_equal(np.log(g1[0, 0, :, 0]), np.log(g1_0_1))
-        np.testing.assert_almost_equal(np.log(g1[0, 1, :, 1]), np.log(g1_1_3))
+        g1 = self.E_func.g1(gamma_0, gamma_1, broadcast=False)
+        g1_0_0 = np.exp(np.array([347/3, 326/3, 218/3, 266/3]))
+        g1_1_1 = np.exp(np.array([153 , 178.5, 151.5,  67.5]))
+        np.testing.assert_almost_equal(np.log(g1[0, 0, :, 0]), np.log(g1_0_0))
+        np.testing.assert_almost_equal(np.log(g1[0, 1, :, 1]), np.log(g1_1_1))
 
     def test_g2(self):
         """Tests the g2 function
         """
         self.setUp()
         theta = self.data.theta
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        g2 = self.E_func.g2(self.S, gamma_0, beta_0, gamma_1, beta_1)
+        g2 = self.E_func.g2(gamma_0, gamma_1)
         # values of g2 at first group and first sample
         g2_0_1 = np.array([347/3, 326/3, 218/3, 266/3])
         # values of g2 at second group and second sample

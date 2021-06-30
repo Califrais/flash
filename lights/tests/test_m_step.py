@@ -15,7 +15,7 @@ class Test(unittest.TestCase):
         data = CreateTestingData()
         alpha = data.fixed_effect_time_order
         L, p = data.n_long_features, data.n_time_indep_features
-        n_samples, X, delta = data.n_samples, data.X, data.delta,
+        n_samples, X, delta = data.n_samples, data.X, data.delta
         K, r_l = 2, 2
         r = L * r_l
         l_pen = 2.
@@ -27,8 +27,8 @@ class Test(unittest.TestCase):
         asso_functions = data.asso_functions
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
-                                     L, p, l_pen, eta_elastic_net,
-                                     data.nb_asso_feat, alpha, asso_functions)
+                                     L, p, l_pen, eta_elastic_net, alpha,
+                                     asso_functions)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
@@ -53,42 +53,6 @@ class Test(unittest.TestCase):
         grad_P = self.M_func.grad_P(self.pi_est[0], self.xi_ext)
         grad_P_ = np.array([-.133, -.069, .133, .069])
         np.testing.assert_almost_equal(grad_P, grad_P_, 3)
-
-    def test_R_func(self):
-        """Tests the R function
-        """
-        self.setUp()
-        theta= self.data.theta
-        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        beta, gamma = self.data.beta, self.data.gamma
-        # for group 0
-        E_g1 = lambda v: self.E_g1
-        args = {"pi_est": self.pi_est, "E_g5": self.E_g5, "E_g4": self.E_g4,
-                    "gamma": gamma, "baseline_hazard": baseline_hazard,
-                    "extracted_features": self.data.ext_feat, "phi": phi,
-                    "ind_1": self.ind_1, "ind_2": self.ind_2,
-                    "E_g1": E_g1, "group": 0}
-        R = self.M_func.R_func(beta[0], {**args})
-        R_ = 755.411
-        np.testing.assert_almost_equal(R, R_, 3)
-
-    def test_grad_R(self):
-        """Tests the gradient of R function
-        """
-        self.setUp()
-        theta = self.data.theta
-        baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        beta, gamma = self.data.beta, self.data.gamma
-        E_g1 = lambda v: self.E_g1
-        args = {"pi_est": self.pi_est, "E_g5": self.E_g5, "E_g4": self.E_g4,
-                "gamma": gamma, "baseline_hazard": baseline_hazard,
-                "extracted_features": self.data.ext_feat, "phi": phi,
-                "ind_1": self.ind_1, "ind_2": self.ind_2,
-                "E_g1": E_g1, "group": 0}
-        grad_R = self.M_func.grad_R(beta[0], {**args})
-        grad_R_ = np.array([350.7, 494.383, 923.433, 166.467, -26.967,
-                             -1039.333, 86.433, 280.867, 908.8])
-        np.testing.assert_almost_equal(grad_R, grad_R_, 3)
 
     def test_Q_func(self):
         """Tests the Q function
@@ -128,8 +92,9 @@ class Test(unittest.TestCase):
                 "ind_1": self.ind_1, "ind_2": self.ind_2,
                 "E_g1": E_g1, "E_log_g1": E_log_g1,
                 "E_g6": E_g6, "group": 0}
+        self.M_func.grad_Q_fixed_stuff(self.data.beta, self.E_g5, args["ind_1"])
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
-        grad_Q_ = np.array([21.333, 103.733, 1953.667, 197.867, 218.267, 971,
+        grad_Q_ = np.array([1953.667, 197.867, 218.267, 971,
                             2575.083, 1625.767, 238.667, 259.067, 788.8,
                             2086.917, 1047.967, 279.467, 299.867, 202.467,
                             1845.9])
