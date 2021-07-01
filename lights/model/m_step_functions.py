@@ -185,8 +185,9 @@ class MstepFunctions:
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_log_g1 = arg["E_log_g1"](gamma_k).T[group].T
         pi_est = arg["pi_est"][group]
+        delta_T = arg["delta_T"]
         sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
-                  (E_g1 * ind_2 * baseline_val).sum(axis=1)
+                  (E_g1 * ind_2 * baseline_val * delta_T).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
@@ -235,10 +236,11 @@ class MstepFunctions:
         E_g1 = arg["E_g1"](gamma_k).T[group].T
         E_g6 = arg["E_g6"](gamma_k).T[group].T
         pi_est = arg["pi_est"][group]
+        delta_T = arg["delta_T"]
         F_f, F_r = self.F_f, self.F_r
         op1 = self.grad_Q_fixed[group]
         op2 = (((F_f.dot(beta_k.flatten()).T[..., np.newaxis] * E_g1.T)
                 + (F_r.swapaxes(0, 1)[..., np.newaxis] * E_g6.T).sum(axis=2))
-               .swapaxes(1,2) * baseline_val * ind_2).sum(axis=-1)
+               .swapaxes(1,2) * baseline_val * delta_T * ind_2).sum(axis=-1)
         grad = ((op1 - op2) * pi_est).sum(axis=1)
         return -grad / n_samples

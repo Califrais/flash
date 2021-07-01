@@ -315,7 +315,7 @@ class QNMCEM(Learner):
         return intensity
 
     @staticmethod
-    def survival(rel_risk, indicator):
+    def survival(rel_risk, indicator, delta_T):
         """Computes the survival function
 
         Parameters
@@ -331,7 +331,7 @@ class QNMCEM(Learner):
         survival : `np.ndarray`, shape=(n_samples, K, N_MC)
             The value of the survival function
         """
-        survival = np.exp(-(rel_risk * indicator).sum(axis=-1).T)
+        survival = np.exp(-(rel_risk * indicator * delta_T).sum(axis=-1).T)
         return survival
 
     def f_y_given_latent(self, extracted_features, g3):
@@ -461,6 +461,7 @@ class QNMCEM(Learner):
         rel_risk = g1.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
+        survival = self.survival(rel_risk, ind_2, self.delta_T)
         f = (intensity ** delta).T * survival
         if not self.MC_sep:
             f_y = self.f_y_given_latent(extracted_features, g3)
@@ -574,6 +575,7 @@ class QNMCEM(Learner):
         T_u = np.unique(T)
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
+        self.delta_T = self.T_u - np.append(0, self.T_u[:-1])
 
         # Initialization
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
@@ -713,7 +715,7 @@ class QNMCEM(Learner):
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
                         "ind_1": ind_1 * 1, "ind_2": ind_2 * 1,
-                        "gamma": gamma}
+                        "gamma": gamma, "delta_T": self.delta_T}
             E_func.compute_AssociationFunctions(S)
             F_func.grad_Q_fixed_stuff(beta_K, E_g5, args_all["ind_1"])
             gamma_0_prev = gamma_0.copy()
@@ -747,6 +749,7 @@ class QNMCEM(Learner):
 
             # baseline hazard update
             baseline_hazard = pd.Series(
+                data=  (1 / self.delta_T) * ((((ind_1 * 1).T * delta).sum(axis=1)) /
                       ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
