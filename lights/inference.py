@@ -455,13 +455,12 @@ class QNMCEM(Learner):
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
-        g1 = E_func.g1(S, gamma_0, gamma_1, False)
+        g1 = E_func.g1(gamma_0, gamma_1, False)
         g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g1.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
-        survival = self.survival(rel_risk, ind_2)
         f = (intensity ** delta).T * survival
         if not self.MC_sep:
             f_y = self.f_y_given_latent(extracted_features, g3)
@@ -650,11 +649,11 @@ class QNMCEM(Learner):
             E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
 
             def E_g1(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g1(S, gamma_0_, gamma_1_),
+                return E_func.Eg(E_func.g1(gamma_0_, gamma_1_),
                                  Lambda_1, pi_xi, f)
 
             def E_log_g1(gamma_0_, gamma_1_):
-                return E_func.Eg(np.log(E_func.g1(S, gamma_0_, gamma_1_)),
+                return E_func.Eg(np.log(E_func.g1(gamma_0_, gamma_1_)),
                                  Lambda_1, pi_xi, f)
 
             def E_g6(gamma_0_, gamma_1_):
@@ -744,11 +743,10 @@ class QNMCEM(Learner):
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
-            E_g1 = E_func.Eg(E_func.g1(S, gamma_0, gamma_1), Lambda_1, pi_xi, f)
+            E_g1 = E_func.Eg(E_func.g1(gamma_0, gamma_1), Lambda_1, pi_xi, f)
 
             # baseline hazard update
             baseline_hazard = pd.Series(
-                data=((((ind_1 * 1).T * delta).sum(axis=1)) /
                       ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 

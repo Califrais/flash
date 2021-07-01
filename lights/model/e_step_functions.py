@@ -142,14 +142,11 @@ class EstepFunctions:
 
         return S
 
-    def g1(self, S, gamma_0, gamma_1, broadcast=True):
+    def g1(self, gamma_0, gamma_1, broadcast=True):
         """Computes g1
 
         Parameters
         ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
         gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for low-risk group
 
@@ -302,7 +299,7 @@ class EstepFunctions:
                  * S.swapaxes(0, 2).swapaxes(1, 2)
             return g6.T.swapaxes(0, 2).swapaxes(2, 3).swapaxes(4, 5)
         else:
-            g1 = self.g1(S, gamma_0, gamma_1, broadcast=True)
+            g1 = self.g1(gamma_0, gamma_1, broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
 
