@@ -26,6 +26,7 @@ class Test(unittest.TestCase):
         J = len(T_u)
         asso_functions = data.asso_functions
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
+        self.delta_T = T_u - np.append(0, T_u[:-1])
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
                                      L, p, l_pen, eta_elastic_net, alpha,
                                      asso_functions)

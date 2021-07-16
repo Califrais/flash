@@ -31,8 +31,8 @@ def get_train_data(n_samples: int = 100):
         The simulated censoring indicator
     """
     simu = SimuJointLongitudinalSurvival(n_samples=n_samples,
-                                         n_time_indep_features=10,
-                                         n_long_features=5, seed=0)
+                                         n_time_indep_features=5,
+                                         n_long_features=3, seed=123)
     X, Y, T, delta = simu.simulate()
     return X, Y, T, delta
 
