@@ -716,7 +716,7 @@ class QNMCEM(Learner):
                         "extracted_features": ext_feat,
                         "ind_1": ind_1 * 1, "ind_2": ind_2 * 1,
                         "gamma": gamma, "delta_T": self.delta_T}
-            E_func.compute_AssociationFunctions(S)
+            E_func.compute_AssociationFunctions(S, True)
             F_func.grad_Q_fixed_stuff(beta_K, E_g5, args_all["ind_1"])
             gamma_0_prev = gamma_0.copy()
             args_0 = {"E_g1": lambda v: E_g1(v, gamma_1),
@@ -745,6 +745,7 @@ class QNMCEM(Learner):
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
+            E_func.compute_AssociationFunctions(S)
             E_g1 = E_func.Eg(E_func.g1(gamma_0, gamma_1), Lambda_1, pi_xi, f)
 
             # baseline hazard update
