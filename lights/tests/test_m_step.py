@@ -71,9 +71,9 @@ class Test(unittest.TestCase):
                     "extracted_features": self.data.ext_feat,
                     "ind_1": self.ind_1, "ind_2": self.ind_2,
                     "E_g1": E_g1,"E_log_g1": E_log_g1,
-                    "E_g6": E_g6, "group": 0}
+                    "E_g6": E_g6, "group": 0, "delta_T": self.delta_T}
         Q = self.M_func.Q_func(gamma[0], {**args})
-        Q_ = 41.607
+        Q_ = 55.774
         np.testing.assert_almost_equal(Q, Q_, 3)
 
     def test_grad_Q(self):
@@ -92,13 +92,12 @@ class Test(unittest.TestCase):
                 "extracted_features": self.data.ext_feat,
                 "ind_1": self.ind_1, "ind_2": self.ind_2,
                 "E_g1": E_g1, "E_log_g1": E_log_g1,
-                "E_g6": E_g6, "group": 0}
+                "E_g6": E_g6, "group": 0, "delta_T": self.delta_T}
         self.M_func.grad_Q_fixed_stuff(self.data.beta, self.E_g5, args["ind_1"])
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
-        grad_Q_ = np.array([1953.667, 197.867, 218.267, 971,
-                            2575.083, 1625.767, 238.667, 259.067, 788.8,
-                            2086.917, 1047.967, 279.467, 299.867, 202.467,
-                            1845.9])
+        grad_Q_ = np.array([2434.333, 272.033, 301.1, 1252.167, 3087.417,
+                            2045.1, 330.167, 359.233, 1030.633, 2517.472,
+                            1405.967, 388.3, 417.367, 305.8, 2317.456])
         np.testing.assert_almost_equal(grad_Q, grad_Q_, 3)
 
 
