@@ -31,8 +31,8 @@ def get_train_data(n_samples: int = 100):
         The simulated censoring indicator
     """
     simu = SimuJointLongitudinalSurvival(n_samples=n_samples,
-                                         n_time_indep_features=10,
-                                         n_long_features=5, seed=0)
+                                         n_time_indep_features=5,
+                                         n_long_features=3, seed=123)
     X, Y, T, delta = simu.simulate()
     return X, Y, T, delta
 
@@ -50,14 +50,10 @@ class Test(unittest.TestCase):
              [-0.93338165, -1.35278999, -1.39697848, 0.89562312, 0.96820651],
              [-0.45341733, 0.31936638, 0.88911544, 0.50002514, -1.3768138]])
         Y = pd.Series(
-            [-0.5028013538645395, 5.393849095319872, 4.818810340862982,
-             1.25233698055894, 3.15349389778566, 7.742937253618135,
-             -0.3535074531359843, 3.8254324869792926, 7.897787205684567],
-            index=[1.6954916374868019, 5.250813641738383, 7.004534113277996,
-                   7.029335447848361, 7.12335527159349, 7.389115747704781,
-                   7.511934099306935, 7.888701036025391, 9.291062836214603])
-        T = np.array([13, 39, 10])
-        delta = np.array([1, 1, 0], dtype=np.ushort)
+            [8.262191, 9.394127, 9.008120, 12.359450, 13.497597],
+            index=[6.731722, 6.806727, 7.333566, 10.970851, 12.200360])
+        T = np.array([16, 12, 21])
+        delta = np.array([0, 0, 1], dtype=np.ushort)
 
         np.testing.assert_almost_equal(X, X_)
         pd.testing.assert_series_equal(Y, Y_.iloc[0, 0])

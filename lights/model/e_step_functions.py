@@ -4,7 +4,8 @@ from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
 
@@ -68,7 +69,7 @@ class EstepFunctions:
         self.g3_, self.g4_, self.g9_ = None, None, None
         self.asso_funcs = None
 
-    def compute_AssociationFunctions(self, S):
+    def compute_AssociationFunctions(self, S, is_normalized=False):
         """
         Compute the value of association functions
 
@@ -76,6 +77,9 @@ class EstepFunctions:
         ----------
         S : `np.ndarray`, shape=(N_MC, r) or (n_samples, K, N_MC, r)
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
+
+        is_normailzed : `boolean`
+            indicator ...
 
         """
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
@@ -86,6 +90,14 @@ class EstepFunctions:
         else:
             self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
                   self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
+            if is_normalized:
+                shape = self.asso_funcs.shape
+                scaled_asso_funcs = self.asso_funcs.reshape((-1, shape[-1]))
+                for i in range(scaled_asso_funcs.shape[1]):
+                    tmp = scaled_asso_funcs[:, i].reshape(-1, 1)
+                    scaled_asso_funcs[:, i] = StandardScaler().fit(tmp) \
+                        .transform(tmp).flatten()
+                self.asso_funcs = scaled_asso_funcs.reshape(shape)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -163,8 +175,8 @@ class EstepFunctions:
             The values of g1 function
         """
         n_samples, K = self.n_samples, self.K
-        g2 = self.g2(gamma_0, gamma_1)
         if self.MC_sep:
+            g2 = self.g2(gamma_0, gamma_1)
             g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)
         else:
             tmp = self.g2(gamma_0, gamma_1)
