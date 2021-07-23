@@ -92,12 +92,9 @@ class EstepFunctions:
                   self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
             if is_normalized:
                 shape = self.asso_funcs.shape
-                scaled_asso_funcs = self.asso_funcs.reshape((-1, shape[-1]))
-                for i in range(scaled_asso_funcs.shape[1]):
-                    tmp = scaled_asso_funcs[:, i].reshape(-1, 1)
-                    scaled_asso_funcs[:, i] = StandardScaler().fit(tmp) \
-                        .transform(tmp).flatten()
-                self.asso_funcs = scaled_asso_funcs.reshape(shape)
+                reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, shape[-1]))
+                self.asso_funcs = StandardScaler().fit_transform(
+                    reshaped_asso_funcs).reshape(shape)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
