@@ -454,7 +454,7 @@ class QNMCEM(Learner):
                                 self.asso_functions, theta, MC_sep)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        E_func.compute_AssociationFunctions(S)
+        E_func.compute_AssociationFunctions(S, True)
         g1 = E_func.g1(gamma_0, gamma_1, False)
         g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
@@ -662,6 +662,13 @@ class QNMCEM(Learner):
                 return E_func.Eg(E_func.g6(S, gamma_0_, gamma_1_),
                                  Lambda_1, pi_xi, f)
 
+            def E_g7():
+                return E_func.Eg(E_func.g7(), Lambda_1, pi_xi, f)
+
+            def E_g8(gamma_0_, gamma_1_):
+                return E_func.Eg(E_func.g8(S, gamma_0_, gamma_1_),
+                    Lambda_1, pi_xi, f)
+
             # M-Step
             D = E_g4.sum(axis=0) / n_samples  # D update
 
@@ -722,7 +729,11 @@ class QNMCEM(Learner):
             args_0 = {"E_g1": lambda v: E_g1(v, gamma_1),
                       "E_log_g1": lambda v: E_log_g1(v, gamma_1),
                       "E_g6": lambda v: E_g6(v, gamma_1),
-                      "group": 0}
+                      "group": 0,
+                      "E_g7": E_g7(),
+                      "E_g8": lambda v: E_g8(v, gamma_1)
+                      }
+
             gamma_0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=copt_max_iter,
@@ -734,7 +745,10 @@ class QNMCEM(Learner):
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, v),
                       "E_log_g1": lambda v: E_log_g1(gamma_0_prev, v),
                       "E_g6": lambda v: E_g6(gamma_0_prev, v),
-                      "group": 1}
+                      "group": 1,
+                      "E_g7": E_g7(),
+                      "E_g8": lambda v: E_g8(gamma_0_prev, v)
+                      }
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=copt_max_iter,
@@ -745,7 +759,6 @@ class QNMCEM(Learner):
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
-            E_func.compute_AssociationFunctions(S)
             E_g1 = E_func.Eg(E_func.g1(gamma_0, gamma_1), Lambda_1, pi_xi, f)
 
             # baseline hazard update

@@ -4,7 +4,7 @@ from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
@@ -314,6 +314,45 @@ class EstepFunctions:
             g1 = self.g1(gamma_0, gamma_1, broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
+
+    def g7(self, broadcast=True):
+        """Computes g7
+        Parameters
+        ----------
+        broadcast : `boolean`, default=True
+            Indicate to expand the dimension or not
+        Returns
+        -------
+        g7 : `np.ndarray`, shape=(K, N_MC, J, dim)
+                            or (n_samples, K, N_MC, J, dim, K)
+            The values of g7 function
+        """
+        g7 = self.asso_funcs.swapaxes(0, 2)
+        if broadcast:
+            g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
+            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
+        return g7
+
+    def g8(self, S, gamma_0, gamma_1):
+        """Computes g8
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+        Returns
+        -------
+        g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
+            The values of g8 function
+        """
+        g7 = self.g7(False)
+        g1 = self.g1(gamma_0, gamma_1, False)
+        g8 = g1[..., np.newaxis] * g7
+        g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
+        return g8
 
     @staticmethod
     def Lambda_g(g, f):
