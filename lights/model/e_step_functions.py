@@ -4,7 +4,7 @@ from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
@@ -92,12 +92,9 @@ class EstepFunctions:
                   self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
             if is_normalized:
                 shape = self.asso_funcs.shape
-                scaled_asso_funcs = self.asso_funcs.reshape((-1, shape[-1]))
-                for i in range(scaled_asso_funcs.shape[1]):
-                    tmp = scaled_asso_funcs[:, i].reshape(-1, 1)
-                    scaled_asso_funcs[:, i] = StandardScaler().fit(tmp) \
-                        .transform(tmp).flatten()
-                self.asso_funcs = scaled_asso_funcs.reshape(shape)
+                reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, shape[-1]))
+                self.asso_funcs = StandardScaler().fit_transform(
+                    reshaped_asso_funcs).reshape(shape)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
@@ -314,6 +311,45 @@ class EstepFunctions:
             g1 = self.g1(gamma_0, gamma_1, broadcast=True)
             g6 = g1.swapaxes(2, -1)[..., np.newaxis] * S
             return g6.swapaxes(2, -1).swapaxes(3, 4).swapaxes(2, 3)
+
+    def g7(self, broadcast=True):
+        """Computes g7
+        Parameters
+        ----------
+        broadcast : `boolean`, default=True
+            Indicate to expand the dimension or not
+        Returns
+        -------
+        g7 : `np.ndarray`, shape=(K, N_MC, J, dim)
+                            or (n_samples, K, N_MC, J, dim, K)
+            The values of g7 function
+        """
+        g7 = self.asso_funcs.swapaxes(0, 2)
+        if broadcast:
+            g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
+            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
+        return g7
+
+    def g8(self, S, gamma_0, gamma_1):
+        """Computes g8
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+        Returns
+        -------
+        g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
+            The values of g8 function
+        """
+        g7 = self.g7(False)
+        g1 = self.g1(gamma_0, gamma_1, False)
+        g8 = g1[..., np.newaxis] * g7
+        g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
+        return g8
 
     @staticmethod
     def Lambda_g(g, f):
