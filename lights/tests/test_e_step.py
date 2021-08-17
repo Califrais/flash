@@ -40,10 +40,10 @@ class Test(unittest.TestCase):
         theta = self.data.theta
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         g1 = self.E_func.g1(gamma_0, gamma_1, broadcast=False)
-        g1_0_0 = np.exp(np.array([347/3, 326/3, 218/3, 266/3]))
-        g1_1_1 = np.exp(np.array([153 , 178.5, 151.5,  67.5]))
-        np.testing.assert_almost_equal(np.log(g1[0, 0, :, 0]), np.log(g1_0_0))
-        np.testing.assert_almost_equal(np.log(g1[0, 1, :, 1]), np.log(g1_1_1))
+        g1_0_0 = np.exp(np.array([-1.899,  0.961, -9.492,  4.563]))
+        g1_1_1 = np.exp(np.array([0.89 ,  1.098, 11.164, -8.141]))
+        np.testing.assert_almost_equal(np.log(g1[0, 0, :, 0]), np.log(g1_0_0), 3)
+        np.testing.assert_almost_equal(np.log(g1[0, 1, :, 1]), np.log(g1_1_1), 3)
 
     def test_g2(self):
         """Tests the g2 function
@@ -53,11 +53,11 @@ class Test(unittest.TestCase):
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         g2 = self.E_func.g2(gamma_0, gamma_1)
         # values of g2 at first group and first sample
-        g2_0_1 = np.array([347/3, 326/3, 218/3, 266/3])
+        g2_0_1 = np.array([-1.899,  0.961, -9.492,  4.563])
         # values of g2 at second group and second sample
-        g2_1_3 = np.array([153 , 178.5, 151.5,  67.5])
-        np.testing.assert_almost_equal(g2[0, 0], g2_0_1)
-        np.testing.assert_almost_equal(g2[1, 1], g2_1_3)
+        g2_1_3 = np.array([0.89 ,  1.098, 11.164, -8.141])
+        np.testing.assert_almost_equal(g2[0, 0], g2_0_1, 3)
+        np.testing.assert_almost_equal(g2[1, 1], g2_1_3, 3)
 
     def test_Lambda_g(self):
         """Tests the Lambda_g function

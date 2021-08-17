@@ -454,7 +454,7 @@ class QNMCEM(Learner):
                                 self.asso_functions, theta, MC_sep)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        E_func.compute_AssociationFunctions(S, True)
+        E_func.compute_AssociationFunctions(S)
         g1 = E_func.g1(gamma_0, gamma_1, False)
         g3 = E_func.g3(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
@@ -657,10 +657,6 @@ class QNMCEM(Learner):
                 return E_func.Eg(np.log(E_func.g1(gamma_0_, gamma_1_)),
                                  Lambda_1, pi_xi, f)
 
-            def E_g6(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g6(S, gamma_0_, gamma_1_),
-                                 Lambda_1, pi_xi, f)
-
             def E_g7():
                 return E_func.Eg(E_func.g7(), Lambda_1, pi_xi, f)
 
@@ -722,12 +718,10 @@ class QNMCEM(Learner):
                         "extracted_features": ext_feat,
                         "ind_1": ind_1 * 1, "ind_2": ind_2 * 1,
                         "gamma": gamma, "delta_T": self.delta_T}
-            E_func.compute_AssociationFunctions(S, True)
-            F_func.grad_Q_fixed_stuff(beta_K, E_g5, args_all["ind_1"])
+            E_func.compute_AssociationFunctions(S)
             gamma_0_prev = gamma_0.copy()
             args_0 = {"E_g1": lambda v: E_g1(v, gamma_1),
                       "E_log_g1": lambda v: E_log_g1(v, gamma_1),
-                      "E_g6": lambda v: E_g6(v, gamma_1),
                       "group": 0,
                       "E_g7": E_g7(),
                       "E_g8": lambda v: E_g8(v, gamma_1)
@@ -743,7 +737,6 @@ class QNMCEM(Learner):
             # gamma_1 update
             args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, v),
                       "E_log_g1": lambda v: E_log_g1(gamma_0_prev, v),
-                      "E_g6": lambda v: E_g6(gamma_0_prev, v),
                       "group": 1,
                       "E_g7": E_g7(),
                       "E_g8": lambda v: E_g8(gamma_0_prev, v)

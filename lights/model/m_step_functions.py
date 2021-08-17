@@ -191,27 +191,6 @@ class MstepFunctions:
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
-    def grad_Q_fixed_stuff(self, beta, E_g5, ind_1):
-        """
-        Compute a fixed stuff of gradient of Q function
-
-        Parameters
-        ----------
-        beta : `list`,
-            Fixed effect parameters for both groups
-
-        E_g5 : `np.ndarray`, shape=(n_samples, r)
-            The values of g5 function
-
-        ind_1 : `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-        """
-        beta = np.hstack((beta[0].reshape(-1, 1), beta[1].reshape(-1, 1)))
-        self.grad_Q_fixed = (self.delta * ((self.F_f.dot(beta)
-                            + (self.F_r.swapaxes(0, 1)[..., np.newaxis]
-                            * E_g5.T).sum(axis=2).T[..., np.newaxis]).T
-                        .swapaxes(0, 1)) * ind_1.T).sum(axis=2).swapaxes(0, 1)
-
     def grad_Q(self, gamma_k, *args):
         """Computes the gradient of the function Q  with time dependence
         association variable

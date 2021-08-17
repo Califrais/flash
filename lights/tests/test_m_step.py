@@ -25,6 +25,9 @@ class Test(unittest.TestCase):
         T_u = np.unique(T)
         J = len(T_u)
         asso_functions = data.asso_functions
+        nb_asso_param = L * len(asso_functions)
+        if 're' in asso_functions:
+            nb_asso_param += L
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
         self.delta_T = T_u - np.append(0, T_u[:-1])
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
@@ -37,7 +40,8 @@ class Test(unittest.TestCase):
         self.E_g2 = np.array([1, 4, 5])
         self.E_g4 = .5 * np.ones(shape=(n_samples, r, r))
         self.E_g5 = np.ones(shape=(n_samples, r))
-        self.E_g6 = np.arange(1, 73).reshape(n_samples, r, J, K)
+        self.E_g7 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
+        self.E_g8 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
 
     def test_P_func(self):
         """Tests the P function
@@ -64,14 +68,13 @@ class Test(unittest.TestCase):
         beta, gamma = self.data.beta, self.data.gamma
         E_g1 = lambda v: self.E_g1
         E_log_g1 = lambda v: np.log(self.E_g1)
-        E_g6 = lambda v: self.E_g6
         args = {"pi_est": self.pi_est, "E_g5": self.E_g5,
                     "phi": phi, "beta": beta,
                     "baseline_hazard": baseline_hazard,
                     "extracted_features": self.data.ext_feat,
                     "ind_1": self.ind_1, "ind_2": self.ind_2,
                     "E_g1": E_g1,"E_log_g1": E_log_g1,
-                    "E_g6": E_g6, "group": 0, "delta_T": self.delta_T}
+                    "group": 0, "delta_T": self.delta_T}
         Q = self.M_func.Q_func(gamma[0], {**args})
         Q_ = 55.774
         np.testing.assert_almost_equal(Q, Q_, 3)
@@ -85,19 +88,19 @@ class Test(unittest.TestCase):
         beta, gamma = self.data.beta, self.data.gamma
         E_g1 = lambda v: self.E_g1
         E_log_g1 = lambda v: np.log(self.E_g1)
-        E_g6 = lambda v: self.E_g6
+        E_g7 = self.E_g7
+        E_g8 = lambda v: self.E_g8
         args = {"pi_est": self.pi_est, "E_g5": self.E_g5,
                 "phi": phi, "beta": beta,
                 "baseline_hazard": baseline_hazard,
                 "extracted_features": self.data.ext_feat,
                 "ind_1": self.ind_1, "ind_2": self.ind_2,
                 "E_g1": E_g1, "E_log_g1": E_log_g1,
-                "E_g6": E_g6, "group": 0, "delta_T": self.delta_T}
-        self.M_func.grad_Q_fixed_stuff(self.data.beta, self.E_g5, args["ind_1"])
+                "E_g7": E_g7, "E_g8": E_g8, "group": 0, "delta_T": self.delta_T}
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
-        grad_Q_ = np.array([2434.333, 272.033, 301.1, 1252.167, 3087.417,
-                            2045.1, 330.167, 359.233, 1030.633, 2517.472,
-                            1405.967, 388.3, 417.367, 305.8, 2317.456])
+        grad_Q_ = np.array([707.967, 721.9, 735.833, 749.767, 763.7, 777.633,
+                            791.567, 805.5, 819.433, 833.367, 847.3, 861.233,
+                            875.167, 889.1,903.033])
         np.testing.assert_almost_equal(grad_Q, grad_Q_, 3)
 
 
