@@ -9,7 +9,7 @@ from lights.base.base import Learner, extract_features, normalize, block_diag, \
     get_xi_from_xi_ext, logistic_grad, get_times_infos, get_ext_from_vect, \
     get_vect_from_ext
 from lights.init.mlmm import MLMM
-from lights.init.cox import initialize_asso_params
+from lights.init.cox import initialize_baseline_hazard
 from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
@@ -588,8 +588,7 @@ class QNMCEM(Learner):
             beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
-            est = initialize_asso_params(X, T, delta)
-            time_indep_cox_coeffs, baseline_hazard = est
+            baseline_hazard = initialize_baseline_hazard(X, T, delta)
         else:
             # Fixed initialization
             q = q_l * L

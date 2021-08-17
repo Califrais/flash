@@ -3,9 +3,8 @@ import pandas as pd
 import numpy as np
 
 
-def initialize_asso_params(X, T, delta):
-    """Initialize the time-independent association parameters and baseline
-    hazard using a standard Cox model
+def initialize_baseline_hazard(X, T, delta):
+    """Initialize baseline hazard using a standard Cox model
 
     Parameters
     ----------
@@ -20,9 +19,6 @@ def initialize_asso_params(X, T, delta):
 
     Returns
     -------
-    gamma_0 : `np.ndarray`, shape=(n_time_indep_features,)
-        The time-independent association parameters
-
     baseline_hazard : `np.ndarray`, shape=(n_samples,)
         The baseline hazard function evaluated at each censored time
     """
@@ -35,8 +31,6 @@ def initialize_asso_params(X, T, delta):
 
     cox = CoxPHFitter()
     cox.fit(data, duration_col='T', event_col='delta')
-
-    gamma_0 = cox.params_.values
     baseline_hazard = cox.baseline_hazard_
 
-    return gamma_0, baseline_hazard
+    return baseline_hazard
