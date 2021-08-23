@@ -64,7 +64,7 @@ class EstepFunctions:
         self.g6_, self.g2_ = None, None
         self.asso_funcs = None
 
-    def compute_AssociationFunctions(self, S, is_normalized=True):
+    def compute_AssociationFunctions(self, S):
         """
         Compute the value of association functions
 
@@ -73,18 +73,14 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r) or (n_samples, K, N_MC, r)
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
 
-        is_normailzed : `boolean`
-            indicator ...
-
         """
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
         self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
               self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
-        if is_normalized:
-            shape = self.asso_funcs.shape
-            reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, shape[-1]))
-            self.asso_funcs = StandardScaler().fit_transform(
-                reshaped_asso_funcs).reshape(shape)
+        shape = self.asso_funcs.shape
+        reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, shape[-1]))
+        self.asso_funcs = StandardScaler().fit_transform(
+            reshaped_asso_funcs).reshape(shape)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
