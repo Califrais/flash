@@ -4,8 +4,8 @@ from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
 
@@ -151,6 +151,71 @@ class EstepFunctions:
 
         return S
 
+    def g1(self, S):
+        """Computes g1
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
+            The values of g1 function
+        """
+        if self.MC_sep:
+            g1 = S
+        else:
+            g1 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
+        return g1
+
+    def g2(self, S):
+        """Computes g2
+
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        Returns
+        -------
+        g2 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
+            The values of g2 function
+        """
+        if self.MC_sep:
+            n_samples = self.n_samples
+            K, r = self.K, self.n_long_features * 2
+            N_MC = S.shape[2]
+            g2 = np.zeros((n_samples, K, N_MC, r, r))
+            for i in range(n_samples):
+                for k in range(K):
+                    g2[i, k] = np.array(
+                        [s.reshape(-1, 1).dot(s.reshape(-1, 1).T)
+                         for s in S[i, k]])
+        else:
+            tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
+            g2 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
+        return g2
+
+    def g3(self, broadcast=True):
+        """Computes g3
+        Parameters
+        ----------
+        broadcast : `boolean`, default=True
+            Indicate to expand the dimension or not
+        Returns
+        -------
+        g3 : `np.ndarray`, shape=(K, N_MC, J, dim)
+                            or (n_samples, K, N_MC, J, dim, K)
+            The values of g3 function
+        """
+        g3 = self.asso_funcs.swapaxes(0, 2)
+        if broadcast:
+            g3 = np.broadcast_to(g3, (self.n_samples,) + g3.shape)
+            g3 = np.broadcast_to(g3[..., None], g3.shape + (2,)).swapaxes(1, -1)
+        return g3
+
     def g4(self, gamma_0, gamma_1, broadcast=True):
         """Computes g4
 
@@ -184,6 +249,27 @@ class EstepFunctions:
             g4 = np.broadcast_to(g4[..., None], g4.shape + (2,)).swapaxes(1, -1)
         return g4
 
+    def g5(self, S, gamma_0, gamma_1):
+        """Computes g5
+        Parameters
+        ----------
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+            Association parameters for high-risk group
+        beta_1 : `np.ndarray`, shape=(q,)
+            Fixed effect parameters for high-risk group
+        Returns
+        -------
+        g5 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
+            The values of g5 function
+        """
+        g3 = self.g3(False)
+        g4 = self.g4(gamma_0, gamma_1, False)
+        g5 = g4[..., np.newaxis] * g3
+        g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(1, -1)
+        return g5
+
     def g6(self, S, beta_0, beta_1):
         """Computes g6
 
@@ -212,92 +298,6 @@ class EstepFunctions:
                 M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
             g6.append(M_iS)
         return g6
-
-    def g2(self, S):
-        """Computes g2
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        g2 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
-            The values of g2 function
-        """
-        if self.MC_sep:
-            n_samples = self.n_samples
-            K, r = self.K, self.n_long_features * 2
-            N_MC = S.shape[2]
-            g2 = np.zeros((n_samples, K, N_MC, r, r))
-            for i in range(n_samples):
-                for k in range(K):
-                    g2[i, k] = np.array(
-                        [s.reshape(-1, 1).dot(s.reshape(-1, 1).T)
-                         for s in S[i, k]])
-        else:
-            tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
-            g2 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
-        return g2
-
-    def g1(self, S):
-        """Computes g1
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        Returns
-        -------
-        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
-            The values of g1 function
-        """
-        if self.MC_sep:
-            g1 = S
-        else:
-            g1 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
-        return g1
-
-    def g3(self, broadcast=True):
-        """Computes g3
-        Parameters
-        ----------
-        broadcast : `boolean`, default=True
-            Indicate to expand the dimension or not
-        Returns
-        -------
-        g3 : `np.ndarray`, shape=(K, N_MC, J, dim)
-                            or (n_samples, K, N_MC, J, dim, K)
-            The values of g3 function
-        """
-        g3 = self.asso_funcs.swapaxes(0, 2)
-        if broadcast:
-            g3 = np.broadcast_to(g3, (self.n_samples,) + g3.shape)
-            g3 = np.broadcast_to(g3[..., None], g3.shape + (2,)).swapaxes(1, -1)
-        return g3
-
-    def g5(self, S, gamma_0, gamma_1):
-        """Computes g5
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
-            Association parameters for high-risk group
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
-        Returns
-        -------
-        g5 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
-            The values of g5 function
-        """
-        g3 = self.g3(False)
-        g4 = self.g4(gamma_0, gamma_1, False)
-        g5 = g4[..., np.newaxis] * g3
-        g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(1, -1)
-        return g5
 
     @staticmethod
     def Lambda_g(g, f):

@@ -177,15 +177,14 @@ class MstepFunctions:
             The value of the Q function
         """
         n_samples, delta = self.n_samples, self.delta
-        arg = args[0]
-        group = arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
-        baseline_val = arg["baseline_hazard"].values.flatten()
+        arg = args[0]
         ind_1, ind_2 = arg["ind_1"], arg["ind_2"]
+        group, delta_T = arg["group"], arg["delta_T"]
+        baseline_val = arg["baseline_hazard"].values.flatten()
+        pi_est = arg["pi_est"][group]
         E_g4 = arg["E_g4"](gamma_k).T[group].T
         E_log_g4 = arg["E_log_g4"](gamma_k).T[group].T
-        pi_est = arg["pi_est"][group]
-        delta_T = arg["delta_T"]
         sub_obj = (E_log_g4 * ind_1).sum(axis=1) * delta - \
                   (E_g4 * ind_2 * baseline_val * delta_T).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
@@ -207,15 +206,14 @@ class MstepFunctions:
         association variable
         """
         n_samples, delta = self.n_samples, self.delta
-        arg = args[0]
-        baseline_val = arg["baseline_hazard"].values.flatten()
-        ind_2, group = arg["ind_2"], arg["group"]
         gamma_k = gamma_k.reshape(-1, 1)
+        arg = args[0]
+        ind_1, ind_2 = arg["ind_1"], arg["ind_2"]
+        group, delta_T =  arg["group"], arg["delta_T"]
+        baseline_val = arg["baseline_hazard"].values.flatten()
         pi_est = arg["pi_est"][group]
-        delta_T = arg["delta_T"]
-        ind_1 = arg["ind_1"]
-        E_g5 = arg["E_g5"](gamma_k).T[group].T.swapaxes(0, 1)
         E_g3 = arg["E_g3"].T[group].T
+        E_g5 = arg["E_g5"](gamma_k).T[group].T.swapaxes(0, 1)
         tmp = (E_g3.T * delta * ind_1.T).T.sum(axis=1) - (
                     E_g5.T * baseline_val * delta_T * ind_2).sum(axis=-1).T
         grad = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)

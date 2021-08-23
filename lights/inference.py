@@ -646,8 +646,11 @@ class QNMCEM(Learner):
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
             self.pi_est = pi_est
-            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
             E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
+            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
+
+            def E_g3():
+                return E_func.Eg(E_func.g3(), Lambda_1, pi_xi, f)
 
             def E_g4(gamma_0_, gamma_1_):
                 return E_func.Eg(E_func.g4(gamma_0_, gamma_1_),
@@ -656,9 +659,6 @@ class QNMCEM(Learner):
             def E_log_g4(gamma_0_, gamma_1_):
                 return E_func.Eg(np.log(E_func.g4(gamma_0_, gamma_1_)),
                                  Lambda_1, pi_xi, f)
-
-            def E_g3():
-                return E_func.Eg(E_func.g3(), Lambda_1, pi_xi, f)
 
             def E_g5(gamma_0_, gamma_1_):
                 return E_func.Eg(E_func.g5(S, gamma_0_, gamma_1_),
@@ -720,10 +720,10 @@ class QNMCEM(Learner):
                         "gamma": gamma, "delta_T": self.delta_T}
             E_func.compute_AssociationFunctions(S)
             gamma_0_prev = gamma_0.copy()
-            args_0 = {"E_g4": lambda v: E_g4(v, gamma_1),
-                      "E_log_g4": lambda v: E_log_g4(v, gamma_1),
-                      "group": 0,
+            args_0 = {"group": 0,
                       "E_g3": E_g3(),
+                      "E_g4": lambda v: E_g4(v, gamma_1),
+                      "E_log_g4": lambda v: E_log_g4(v, gamma_1),
                       "E_g5": lambda v: E_g5(v, gamma_1)
                       }
 
@@ -735,10 +735,10 @@ class QNMCEM(Learner):
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_1 update
-            args_1 = {"E_g4": lambda v: E_g4(gamma_0_prev, v),
-                      "E_log_g4": lambda v: E_log_g4(gamma_0_prev, v),
-                      "group": 1,
+            args_1 = {"group": 1,
                       "E_g3": E_g3(),
+                      "E_g4": lambda v: E_g4(gamma_0_prev, v),
+                      "E_log_g4": lambda v: E_log_g4(gamma_0_prev, v),
                       "E_g5": lambda v: E_g5(gamma_0_prev, v)
                       }
             gamma_1 = copt.minimize_proximal_gradient(

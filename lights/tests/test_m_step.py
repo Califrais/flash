@@ -36,10 +36,10 @@ class Test(unittest.TestCase):
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
-        self.E_g4 = np.arange(1, 13).reshape(n_samples, J, K)
-        self.E_g2 = .5 * np.ones(shape=(n_samples, r, r))
         self.E_g1 = np.ones(shape=(n_samples, r))
+        self.E_g2 = .5 * np.ones(shape=(n_samples, r, r))
         self.E_g3 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
+        self.E_g4 = np.arange(1, 13).reshape(n_samples, J, K)
         self.E_g5 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
 
     def test_P_func(self):
