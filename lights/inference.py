@@ -86,10 +86,6 @@ class QNMCEM(Learner):
         If `True`, we compute the global objective to be minimized by the QNMCEM
          algorithm and store it in history
 
-    MC_sep: `bool`, default=False
-        If `False`, we use the same set of MC samples for all subject,
-        otherwise we sample a seperate set of MC samples for each subject
-
     copt_solver_step : function or `str`='backtracking', default='backtracking'
         Step size for optimization algorithm used in Copt colver
     """
@@ -99,8 +95,7 @@ class QNMCEM(Learner):
                  max_iter=100, verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj=False, MC_sep=False,
-                 copt_solver_step='backtracking'):
+                 compute_obj=False, copt_solver_step='backtracking'):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.tol = tol
@@ -117,7 +112,6 @@ class QNMCEM(Learner):
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.compute_obj = compute_obj
-        self.MC_sep = MC_sep
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -412,8 +406,7 @@ class QNMCEM(Learner):
 
         return log_lik
 
-    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S,
-                            MC_sep):
+    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
         Parameters
@@ -439,10 +432,6 @@ class QNMCEM(Learner):
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples
 
-        MC_sep: `bool`, default=False
-        If `False`, we use the same set of MC samples for all subject,
-        otherwise we sample a seperate set of MC samples for each subject
-
         Returns
         -------
         f : `np.ndarray`, shape=(n_samples, K, N_MC)
@@ -451,7 +440,7 @@ class QNMCEM(Learner):
         theta, alpha = self.theta, self.fixed_effect_time_order
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         E_func = EstepFunctions(X, T, T_u, delta, extracted_features, alpha,
-                                self.asso_functions, theta, MC_sep)
+                                self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
@@ -463,9 +452,8 @@ class QNMCEM(Learner):
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2, self.delta_T)
         f = (intensity ** delta).T * survival
-        if not self.MC_sep:
-            f_y = self.f_y_given_latent(extracted_features, g6)
-            f *= f_y
+        f_y = self.f_y_given_latent(extracted_features, g6)
+        f *= f_y
         return f
 
     def predict_marker(self, X, Y, prediction_times=None):
@@ -506,7 +494,7 @@ class QNMCEM(Learner):
             delta_prediction = np.zeros(n_samples)
             T_u = self.T_u
             f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
-                                         delta_prediction, self.S, self.MC_sep)
+                                         delta_prediction, self.S)
             pi_xi = self._get_proba(X)
             marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
             return marker
@@ -616,21 +604,18 @@ class QNMCEM(Learner):
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
-                                asso_functions, self.theta, self.MC_sep)
+                                asso_functions, self.theta)
         F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen_EN,
                                 self.eta_elastic_net, alpha, asso_functions)
 
         S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S,
-                                     self.MC_sep)
+        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
         pi_xi = self._get_proba(X)
 
         # Store init values
         if self.compute_obj:
             f_mean = f.mean(axis=-1)
-            if self.MC_sep:
-                f_mean *= self.mlmm_density(ext_feat)
             obj = self._func_obj(pi_xi, f_mean)
             self.history.update(n_iter=0, obj=obj,
                                 rel_obj=np.inf, theta=self.theta)
@@ -688,17 +673,13 @@ class QNMCEM(Learner):
             (U_list, V_list, y_list, _) = ext_feat[0]
             num = np.zeros((K, L * q_l))
             den = np.zeros((K, L * q_l, L * q_l))
-            if self.MC_sep:
-                None
-                #TODO: Update later
-            else:
-                for i in range(n_samples):
-                    U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
-                    tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g1[i])))
-                    tmp_den = U_i.T.dot(U_i)
-                    for k in range(K):
-                        num[k] += pi_est_K[k, i] * tmp_num
-                        den[k] += pi_est_K[k, i] * tmp_den
+            for i in range(n_samples):
+                U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
+                tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g1[i])))
+                tmp_den = U_i.T.dot(U_i)
+                for k in range(K):
+                    num[k] += pi_est_K[k, i] * tmp_num
+                    den[k] += pi_est_K[k, i] * tmp_den
 
             beta_0 = np.linalg.inv(den[0]).dot(num[0]).reshape(-1, 1)
             beta_1 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
@@ -783,7 +764,7 @@ class QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S, self.MC_sep)
+            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
 
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             prev_theta = self.theta.copy()
@@ -791,8 +772,6 @@ class QNMCEM(Learner):
                 if self.compute_obj:
                     prev_obj = obj
                     f_mean = f.mean(axis=-1)
-                    if self.MC_sep:
-                        f_mean *= self.mlmm_density(ext_feat)
                     obj = self._func_obj(pi_xi, f_mean)
                     rel_obj = abs(obj - prev_obj) / abs(prev_obj)
                     self.history.update(n_iter=n_iter, theta=self.theta,

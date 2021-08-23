@@ -19,7 +19,7 @@ class Test(unittest.TestCase):
         self.S, self.n_MC = data.S, data.S.shape[0]
         self.E_func = EstepFunctions(data.X, data.T, data.T_u, data.delta,
                                      data.ext_feat, alpha, asso_functions,
-                                     theta, MC_sep=False)
+                                     theta)
         self.E_func.compute_AssociationFunctions(self.S)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
         self.data = data
