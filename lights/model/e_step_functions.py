@@ -92,7 +92,7 @@ class EstepFunctions:
 
         Returns
         -------
-        S : `np.ndarray`, shape=(N_MC, r) or (n_samples, K, N_MC, r)
+        S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
         """
         D = self.theta["long_cov"]
