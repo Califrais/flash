@@ -716,7 +716,7 @@ class QNMCEM(Learner):
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
-                        "ind_1": ind_1 * 1, "ind_2": ind_2 * 1,
+                        "ind_1": ind_1, "ind_2": ind_2,
                         "gamma": gamma, "delta_T": self.delta_T}
             E_func.compute_AssociationFunctions(S)
             gamma_0_prev = gamma_0.copy()
@@ -755,8 +755,8 @@ class QNMCEM(Learner):
 
             # baseline hazard update
             baseline_hazard = pd.Series(
-                data=  (1 / self.delta_T) * ((((ind_1 * 1).T * delta).sum(axis=1)) /
-                      ((E_g4.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
+                data=  (1 / self.delta_T) * (((ind_1.T * delta).sum(axis=1)) /
+                      ((E_g4.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
             # phi update

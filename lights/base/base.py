@@ -280,8 +280,8 @@ def get_times_infos(T, T_u):
         The indicator matrix for comparing event times (T <= T_u)
     """
     J = T_u.shape[0]
-    indicator_1 = T.reshape(-1, 1) == T_u
-    indicator_2 = T.reshape(-1, 1) >= T_u
+    indicator_1 = (T.reshape(-1, 1) == T_u).astype(np.ushort)
+    indicator_2 = (T.reshape(-1, 1) >= T_u).astype(np.ushort)
     return J, indicator_1, indicator_2
 
 

@@ -213,7 +213,7 @@ class MstepFunctions:
         gamma_k = gamma_k.reshape(-1, 1)
         pi_est = arg["pi_est"][group]
         delta_T = arg["delta_T"]
-        ind_1 = arg["ind_1"] * 1
+        ind_1 = arg["ind_1"]
         E_g5 = arg["E_g5"](gamma_k).T[group].T.swapaxes(0, 1)
         E_g3 = arg["E_g3"].T[group].T
         tmp = (E_g3.T * delta * ind_1.T).T.sum(axis=1) - (
