@@ -334,7 +334,7 @@ class QNMCEM(Learner):
         survival = np.exp(-(rel_risk * indicator * delta_T).sum(axis=-1).T)
         return survival
 
-    def f_y_given_latent(self, extracted_features, g3):
+    def f_y_given_latent(self, extracted_features, g6):
         """Computes the density of the longitudinal processes given latent
         variables
 
@@ -346,8 +346,8 @@ class QNMCEM(Learner):
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-        g3 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
-            The values of g3 function
+        g6 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
+            The values of g6 function
 
         Returns
         -------
@@ -357,11 +357,11 @@ class QNMCEM(Learner):
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         n_samples, n_long_features = self.n_samples, self.n_long_features
         phi = self.theta["phi"]
-        N_MC = g3[0].shape[2]
+        N_MC = g6[0].shape[2]
         K = 2  # 2 latent groups
         f_y = np.ones(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), np.array(y_list[i]).flatten(), g3[i]
+            n_i, y_i, M_iS = sum(N_list[i]), np.array(y_list[i]).flatten(), g6[i]
             inv_Phi_i = []
             for l in range(n_long_features):
                 inv_Phi_i += [phi[l, 0]] * N_list[i][l]
@@ -455,16 +455,16 @@ class QNMCEM(Learner):
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
-        g1 = E_func.g1(gamma_0, gamma_1, False)
-        g3 = E_func.g3(S, beta_0, beta_1)
+        g4 = E_func.g4(gamma_0, gamma_1, False)
+        g6 = E_func.g6(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
-        rel_risk = g1.swapaxes(0, 2) * baseline_val
+        rel_risk = g4.swapaxes(0, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2, self.delta_T)
         f = (intensity ** delta).T * survival
         if not self.MC_sep:
-            f_y = self.f_y_given_latent(extracted_features, g3)
+            f_y = self.f_y_given_latent(extracted_features, g6)
             f *= f_y
         return f
 
@@ -646,26 +646,26 @@ class QNMCEM(Learner):
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
             self.pi_est = pi_est
-            E_g4 = E_func.Eg(E_func.g4(S), Lambda_1, pi_xi, f)
-            E_g5 = E_func.Eg(E_func.g5(S), Lambda_1, pi_xi, f)
+            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
+            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
 
-            def E_g1(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g1(gamma_0_, gamma_1_),
+            def E_g4(gamma_0_, gamma_1_):
+                return E_func.Eg(E_func.g4(gamma_0_, gamma_1_),
                                  Lambda_1, pi_xi, f)
 
-            def E_log_g1(gamma_0_, gamma_1_):
-                return E_func.Eg(np.log(E_func.g1(gamma_0_, gamma_1_)),
+            def E_log_g4(gamma_0_, gamma_1_):
+                return E_func.Eg(np.log(E_func.g4(gamma_0_, gamma_1_)),
                                  Lambda_1, pi_xi, f)
 
-            def E_g7():
-                return E_func.Eg(E_func.g7(), Lambda_1, pi_xi, f)
+            def E_g3():
+                return E_func.Eg(E_func.g3(), Lambda_1, pi_xi, f)
 
-            def E_g8(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g8(S, gamma_0_, gamma_1_),
+            def E_g5(gamma_0_, gamma_1_):
+                return E_func.Eg(E_func.g5(S, gamma_0_, gamma_1_),
                     Lambda_1, pi_xi, f)
 
             # M-Step
-            D = E_g4.sum(axis=0) / n_samples  # D update
+            D = E_g2.sum(axis=0) / n_samples  # D update
 
             if warm_start:
                 xi_init = xi_ext
@@ -694,7 +694,7 @@ class QNMCEM(Learner):
             else:
                 for i in range(n_samples):
                     U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
-                    tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g5[i])))
+                    tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g1[i])))
                     tmp_den = U_i.T.dot(U_i)
                     for k in range(K):
                         num[k] += pi_est_K[k, i] * tmp_num
@@ -712,7 +712,7 @@ class QNMCEM(Learner):
             l_pen_SGL = self.l_pen_SGL
             prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
             copt_max_iter = 10
-            args_all = {"pi_est": pi_est_K, "E_g5": E_g5,
+            args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
@@ -720,11 +720,11 @@ class QNMCEM(Learner):
                         "gamma": gamma, "delta_T": self.delta_T}
             E_func.compute_AssociationFunctions(S)
             gamma_0_prev = gamma_0.copy()
-            args_0 = {"E_g1": lambda v: E_g1(v, gamma_1),
-                      "E_log_g1": lambda v: E_log_g1(v, gamma_1),
+            args_0 = {"E_g4": lambda v: E_g4(v, gamma_1),
+                      "E_log_g4": lambda v: E_log_g4(v, gamma_1),
                       "group": 0,
-                      "E_g7": E_g7(),
-                      "E_g8": lambda v: E_g8(v, gamma_1)
+                      "E_g3": E_g3(),
+                      "E_g5": lambda v: E_g5(v, gamma_1)
                       }
 
             gamma_0 = copt.minimize_proximal_gradient(
@@ -735,11 +735,11 @@ class QNMCEM(Learner):
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
 
             # gamma_1 update
-            args_1 = {"E_g1": lambda v: E_g1(gamma_0_prev, v),
-                      "E_log_g1": lambda v: E_log_g1(gamma_0_prev, v),
+            args_1 = {"E_g4": lambda v: E_g4(gamma_0_prev, v),
+                      "E_log_g4": lambda v: E_log_g4(gamma_0_prev, v),
                       "group": 1,
-                      "E_g7": E_g7(),
-                      "E_g8": lambda v: E_g8(gamma_0_prev, v)
+                      "E_g3": E_g3(),
+                      "E_g5": lambda v: E_g5(gamma_0_prev, v)
                       }
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
@@ -751,12 +751,12 @@ class QNMCEM(Learner):
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
-            E_g1 = E_func.Eg(E_func.g1(gamma_0, gamma_1), Lambda_1, pi_xi, f)
+            E_g4 = E_func.Eg(E_func.g4(gamma_0, gamma_1), Lambda_1, pi_xi, f)
 
             # baseline hazard update
             baseline_hazard = pd.Series(
                 data=  (1 / self.delta_T) * ((((ind_1 * 1).T * delta).sum(axis=1)) /
-                      ((E_g1.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
+                      ((E_g4.T * (ind_2 * 1).T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
             # phi update
@@ -769,13 +769,13 @@ class QNMCEM(Learner):
                 pi_est_stack = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta_stack[q_l * l: q_l * (l + 1)]
-                E_g5_l = E_g5.reshape(n_samples, L, r_l)[:, l].reshape(-1, 1)
-                E_g4_l = block_diag(E_g4[:, r_l * l: r_l * (l + 1),
+                E_g1_l = E_g1.reshape(n_samples, L, r_l)[:, l].reshape(-1, 1)
+                E_g2_l = block_diag(E_g2[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
                 tmp = y_l - U_l.dot(beta_l)
                 phi_l = (pi_est_stack * (
-                        tmp * (tmp - 2 * (V_l.dot(E_g5_l))))).sum() \
-                        + np.trace(V_l.T.dot(V_l).dot(E_g4_l))
+                        tmp * (tmp - 2 * (V_l.dot(E_g1_l))))).sum() \
+                        + np.trace(V_l.T.dot(V_l).dot(E_g2_l))
                 phi[l] = phi_l / N_l
 
             self._update_theta(phi=phi, baseline_hazard=baseline_hazard,

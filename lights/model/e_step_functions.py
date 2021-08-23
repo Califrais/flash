@@ -66,7 +66,7 @@ class EstepFunctions:
         self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
                                                 T_u, alpha, L).get_asso_feat()
         self.MC_sep = MC_sep
-        self.g3_, self.g4_, self.g9_ = None, None, None
+        self.g6_, self.g2_ = None, None
         self.asso_funcs = None
 
     def compute_AssociationFunctions(self, S, is_normalized=True):
@@ -151,8 +151,8 @@ class EstepFunctions:
 
         return S
 
-    def g1(self, gamma_0, gamma_1, broadcast=True):
-        """Computes g1
+    def g4(self, gamma_0, gamma_1, broadcast=True):
+        """Computes g4
 
         Parameters
         ----------
@@ -163,52 +163,29 @@ class EstepFunctions:
             Association parameters for high-risk group
 
         broadcast : `boolean`, default=True
-            Indicates to expand the dimension of g1 or not
+            Indicates to expand the dimension of g4 or not
 
         Returns
         -------
-        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
+        g4 : `np.ndarray`, shape=(n_samples, K, N_MC, J)
                             or (n_samples, K, N_MC, J, K)
-            The values of g1 function
+            The values of g4 function
         """
         n_samples, K = self.n_samples, self.K
-        if self.MC_sep:
-            g2 = self.g2(gamma_0, gamma_1)
-            g1 = np.exp(g2).swapaxes(0, 1).swapaxes(2, 3)
-        else:
-            tmp = self.g2(gamma_0, gamma_1)
-            g2 = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
-            g1 = np.exp(g2).swapaxes(2, 3)
-        if broadcast:
-            g1 = np.broadcast_to(g1[..., None], g1.shape + (2,)).swapaxes(1, -1)
-        return g1
-
-    def g2(self, gamma_0, gamma_1):
-        """Computes g2
-
-        Parameters
-        ----------
-        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
-            Association parameters for low-risk group
-
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
-            Association parameters for high-risk group
-
-        Returns
-        -------
-        g2 : `np.ndarray`, shape=(K, J, N_MC) or (K, n_samples, J, N_MC)
-            The values of g2 function
-        """
         gamma = np.hstack((gamma_0, gamma_1)).T
-        g2 = (self.asso_funcs * gamma).sum(axis=-1)
         if self.MC_sep:
-            g2 = g2.swapaxes(0, 2).swapaxes(1, 2).T
+            tmp = (self.asso_funcs * gamma).sum(axis=-1).swapaxes(0, 2).swapaxes(1, 2).T
+            g4 = np.exp(tmp).swapaxes(0, 1).swapaxes(2, 3)
         else:
-            g2 = g2.swapaxes(0, 1).T
-        return g2
+            tmp = (self.asso_funcs * gamma).sum(axis=-1).swapaxes(0, 1).T
+            tmp_ = np.broadcast_to(tmp, (n_samples, ) + tmp.shape)
+            g4 = np.exp(tmp_).swapaxes(2, 3)
+        if broadcast:
+            g4 = np.broadcast_to(g4[..., None], g4.shape + (2,)).swapaxes(1, -1)
+        return g4
 
-    def g3(self, S, beta_0, beta_1):
-        """Computes g3
+    def g6(self, S, beta_0, beta_1):
+        """Computes g6
 
         Parameters
         ----------
@@ -225,7 +202,7 @@ class EstepFunctions:
         U_list, V_list, y_list, N_list = self.extracted_features[0]
         K = self.K
         beta_stack = np.hstack((beta_0, beta_1))
-        g3 = []
+        g6 = []
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
             if self.MC_sep:
@@ -233,11 +210,11 @@ class EstepFunctions:
                        + S[i].dot(V_i.T).swapaxes(1, 2)
             else:
                 M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            g3.append(M_iS)
-        return g3
+            g6.append(M_iS)
+        return g6
 
-    def g4(self, S):
-        """Computes g4
+    def g2(self, S):
+        """Computes g2
 
         Parameters
         ----------
@@ -246,26 +223,26 @@ class EstepFunctions:
 
         Returns
         -------
-        g4 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
-            The values of g4 function
+        g2 : `np.ndarray`, shape=(n_samples, K, N_MC, r, r)
+            The values of g2 function
         """
         if self.MC_sep:
             n_samples = self.n_samples
             K, r = self.K, self.n_long_features * 2
             N_MC = S.shape[2]
-            g4 = np.zeros((n_samples, K, N_MC, r, r))
+            g2 = np.zeros((n_samples, K, N_MC, r, r))
             for i in range(n_samples):
                 for k in range(K):
-                    g4[i, k] = np.array(
+                    g2[i, k] = np.array(
                         [s.reshape(-1, 1).dot(s.reshape(-1, 1).T)
                          for s in S[i, k]])
         else:
             tmp = np.array([s.reshape(-1, 1).dot(s.reshape(-1, 1).T) for s in S])
-            g4 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
-        return g4
+            g2 = np.broadcast_to(tmp, (self.n_samples, self.K) + tmp.shape)
+        return g2
 
-    def g5(self, S):
-        """Computes g5
+    def g1(self, S):
+        """Computes g1
 
         Parameters
         ----------
@@ -274,35 +251,35 @@ class EstepFunctions:
 
         Returns
         -------
-        g5 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
-            The values of gS function
+        g1 : `np.ndarray`, shape=(n_samples, K, N_MC, r)
+            The values of g1 function
         """
         if self.MC_sep:
-            g5 = S
+            g1 = S
         else:
-            g5 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
-        return g5
+            g1 = np.broadcast_to(S, (self.n_samples, self.K) + S.shape)
+        return g1
 
-    def g7(self, broadcast=True):
-        """Computes g7
+    def g3(self, broadcast=True):
+        """Computes g3
         Parameters
         ----------
         broadcast : `boolean`, default=True
             Indicate to expand the dimension or not
         Returns
         -------
-        g7 : `np.ndarray`, shape=(K, N_MC, J, dim)
+        g3 : `np.ndarray`, shape=(K, N_MC, J, dim)
                             or (n_samples, K, N_MC, J, dim, K)
-            The values of g7 function
+            The values of g3 function
         """
-        g7 = self.asso_funcs.swapaxes(0, 2)
+        g3 = self.asso_funcs.swapaxes(0, 2)
         if broadcast:
-            g7 = np.broadcast_to(g7, (self.n_samples,) + g7.shape)
-            g7 = np.broadcast_to(g7[..., None], g7.shape + (2,)).swapaxes(1, -1)
-        return g7
+            g3 = np.broadcast_to(g3, (self.n_samples,) + g3.shape)
+            g3 = np.broadcast_to(g3[..., None], g3.shape + (2,)).swapaxes(1, -1)
+        return g3
 
-    def g8(self, S, gamma_0, gamma_1):
-        """Computes g8
+    def g5(self, S, gamma_0, gamma_1):
+        """Computes g5
         Parameters
         ----------
         S : `np.ndarray`, shape=(N_MC, r)
@@ -313,14 +290,14 @@ class EstepFunctions:
             Fixed effect parameters for high-risk group
         Returns
         -------
-        g8 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
-            The values of g8 function
+        g5 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
+            The values of g5 function
         """
-        g7 = self.g7(False)
-        g1 = self.g1(gamma_0, gamma_1, False)
-        g8 = g1[..., np.newaxis] * g7
-        g8 = np.broadcast_to(g8[..., None], g8.shape + (2,)).swapaxes(1, -1)
-        return g8
+        g3 = self.g3(False)
+        g4 = self.g4(gamma_0, gamma_1, False)
+        g5 = g4[..., np.newaxis] * g3
+        g5 = np.broadcast_to(g5[..., None], g5.shape + (2,)).swapaxes(1, -1)
+        return g5
 
     @staticmethod
     def Lambda_g(g, f):

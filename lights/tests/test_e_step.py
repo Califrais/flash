@@ -33,56 +33,42 @@ class Test(unittest.TestCase):
              [1, 3, 9, 0, 0, 0, 0, 0, 0, 0, 1, 6, 3, 9 / 2, 9]])
         self.g6_0_1 = np.exp(49) * self.g5_0_1
 
-    def test_g1(self):
-        """Tests the g1 function
+    def test_g4(self):
+        """Tests the g4 function
         """
         self.setUp()
         theta = self.data.theta
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        g1 = self.E_func.g1(gamma_0, gamma_1, broadcast=False)
-        g1_0_0 = np.exp(np.array([-1.899,  0.961, -9.492,  4.563]))
-        g1_1_1 = np.exp(np.array([0.89 ,  1.098, 11.164, -8.141]))
-        np.testing.assert_almost_equal(np.log(g1[0, 0, :, 0]), np.log(g1_0_0), 3)
-        np.testing.assert_almost_equal(np.log(g1[0, 1, :, 1]), np.log(g1_1_1), 3)
-
-    def test_g2(self):
-        """Tests the g2 function
-        """
-        self.setUp()
-        theta = self.data.theta
-        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        g2 = self.E_func.g2(gamma_0, gamma_1)
-        # values of g2 at first group and first sample
-        g2_0_1 = np.array([-1.899,  0.961, -9.492,  4.563])
-        # values of g2 at second group and second sample
-        g2_1_3 = np.array([0.89 ,  1.098, 11.164, -8.141])
-        np.testing.assert_almost_equal(g2[0, 0], g2_0_1, 3)
-        np.testing.assert_almost_equal(g2[1, 1], g2_1_3, 3)
+        g4 = self.E_func.g4(gamma_0, gamma_1, broadcast=False)
+        g4_0_0 = np.exp(np.array([-1.899,  0.961, -9.492,  4.563]))
+        g4_1_1 = np.exp(np.array([0.89 ,  1.098, 11.164, -8.141]))
+        np.testing.assert_almost_equal(np.log(g4[0, 0, :, 0]), np.log(g4_0_0), 3)
+        np.testing.assert_almost_equal(np.log(g4[0, 1, :, 1]), np.log(g4_1_1), 3)
 
     def test_Lambda_g(self):
         """Tests the Lambda_g function
         """
         self.setUp()
         tmp = np.arange(1, 49).reshape(3, 2, 4, 2)
-        g1 = np.broadcast_to(tmp[..., None], tmp.shape + (2,)).swapaxes(1, -1)
+        g4 = np.broadcast_to(tmp[..., None], tmp.shape + (2,)).swapaxes(1, -1)
         f = .02 * np.arange(1, 25).reshape(3, 2, 4)
-        Lambda_g1 = self.E_func.Lambda_g(g1, f)
-        Lambda_g1_ = np.array([[0.25, 0.65], [0.57, 1.61]])
-        np.testing.assert_almost_equal(Lambda_g1[0, :, 0], Lambda_g1_)
+        Lambda_g4 = self.E_func.Lambda_g(g4, f)
+        Lambda_g4_ = np.array([[0.25, 0.65], [0.57, 1.61]])
+        np.testing.assert_almost_equal(Lambda_g4[0, :, 0], Lambda_g4_)
 
     def test_Eg(self):
         """Tests the expection of g functions
         """
         self.setUp()
         tmp = np.arange(1, 49).reshape(3, 2, 4, 2)
-        g1 = np.broadcast_to(tmp[..., None], tmp.shape + (2,)).swapaxes(1, -1)
+        g4 = np.broadcast_to(tmp[..., None], tmp.shape + (2,)).swapaxes(1, -1)
         f = .02 * np.arange(1, 25).reshape(3, 2, 4)
         n_samples, n_MC, K = self.n_samples, self.n_MC, 2
         Lambda_1 = self.E_func.Lambda_g(np.ones(shape=(n_samples, K, n_MC)), f)
         pi_xi = 1 / (1 + np.exp(np.array([-3, -4, -6])))
-        Eg1 = self.E_func.Eg(g1, Lambda_1, pi_xi, f)
-        Eg1_ = np.array([4.396, 12.396])
-        np.testing.assert_almost_equal(Eg1[0, 0], Eg1_, 3)
+        Eg4 = self.E_func.Eg(g4, Lambda_1, pi_xi, f)
+        Eg4_ = np.array([4.396, 12.396])
+        np.testing.assert_almost_equal(Eg4[0, 0], Eg4_, 3)
 
 if __name__ == "main":
     unittest.main()

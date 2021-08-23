@@ -182,12 +182,12 @@ class MstepFunctions:
         gamma_k = gamma_k.reshape(-1, 1)
         baseline_val = arg["baseline_hazard"].values.flatten()
         ind_1, ind_2 = arg["ind_1"], arg["ind_2"]
-        E_g1 = arg["E_g1"](gamma_k).T[group].T
-        E_log_g1 = arg["E_log_g1"](gamma_k).T[group].T
+        E_g4 = arg["E_g4"](gamma_k).T[group].T
+        E_log_g4 = arg["E_log_g4"](gamma_k).T[group].T
         pi_est = arg["pi_est"][group]
         delta_T = arg["delta_T"]
-        sub_obj = (E_log_g1 * ind_1).sum(axis=1) * delta - \
-                  (E_g1 * ind_2 * baseline_val * delta_T).sum(axis=1)
+        sub_obj = (E_log_g4 * ind_1).sum(axis=1) * delta - \
+                  (E_g4 * ind_2 * baseline_val * delta_T).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
@@ -214,9 +214,9 @@ class MstepFunctions:
         pi_est = arg["pi_est"][group]
         delta_T = arg["delta_T"]
         ind_1 = arg["ind_1"] * 1
-        E_g8 = arg["E_g8"](gamma_k).T[group].T.swapaxes(0, 1)
-        E_g7 = arg["E_g7"].T[group].T
-        tmp = (E_g7.T * delta * ind_1.T).T.sum(axis=1) - (
-                    E_g8.T * baseline_val * delta_T * ind_2).sum(axis=-1).T
+        E_g5 = arg["E_g5"](gamma_k).T[group].T.swapaxes(0, 1)
+        E_g3 = arg["E_g3"].T[group].T
+        tmp = (E_g3.T * delta * ind_1.T).T.sum(axis=1) - (
+                    E_g5.T * baseline_val * delta_T * ind_2).sum(axis=-1).T
         grad = (tmp.swapaxes(0, 1) * pi_est).sum(axis=1)
         return -grad / n_samples

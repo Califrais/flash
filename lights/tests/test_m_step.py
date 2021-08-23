@@ -36,12 +36,11 @@ class Test(unittest.TestCase):
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
-        self.E_g1 = np.arange(1, 13).reshape(n_samples, J, K)
-        self.E_g2 = np.array([1, 4, 5])
-        self.E_g4 = .5 * np.ones(shape=(n_samples, r, r))
-        self.E_g5 = np.ones(shape=(n_samples, r))
-        self.E_g7 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
-        self.E_g8 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
+        self.E_g4 = np.arange(1, 13).reshape(n_samples, J, K)
+        self.E_g2 = .5 * np.ones(shape=(n_samples, r, r))
+        self.E_g1 = np.ones(shape=(n_samples, r))
+        self.E_g3 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
+        self.E_g5 = np.arange(1, 181).reshape((n_samples, J, nb_asso_param, K))
 
     def test_P_func(self):
         """Tests the P function
@@ -66,14 +65,14 @@ class Test(unittest.TestCase):
         theta = self.data.theta
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         beta, gamma = self.data.beta, self.data.gamma
-        E_g1 = lambda v: self.E_g1
-        E_log_g1 = lambda v: np.log(self.E_g1)
-        args = {"pi_est": self.pi_est, "E_g5": self.E_g5,
+        E_g4 = lambda v: self.E_g4
+        E_log_g4 = lambda v: np.log(self.E_g4)
+        args = {"pi_est": self.pi_est, "E_g1": self.E_g1,
                     "phi": phi, "beta": beta,
                     "baseline_hazard": baseline_hazard,
                     "extracted_features": self.data.ext_feat,
                     "ind_1": self.ind_1, "ind_2": self.ind_2,
-                    "E_g1": E_g1,"E_log_g1": E_log_g1,
+                    "E_g4": E_g4,"E_log_g4": E_log_g4,
                     "group": 0, "delta_T": self.delta_T}
         Q = self.M_func.Q_func(gamma[0], {**args})
         Q_ = 55.774
@@ -86,17 +85,17 @@ class Test(unittest.TestCase):
         theta = self.data.theta
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
         beta, gamma = self.data.beta, self.data.gamma
-        E_g1 = lambda v: self.E_g1
-        E_log_g1 = lambda v: np.log(self.E_g1)
-        E_g7 = self.E_g7
-        E_g8 = lambda v: self.E_g8
-        args = {"pi_est": self.pi_est, "E_g5": self.E_g5,
+        E_g4 = lambda v: self.E_g4
+        E_log_g4 = lambda v: np.log(self.E_g4)
+        E_g3 = self.E_g3
+        E_g5 = lambda v: self.E_g5
+        args = {"pi_est": self.pi_est, "E_g1": self.E_g1,
                 "phi": phi, "beta": beta,
                 "baseline_hazard": baseline_hazard,
                 "extracted_features": self.data.ext_feat,
                 "ind_1": self.ind_1, "ind_2": self.ind_2,
-                "E_g1": E_g1, "E_log_g1": E_log_g1,
-                "E_g7": E_g7, "E_g8": E_g8, "group": 0, "delta_T": self.delta_T}
+                "E_g4": E_g4, "E_log_g4": E_log_g4,
+                "E_g3": E_g3, "E_g5": E_g5, "group": 0, "delta_T": self.delta_T}
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
         grad_Q_ = np.array([707.967, 721.9, 735.833, 749.767, 763.7, 777.633,
                             791.567, 805.5, 819.433, 833.367, 847.3, 861.233,
