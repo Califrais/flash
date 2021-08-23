@@ -185,7 +185,7 @@ class EstepFunctions:
             g4 = np.broadcast_to(g4[..., None], g4.shape + (2,)).swapaxes(1, -1)
         return g4
 
-    def g5(self, S, gamma_0, gamma_1):
+    def g5(self, gamma_0, gamma_1):
         """Computes g5
         Parameters
         ----------
