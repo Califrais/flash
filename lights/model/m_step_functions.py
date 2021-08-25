@@ -1,6 +1,5 @@
 import numpy as np
-from numpy.linalg import multi_dot
-from lights.base.base import logistic_loss, get_xi_from_xi_ext, get_vect_from_ext
+from lights.base.base import logistic_loss, get_xi_from_xi_ext
 from lights.model.regularizations import ElasticNet
 from lights.model.associations import AssociationFunctionFeatures
 
@@ -53,8 +52,8 @@ class MstepFunctions:
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         T_u = np.unique(self.T)
         alpha, L = self.fixed_effect_time_order, self.n_long_features
-        self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list, T_u,
-                                        alpha, L).get_asso_feat()
+        self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
+                                                T_u, alpha, L).get_asso_feat()
         self.grad_Q_fixed = None
 
     def P_pen_func(self, pi_est, xi_ext):
@@ -168,8 +167,8 @@ class MstepFunctions:
 
         Parameters
         ----------
-        gamma_k : `np.ndarray`, shape=(L * A,) or (n_time_indep_features,)
-            Association parameters (time dependence or independence) for group k
+        gamma_k : `np.ndarray`, shape=(L * nb_asso_param,)
+            Association parameters  for group k
 
         Returns
         -------
@@ -191,19 +190,17 @@ class MstepFunctions:
         return -sub_obj / n_samples
 
     def grad_Q(self, gamma_k, *args):
-        """Computes the gradient of the function Q  with time dependence
-        association variable
+        """Computes the gradient of the function Q  with association variable
 
         Parameters
         ----------
-        gamma_k_dep : `np.ndarray`, shape=(L*A,)
-            Time dependence association parameters for group k
+        gamma_k : `np.ndarray`, shape=(L * nb_asso_param,)
+            Association parameters for group k
 
         Returns
         -------
         output : `np.ndarray`
-            The value of the Q gradient with time dependence
-        association variable
+            The value of the Q gradient with association variable
         """
         n_samples, delta = self.n_samples, self.delta
         gamma_k = gamma_k.reshape(-1, 1)

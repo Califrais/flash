@@ -1,10 +1,12 @@
+
 import numpy as np
 from lights.model.associations import AssociationFunctionFeatures
+from sklearn.preprocessing import StandardScaler
 from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-from sklearn.preprocessing import StandardScaler
+
 
 class EstepFunctions:
     """A class to define functions relative to the E-step of the QNMCEM
@@ -35,7 +37,7 @@ class EstepFunctions:
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
-    asso_functions : `list` or `str`='all'
+    asso_functions_list : `list` or `str`='all'
         List of association functions wanted or string 'all' to select all
         defined association functions. The available functions are :
             - 'lp' : linear predictor
@@ -189,12 +191,11 @@ class EstepFunctions:
         """Computes g5
         Parameters
         ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param + p,)
+        gamma_0 : `np.ndarray`, shape=(L * nb_asso_param,)
+            Association parameters for low-risk group
+
+        gamma_1 : `np.ndarray`, shape=(L * nb_asso_param,)
             Association parameters for high-risk group
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
         Returns
         -------
         g5 : `np.ndarray`, shape=(n_samples, K, N_MC, J, dim, K)
@@ -297,6 +298,7 @@ class EstepFunctions:
                 Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
         return Eg.T
 
+
 @nb.njit(parallel=True, fastmath=True)
 def Lambda_g_3_nb(g, f):
     n_samples, K, N_MC = f.shape
@@ -306,6 +308,7 @@ def Lambda_g_3_nb(g, f):
             for j in nb.prange(N_MC):
                 res[i, k] += (g[i, k, j] * f[i, k, j]) / N_MC
     return res
+
 
 @nb.njit(parallel=True, fastmath=True)
 def Lambda_g_4_nb(g, f):
@@ -317,6 +320,7 @@ def Lambda_g_4_nb(g, f):
                 for m in nb.prange(g.shape[3]):
                     res[i, k, m] += (g[i, k, j, m] * f[i, k, j]) / N_MC
     return res
+
 
 @nb.njit(parallel=True, fastmath=True)
 def Lambda_g_5_nb(g, f):
@@ -330,6 +334,7 @@ def Lambda_g_5_nb(g, f):
                         res[i, k, m, n] += \
                                         (g[i, k, j, m, n] * f[i, k, j]) / N_MC
     return res
+
 
 @nb.njit(parallel=True, fastmath=True)
 def Lambda_g_6_nb(g, f):

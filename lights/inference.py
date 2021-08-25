@@ -6,14 +6,13 @@ from scipy.optimize import fmin_l_bfgs_b
 from numpy.linalg import multi_dot
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, block_diag, \
-    get_xi_from_xi_ext, logistic_grad, get_times_infos, get_ext_from_vect, \
-    get_vect_from_ext
+    get_xi_from_xi_ext, logistic_grad, get_times_infos
 from lights.init.mlmm import MLMM
 from lights.init.cox import initialize_baseline_hazard
 from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
-from scipy.stats import multivariate_normal, norm
+from scipy.stats import multivariate_normal
 
 
 class QNMCEM(Learner):
@@ -168,7 +167,7 @@ class QNMCEM(Learner):
         theta : `dictionary`
             Dictionary of current estimated parameters
 
-        pre_theta : `dictionary`
+        prev_theta : `dictionary`
             Dictionary of previous iteration estimated parameters
 
         eps : float
@@ -319,6 +318,10 @@ class QNMCEM(Learner):
 
         indicator: `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times (T <= T_u)
+
+        delta_T: `np.array`, shape=(J)
+            The list of time interval between two consecutive
+             unique censored times.
 
         Returns
         -------
@@ -646,7 +649,7 @@ class QNMCEM(Learner):
                                  Lambda_1, pi_xi, f)
 
             def E_g5(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g5(S, gamma_0_, gamma_1_),
+                return E_func.Eg(E_func.g5(gamma_0_, gamma_1_),
                     Lambda_1, pi_xi, f)
 
             # M-Step
@@ -750,7 +753,7 @@ class QNMCEM(Learner):
                 pi_est_stack = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
                 N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
                 beta_l = beta_stack[q_l * l: q_l * (l + 1)]
-                E_g1_l = E_g1.reshape(n_samples, L, r_l)[:, l].reshape(-1, 1)
+                E_g1_l = E_g1.reshape((n_samples, L, r_l))[:, l].reshape(-1, 1)
                 E_g2_l = block_diag(E_g2[:, r_l * l: r_l * (l + 1),
                                     r_l * l: r_l * (l + 1)])
                 tmp = y_l - U_l.dot(beta_l)
