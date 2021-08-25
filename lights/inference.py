@@ -293,7 +293,7 @@ class QNMCEM(Learner):
 
         Parameters
         ----------
-        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+        rel_risk: `np.ndarray`, shape=(N_MC, K, J)
             The relative risk
 
         indicator: `np.ndarray`, shape=(n_samples, J)
@@ -304,7 +304,7 @@ class QNMCEM(Learner):
         intensity : `np.ndarray`, shape=(N_MC, K, n_samples)
             The value of intensity
         """
-        intensity = (rel_risk * indicator).sum(axis=-1)
+        intensity = rel_risk.dot(indicator.T)
         return intensity
 
     @staticmethod
@@ -313,7 +313,7 @@ class QNMCEM(Learner):
 
         Parameters
         ----------
-        rel_risk: `np.ndarray`, shape=(N_MC, K, n_samples, J)
+        rel_risk: `np.ndarray`, shape=(N_MC, K, J)
             The relative risk
 
         indicator: `np.ndarray`, shape=(n_samples, J)
@@ -328,7 +328,7 @@ class QNMCEM(Learner):
         survival : `np.ndarray`, shape=(n_samples, K, N_MC)
             The value of the survival function
         """
-        survival = np.exp(-(rel_risk * indicator * delta_T).sum(axis=-1).T)
+        survival = np.exp(-(rel_risk * delta_T).dot(indicator.T).T)
         return survival
 
     def f_y_given_latent(self, extracted_features, g6):
@@ -447,10 +447,10 @@ class QNMCEM(Learner):
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
-        g4 = E_func.g4(gamma_0, gamma_1, False)
+        g4 = E_func.g4(gamma_0, gamma_1)
         g6 = E_func.g6(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
-        rel_risk = g4.swapaxes(0, 2) * baseline_val
+        rel_risk = g4.swapaxes(1, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2, self.delta_T)
@@ -613,7 +613,7 @@ class QNMCEM(Learner):
 
         S = E_func.construct_MC_samples(N)
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
-        Lambda_1 = E_func.Lambda_g(np.ones(shape=(n_samples, 2, 2 * N)), f)
+        Lambda_1 = E_func.Lambda_g(np.ones(shape=(2 * N)), f)
         pi_xi = self._get_proba(X)
 
         # Store init values
@@ -794,7 +794,7 @@ class QNMCEM(Learner):
                 break
             else:
                 # Update for next iteration
-                Lambda_1 = E_func.Lambda_g(np.ones((n_samples, 2, 2 * N)), f)
+                Lambda_1 = E_func.Lambda_g(np.ones((2 * N)), f)
 
         self._end_solve()
 
