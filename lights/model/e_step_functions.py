@@ -269,7 +269,7 @@ class EstepFunctions:
     def Eg(self, g, Lambda_1, pi_xi, f):
         """Computes approximated expectations of different functions g taking
         random effects as input, conditional on the observed data and the
-        current estimate of the parameters. See (14) in the lights paper
+        current estimate of the parameters. See (13) in the lights paper
 
         Parameters
         ----------
@@ -277,7 +277,7 @@ class EstepFunctions:
             The value of g function for all samples
 
         Lambda_1: `np.ndarray`, shape=(n_samples, K)
-            Approximated integral (see (15) in the lights paper) with
+            Approximated integral (see (17) in the lights paper) with
             \tilde(g)=1
 
         pi_xi: `np.ndarray`, shape=(n_samples,)
