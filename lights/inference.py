@@ -331,7 +331,7 @@ class QNMCEM(Learner):
         survival = np.exp(-(rel_risk * delta_T).dot(indicator.T).T)
         return survival
 
-    def f_y_given_latent(self, extracted_features, g6):
+    def f_y_given_latent(self, extracted_features, S, beta):
         """Computes the density of the longitudinal processes given latent
         variables
 
@@ -343,8 +343,11 @@ class QNMCEM(Learner):
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-        g6 : `list` of n_samples `np.array`s with shape=(K, n_i, N_MC)
-            The values of g6 function
+        S : `np.ndarray`, shape=(N_MC, r)
+            Set of constructed Monte Carlo samples
+
+        beta : `list`
+            list of fixed effect parameters
 
         Returns
         -------
@@ -354,18 +357,19 @@ class QNMCEM(Learner):
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         n_samples, n_long_features = self.n_samples, self.n_long_features
         phi = self.theta["phi"]
-        N_MC = g6[0].shape[2]
+        N_MC = S.shape[0]
         K = 2  # 2 latent groups
         f_y = np.ones(shape=(n_samples, K, N_MC))
         for i in range(n_samples):
-            n_i, y_i, M_iS = sum(N_list[i]), np.array(y_list[i]).flatten(), g6[i]
+            U_i, V_i, y_i, n_i = U_list[i], V_list[i], \
+                                 np.array(y_list[i]).flatten(), N_list[i]
             inv_Phi_i = []
             for l in range(n_long_features):
                 inv_Phi_i += [phi[l, 0]] * N_list[i][l]
             cov = np.diag(inv_Phi_i)
             for k in range(K):
                 for s in range(N_MC):
-                    mean = M_iS[k, :, s]
+                    mean = U_i.dot(beta[k].flatten()) + V_i.dot(S[s])
                     f_y[i, k, s] = multivariate_normal.pdf(y_i, mean, cov)
 
         return f_y
@@ -448,14 +452,13 @@ class QNMCEM(Learner):
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
         g4 = E_func.g4(gamma_0, gamma_1)
-        g6 = E_func.g6(S, beta_0, beta_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g4.swapaxes(1, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
         survival = self.survival(rel_risk, ind_2, self.delta_T)
         f = (intensity ** delta).T * survival
-        f_y = self.f_y_given_latent(extracted_features, g6)
+        f_y = self.f_y_given_latent(extracted_features, S, [beta_0, beta_1])
         f *= f_y
         return f
 

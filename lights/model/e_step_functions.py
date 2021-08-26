@@ -192,31 +192,6 @@ class EstepFunctions:
         g5 = g4[:, :, np.newaxis, :] * g3
         return g5
 
-    def g6(self, S, beta_0, beta_1):
-        """Computes g6
-
-        Parameters
-        ----------
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
-        beta_0 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for low-risk group
-
-        beta_1 : `np.ndarray`, shape=(q,)
-            Fixed effect parameters for high-risk group
-        """
-        n_samples, n_long_features = self.n_samples, self.n_long_features
-        U_list, V_list, y_list, N_list = self.extracted_features[0]
-        K = self.K
-        beta_stack = np.hstack((beta_0, beta_1))
-        g6 = []
-        for i in range(n_samples):
-            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], N_list[i]
-            M_iS = U_i.dot(beta_stack).T.reshape(K, -1, 1) + V_i.dot(S.T)
-            g6.append(M_iS)
-        return g6
-
     @staticmethod
     def Lambda_g(g, f):
         """Approximated integral (see (15) in the lights paper)
