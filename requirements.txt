@@ -274,7 +274,7 @@ pickleshare==0.7.5
     # via
     #   -r requirements.in
     #   ipython
-pillow==8.1.1
+pillow==8.2.0
     # via -r requirements.in
 pluggy==0.13.1
     # via
