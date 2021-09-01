@@ -29,7 +29,6 @@ class Test(unittest.TestCase):
         if 're' in asso_functions:
             nb_asso_param += L
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
-        self.delta_T = T_u - np.append(0, T_u[:-1])
         self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
                                      L, p, l_pen, eta_elastic_net, alpha,
                                      asso_functions)
@@ -72,10 +71,9 @@ class Test(unittest.TestCase):
                     "baseline_hazard": baseline_hazard,
                     "extracted_features": self.data.ext_feat,
                     "ind_1": self.ind_1, "ind_2": self.ind_2,
-                    "E_g4": E_g4,"E_log_g4": E_log_g4,
-                    "group": 0, "delta_T": self.delta_T}
+                    "E_g4": E_g4,"E_log_g4": E_log_g4, "group": 0}
         Q = self.M_func.Q_func(gamma[0], {**args})
-        Q_ = 55.774
+        Q_ = 41.607
         np.testing.assert_almost_equal(Q, Q_, 3)
 
     def test_grad_Q(self):
@@ -95,11 +93,10 @@ class Test(unittest.TestCase):
                 "extracted_features": self.data.ext_feat,
                 "ind_1": self.ind_1, "ind_2": self.ind_2,
                 "E_g4": E_g4, "E_log_g4": E_log_g4,
-                "E_g3": E_g3, "E_g5": E_g5, "group": 0, "delta_T": self.delta_T}
+                "E_g3": E_g3, "E_g5": E_g5, "group": 0}
         grad_Q = self.M_func.grad_Q(gamma[0], {**args})
-        grad_Q_ = np.array([707.967, 721.9, 735.833, 749.767, 763.7, 777.633,
-                            791.567, 805.5, 819.433, 833.367, 847.3, 861.233,
-                            875.167, 889.1,903.033])
+        grad_Q_ = np.array([525.8, 535.4, 545, 554.6, 564.2, 573.8, 583.4,
+                            593, 602.6, 612.2, 621.8, 631.4, 641, 650.6, 660.2])
         np.testing.assert_almost_equal(grad_Q, grad_Q_, 3)
 
 
