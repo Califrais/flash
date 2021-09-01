@@ -308,7 +308,7 @@ class QNMCEM(Learner):
         return intensity
 
     @staticmethod
-    def survival(rel_risk, indicator, delta_T):
+    def survival(rel_risk, indicator):
         """Computes the survival function
 
         Parameters
@@ -319,16 +319,12 @@ class QNMCEM(Learner):
         indicator: `np.ndarray`, shape=(n_samples, J)
             The indicator matrix for comparing event times (T <= T_u)
 
-        delta_T: `np.array`, shape=(J)
-            The list of time interval between two consecutive
-             unique censored times.
-
         Returns
         -------
         survival : `np.ndarray`, shape=(n_samples, K, N_MC)
             The value of the survival function
         """
-        survival = np.exp(-(rel_risk * delta_T).dot(indicator.T).T)
+        survival = np.exp(-(rel_risk).dot(indicator.T).T)
         return survival
 
     def f_y_given_latent(self, extracted_features, S, beta):
@@ -456,7 +452,7 @@ class QNMCEM(Learner):
         rel_risk = g4.swapaxes(1, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = self.intensity(rel_risk, ind_1)
-        survival = self.survival(rel_risk, ind_2, self.delta_T)
+        survival = self.survival(rel_risk, ind_2)
         f = (intensity ** delta).T * survival
         f_y = self.f_y_given_latent(extracted_features, S, [beta_0, beta_1])
         f *= f_y
@@ -569,7 +565,6 @@ class QNMCEM(Learner):
         T_u = np.unique(T)
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
-        self.delta_T = self.T_u - np.append(0, self.T_u[:-1])
 
         # Initialization
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
@@ -703,8 +698,7 @@ class QNMCEM(Learner):
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
-                        "ind_1": ind_1, "ind_2": ind_2,
-                        "gamma": gamma, "delta_T": self.delta_T}
+                        "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
             E_func.compute_AssociationFunctions(S)
             gamma_0_prev = gamma_0.copy()
             args_0 = {"group": 0,
@@ -742,7 +736,7 @@ class QNMCEM(Learner):
 
             # baseline hazard update
             baseline_hazard = pd.Series(
-                data=  (1 / self.delta_T) * (((ind_1.T * delta).sum(axis=1)) /
+                data=  (((ind_1.T * delta).sum(axis=1)) /
                       ((E_g4.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
