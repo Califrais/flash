@@ -351,7 +351,7 @@ class QNMCEM(Learner):
             The value of the f(Y | S, G ; theta)
         """
         (U_list, V_list, y_list, N_list) = extracted_features[0]
-        n_samples, n_long_features = self.n_samples, self.n_long_features
+        n_samples, n_long_features = len(y_list), self.n_long_features
         phi = self.theta["phi"]
         N_MC = S.shape[0]
         K = 2  # 2 latent groups
