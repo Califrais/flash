@@ -468,7 +468,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                     times_i[l] = np.append(times_i[l], t_max[i])
                 if len(times_i[l]) > 10:
                     times_i[l] = np.sort(np.random.choice(times_i[l],
-                                                        size=5, replace=False))
+                                                        size=10, replace=False))
                 n_il = len(times_i[l])
                 N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
