@@ -8,34 +8,20 @@ alabaster==0.7.12
     # via
     #   -r requirements.in
     #   sphinx
-appnope==0.1.0
+appnope==0.1.2
     # via
     #   -r requirements.in
     #   ipykernel
     #   ipython
-argon2-cffi==20.1.0
+argon2-cffi==21.1.0
     # via
     #   -r requirements.in
     #   notebook
-async-generator==1.10
-    # via
-    #   -r requirements.in
-    #   nbclient
-attrs==19.3.0
+attrs==21.2.0
     # via
     #   -r requirements.in
     #   jsonschema
-    #   pytest
-autograd==1.3
-    # via
-    #   -r requirements.in
-    #   autograd-gamma
-    #   lifelines
-autograd-gamma==0.4.2
-    # via
-    #   -r requirements.in
-    #   lifelines
-babel==2.8.0
+babel==2.9.1
     # via
     #   -r requirements.in
     #   sphinx
@@ -43,56 +29,53 @@ backcall==0.2.0
     # via
     #   -r requirements.in
     #   ipython
-bleach==3.3.0
+bleach==4.1.0
     # via
     #   -r requirements.in
     #   nbconvert
-certifi==2020.4.5.2
+certifi==2021.5.30
     # via
     #   -r requirements.in
     #   requests
-cffi==1.14.3
+cffi==1.14.6
     # via
     #   -r requirements.in
     #   argon2-cffi
-chardet==3.0.4
+charset-normalizer==2.0.4
     # via
     #   -r requirements.in
     #   requests
-git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
-    # via -r requirements.in
+click==8.0.1
+    # via
+    #   -r requirements.in
+    #   pip-compile-multi
+    #   pip-tools
 cycler==0.10.0
     # via
     #   -r requirements.in
     #   matplotlib
-decorator==4.4.2
+debugpy==1.4.1
+    # via
+    #   -r requirements.in
+    #   ipykernel
+decorator==5.0.9
     # via
     #   -r requirements.in
     #   ipython
-    #   traitlets
-defusedxml==0.6.0
+defusedxml==0.7.1
     # via
     #   -r requirements.in
     #   nbconvert
-dill==0.3.1.1
-    # via
-    #   -r requirements.in
-    #   tick
-docutils==0.16
+docutils==0.17.1
     # via
     #   -r requirements.in
     #   sphinx
 entrypoints==0.3
     # via
     #   -r requirements.in
+    #   jupyter-client
     #   nbconvert
-external==0.0.1
-    # via -r requirements.in
-future==0.18.2
-    # via
-    #   -r requirements.in
-    #   autograd
-idna==2.9
+idna==3.2
     # via
     #   -r requirements.in
     #   requests
@@ -100,13 +83,7 @@ imagesize==1.2.0
     # via
     #   -r requirements.in
     #   sphinx
-importlib-metadata==1.6.1
-    # via -r requirements.in
-iniconfig==1.1.1
-    # via
-    #   -r requirements.in
-    #   pytest
-ipykernel==5.3.0
+ipykernel==6.3.1
     # via
     #   -r requirements.in
     #   ipywidgets
@@ -114,7 +91,7 @@ ipykernel==5.3.0
     #   jupyter-console
     #   notebook
     #   qtconsole
-ipython==7.15.0
+ipython==7.27.0
     # via
     #   -r requirements.in
     #   ipykernel
@@ -123,26 +100,27 @@ ipython==7.15.0
 ipython-genutils==0.2.0
     # via
     #   -r requirements.in
+    #   ipykernel
+    #   ipywidgets
     #   nbformat
     #   notebook
     #   qtconsole
-    #   traitlets
-ipywidgets==7.5.1
+ipywidgets==7.6.4
     # via
     #   -r requirements.in
     #   jupyter
-jedi==0.17.0
+jedi==0.18.0
     # via
     #   -r requirements.in
     #   ipython
-jinja2==2.11.2
+jinja2==3.0.1
     # via
     #   -r requirements.in
     #   nbconvert
     #   notebook
     #   numpydoc
     #   sphinx
-joblib==0.15.1
+joblib==1.0.1
     # via
     #   -r requirements.in
     #   scikit-learn
@@ -152,7 +130,7 @@ jsonschema==3.2.0
     #   nbformat
 jupyter==1.0.0
     # via -r requirements.in
-jupyter-client==6.1.12
+jupyter-client==7.0.2
     # via
     #   -r requirements.in
     #   ipykernel
@@ -160,11 +138,11 @@ jupyter-client==6.1.12
     #   nbclient
     #   notebook
     #   qtconsole
-jupyter-console==6.1.0
+jupyter-console==6.4.0
     # via
     #   -r requirements.in
     #   jupyter
-jupyter-core==4.6.3
+jupyter-core==4.7.1
     # via
     #   -r requirements.in
     #   jupyter-client
@@ -173,40 +151,42 @@ jupyter-core==4.6.3
     #   notebook
     #   qtconsole
 jupyterlab-pygments==0.1.2
-    # via -r requirements.in
-kiwisolver==1.2.0
+    # via
+    #   -r requirements.in
+    #   nbconvert
+jupyterlab-widgets==1.0.1
+    # via
+    #   -r requirements.in
+    #   ipywidgets
+kiwisolver==1.3.2
     # via
     #   -r requirements.in
     #   matplotlib
-lifelines==0.24.9
-    # via -r requirements.in
-llvmlite==0.36.0
-    # via
-    #   -r requirements.in
-    #   numba
-markupsafe==1.1.1
+markupsafe==2.0.1
     # via
     #   -r requirements.in
     #   jinja2
-matplotlib==3.2.1
+matplotlib==3.4.3
+    # via -r requirements.in
+matplotlib-inline==0.1.2
     # via
     #   -r requirements.in
-    #   lifelines
-    #   tick
-matplotlib-inline==0.1.2
-    # via -r requirements.in
+    #   ipykernel
+    #   ipython
 mistune==0.8.4
     # via
     #   -r requirements.in
     #   nbconvert
-nbclient==0.5.3
-    # via -r requirements.in
-nbconvert==5.6.1
+nbclient==0.5.4
+    # via
+    #   -r requirements.in
+    #   nbconvert
+nbconvert==6.1.0
     # via
     #   -r requirements.in
     #   jupyter
     #   notebook
-nbformat==5.0.7
+nbformat==5.1.3
     # via
     #   -r requirements.in
     #   ipywidgets
@@ -216,56 +196,41 @@ nbformat==5.0.7
 nest-asyncio==1.5.1
     # via
     #   -r requirements.in
+    #   jupyter-client
     #   nbclient
-notebook==6.2.0
+notebook==6.4.3
     # via
     #   -r requirements.in
     #   jupyter
     #   widgetsnbextension
-numba==0.53.1
-    # via -r requirements.in
-numpy==1.21.0
+numpy==1.21.2
     # via
     #   -r requirements.in
-    #   autograd
-    #   copt
-    #   lifelines
     #   matplotlib
-    #   numba
     #   pandas
-    #   patsy
     #   scikit-learn
     #   scipy
-    #   statsmodels
-    #   tick
-numpydoc==1.0.0
-    # via
-    #   -r requirements.in
-    #   tick
-packaging==20.4
+numpydoc==1.1.0
+    # via -r requirements.in
+packaging==21.0
     # via
     #   -r requirements.in
     #   bleach
-    #   pytest
     #   sphinx
-pandas==1.2.5
-    # via
-    #   -r requirements.in
-    #   lifelines
-    #   statsmodels
-    #   tick
-pandocfilters==1.4.2
+pandas==1.3.2
+    # via -r requirements.in
+pandocfilters==1.4.3
     # via
     #   -r requirements.in
     #   nbconvert
-parso==0.7.0
+parso==0.8.2
     # via
     #   -r requirements.in
     #   jedi
-patsy==0.5.1
+pep517==0.11.0
     # via
     #   -r requirements.in
-    #   statsmodels
+    #   pip-tools
 pexpect==4.8.0
     # via
     #   -r requirements.in
@@ -274,35 +239,35 @@ pickleshare==0.7.5
     # via
     #   -r requirements.in
     #   ipython
-pillow==8.2.0
-    # via -r requirements.in
-pluggy==0.13.1
+pillow==8.3.2
     # via
     #   -r requirements.in
-    #   pytest
-prometheus-client==0.8.0
+    #   matplotlib
+pip-compile-multi==2.4.1
+    # via -r requirements.in
+pip-tools==6.2.0
+    # via
+    #   -r requirements.in
+    #   pip-compile-multi
+prometheus-client==0.11.0
     # via
     #   -r requirements.in
     #   notebook
-prompt-toolkit==3.0.5
+prompt-toolkit==3.0.20
     # via
     #   -r requirements.in
     #   ipython
     #   jupyter-console
-ptyprocess==0.6.0
+ptyprocess==0.7.0
     # via
     #   -r requirements.in
     #   pexpect
     #   terminado
-py==1.10.0
-    # via
-    #   -r requirements.in
-    #   pytest
 pycparser==2.20
     # via
     #   -r requirements.in
     #   cffi
-pygments==2.6.1
+pygments==2.10.0
     # via
     #   -r requirements.in
     #   ipython
@@ -316,85 +281,64 @@ pyparsing==2.4.7
     #   -r requirements.in
     #   matplotlib
     #   packaging
-pyrsistent==0.16.0
+pyrsistent==0.18.0
     # via
     #   -r requirements.in
     #   jsonschema
-pytest==6.2.1
-    # via -r requirements.in
-python-dateutil==2.8.1
+python-dateutil==2.8.2
     # via
     #   -r requirements.in
     #   jupyter-client
     #   matplotlib
     #   pandas
-pytz==2020.1
+pytz==2021.1
     # via
     #   -r requirements.in
     #   babel
     #   pandas
-pyzmq==19.0.1
+pyzmq==22.2.1
     # via
     #   -r requirements.in
     #   jupyter-client
     #   notebook
     #   qtconsole
-qtconsole==4.7.4
+qtconsole==5.1.1
     # via
     #   -r requirements.in
     #   jupyter
-qtpy==1.9.0
+qtpy==1.11.0
     # via
     #   -r requirements.in
     #   qtconsole
-requests==2.23.0
+requests==2.26.0
     # via
     #   -r requirements.in
     #   sphinx
 scikit-learn==0.24.2
+    # via -r requirements.in
+scipy==1.7.1
     # via
     #   -r requirements.in
-    #   sklearn
-    #   tick
-scipy==1.7.0
-    # via
-    #   -r requirements.in
-    #   autograd-gamma
-    #   copt
-    #   lifelines
     #   scikit-learn
-    #   statsmodels
-    #   tick
-send2trash==1.5.0
+send2trash==1.8.0
     # via
     #   -r requirements.in
     #   notebook
-six==1.15.0
+six==1.16.0
     # via
     #   -r requirements.in
-    #   argon2-cffi
     #   bleach
-    #   copt
     #   cycler
     #   jsonschema
-    #   packaging
-    #   patsy
-    #   pyrsistent
     #   python-dateutil
-    #   traitlets
-sklearn==0.0
-    # via
-    #   -r requirements.in
-    #   copt
-snowballstemmer==2.0.0
+snowballstemmer==2.1.0
     # via
     #   -r requirements.in
     #   sphinx
-sphinx==3.1.0
+sphinx==4.1.2
     # via
     #   -r requirements.in
     #   numpydoc
-    #   tick
 sphinxcontrib-applehelp==1.0.2
     # via
     #   -r requirements.in
@@ -403,7 +347,7 @@ sphinxcontrib-devhelp==1.0.2
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-htmlhelp==1.0.3
+sphinxcontrib-htmlhelp==2.0.0
     # via
     #   -r requirements.in
     #   sphinx
@@ -415,30 +359,30 @@ sphinxcontrib-qthelp==1.0.3
     # via
     #   -r requirements.in
     #   sphinx
-sphinxcontrib-serializinghtml==1.1.4
+sphinxcontrib-serializinghtml==1.1.5
     # via
     #   -r requirements.in
     #   sphinx
-statsmodels==0.12.2
-    # via -r requirements.in
-terminado==0.8.3
+terminado==0.11.1
     # via
     #   -r requirements.in
     #   notebook
-testpath==0.4.4
+testpath==0.5.0
     # via
     #   -r requirements.in
     #   nbconvert
-threadpoolctl==2.1.0
+threadpoolctl==2.2.0
     # via
     #   -r requirements.in
     #   scikit-learn
-tick==0.7.0.1
-    # via -r requirements.in
-toml==0.10.2
+tomli==1.2.1
     # via
     #   -r requirements.in
-    #   pytest
+    #   pep517
+toposort==1.6
+    # via
+    #   -r requirements.in
+    #   pip-compile-multi
 tornado==6.1
     # via
     #   -r requirements.in
@@ -446,11 +390,7 @@ tornado==6.1
     #   jupyter-client
     #   notebook
     #   terminado
-tqdm==4.54.1
-    # via
-    #   -r requirements.in
-    #   copt
-traitlets==4.3.3
+traitlets==5.1.0
     # via
     #   -r requirements.in
     #   ipykernel
@@ -464,11 +404,11 @@ traitlets==4.3.3
     #   nbformat
     #   notebook
     #   qtconsole
-urllib3==1.25.9
+urllib3==1.26.6
     # via
     #   -r requirements.in
     #   requests
-wcwidth==0.2.4
+wcwidth==0.2.5
     # via
     #   -r requirements.in
     #   prompt-toolkit
@@ -476,14 +416,13 @@ webencodings==0.5.1
     # via
     #   -r requirements.in
     #   bleach
+wheel==0.37.0
+    # via pip-tools
 widgetsnbextension==3.5.1
     # via
     #   -r requirements.in
     #   ipywidgets
-zipp==3.4.1
-    # via
-    #   -r requirements.in
-    #   importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
+# pip
 # setuptools
