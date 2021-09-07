@@ -694,7 +694,7 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL = self.l_pen_SGL
             prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            copt_max_iter = 20
+            copt_max_iter = 50
             args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
@@ -709,12 +709,15 @@ class QNMCEM(Learner):
                       "E_g5": lambda v: E_g5(v, gamma_1)
                       }
 
-            gamma_0 = copt.minimize_proximal_gradient(
+            res0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=copt_max_iter,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
                 step=self.copt_step,
-                accelerated=self.copt_accelerate).x.reshape(-1, 1)
+                accelerated=self.copt_accelerate)
+
+            print(res0)
+            gamma_0 = res0.x.reshape(-1, 1)
 
             # gamma_1 update
             args_1 = {"group": 1,
