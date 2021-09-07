@@ -1,4 +1,7 @@
 {
-    "l_pen_SGL" : 0.01,
-    "l_pen_EN" : 0.01
+    "l_pen_EN" : 0.01,
+    "l_pen_SGL" : 0.1,
+    "eta_sp_gp_l1" : 1,
+    "max_iter" : 30,
+    "std_error" : 4
 }

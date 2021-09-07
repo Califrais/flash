@@ -383,11 +383,16 @@ class SimuJointLongitudinalSurvival(Simulation):
 
             K = 2
             nb_nonactive_group = n_long_features - int(sparsity * n_long_features)
+
             # set of nonactive group for 2 classes
             S_k = np.array_split(np.random.choice(n_long_features,
                                 K * nb_nonactive_group, replace=False), K)
             # number of active features in each group
-            nb_active_features = int(sparsity * nb_asso_param)
+            # nb_active_features = int(sparsity * nb_asso_param)
+
+            #TODO : for testing
+            nb_active_features = nb_asso_param
+
             gamma = []
             for k in range(K):
                 gamma_k = np.zeros(nb_asso_features)
@@ -468,7 +473,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                     times_i[l] = np.append(times_i[l], t_max[i])
                 if len(times_i[l]) > 10:
                     times_i[l] = np.sort(np.random.choice(times_i[l],
-                                                        size=5, replace=False))
+                                                        size=10, replace=False))
                 n_il = len(times_i[l])
                 N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]

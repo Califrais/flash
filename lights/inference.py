@@ -39,6 +39,7 @@ class QNMCEM(Learner):
 
     eta_sp_gp_l1: `float`, default=0.1
         The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
+        For eta_sp_gp_l1 = 1 this is
 
     max_iter : `int`, default=100
         Maximum number of iterations of the solver
@@ -600,7 +601,7 @@ class QNMCEM(Learner):
                            phi=phi, baseline_hazard=baseline_hazard)
 
         # Stopping criteria and bounds vector for the L-BGFS-B algorithm
-        maxiter, pgtol = 10, 1e-5
+        maxiter, pgtol = 30, 1e-5
         bounds_xi = [(0, None)] * 2 * p
 
         # Instanciates E-step and M-step functions
@@ -693,7 +694,7 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL = self.l_pen_SGL
             prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            copt_max_iter = 10
+            copt_max_iter = 20
             args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
