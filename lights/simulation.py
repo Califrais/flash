@@ -404,6 +404,10 @@ class SimuJointLongitudinalSurvival(Simulation):
             return gamma
 
         gamma_0, gamma_1 = simu_sparse_asso_features()
+
+        # TODO test simon
+        gamma_0 = gamma_1.copy()
+
         self.asso_coeffs = [gamma_0, gamma_1]
 
         # Simulation of true times
