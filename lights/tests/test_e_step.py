@@ -13,13 +13,11 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         data = CreateTestingData()
-        alpha = data.fixed_effect_time_order
+        alpha, L = data.fixed_effect_time_order, data.n_long_features
         theta, asso_functions = data.theta, data.asso_functions
         self.n_samples = data.n_samples
         self.S, self.n_MC = data.S, data.S.shape[0]
-        self.E_func = EstepFunctions(data.X, data.T, data.T_u, data.delta,
-                                     data.ext_feat, alpha, asso_functions,
-                                     theta)
+        self.E_func = EstepFunctions(data.T_u, L, alpha, asso_functions, theta)
         self.E_func.compute_AssociationFunctions(self.S)
         self.ind_1, self.ind_2 = data.ind_1, data.ind_2
         self.data = data
