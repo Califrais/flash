@@ -1,7 +1,6 @@
 import numpy as np
 from lights.base.base import logistic_loss, get_xi_from_xi_ext
 from lights.model.regularizations import ElasticNet
-from lights.model.associations import AssociationFunctionFeatures
 
 
 class MstepFunctions:
@@ -16,17 +15,11 @@ class MstepFunctions:
     X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
         The time-independent features matrix
 
-    T : `np.ndarray`, shape=(n_samples,)
-        The censored times of the event of interest
-
     delta : `np.ndarray`, shape=(n_samples,)
         The censoring indicator
 
     n_time_indep_features : `int`
         Number of time-independent features
-
-    n_long_features : `int`
-        Number of longitudinal features
 
     l_pen_EN : `float`, default=0.
         Level of penalization for the ElasticNet
@@ -39,22 +32,13 @@ class MstepFunctions:
         of L1 and L2
     """
 
-    def __init__(self, fit_intercept, X, T, delta, n_long_features,
-                 n_time_indep_features, l_pen_EN, eta_elastic_net,
-                 fixed_effect_time_order, asso_functions_list):
+    def __init__(self, fit_intercept, X, delta, n_time_indep_features,
+                 l_pen_EN, eta_elastic_net):
         self.fit_intercept = fit_intercept
-        self.X, self.T, self.delta = X, T, delta
-        self.n_long_features = n_long_features
+        self.X, self.delta = X, delta
         self.n_time_indep_features = n_time_indep_features
-        n_samples = len(T)
-        self.n_samples = n_samples
-        self.fixed_effect_time_order = fixed_effect_time_order
+        self.n_samples = X.shape[0]
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
-        T_u = np.unique(self.T)
-        alpha, L = self.fixed_effect_time_order, self.n_long_features
-        self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
-                                                T_u, alpha, L).get_asso_feat()
-        self.grad_Q_fixed = None
 
     def P_pen_func(self, pi_est, xi_ext):
         """Computes the sub objective function P with penalty, to be minimized

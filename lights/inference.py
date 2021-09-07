@@ -325,7 +325,7 @@ class QNMCEM(Learner):
         survival : `np.ndarray`, shape=(n_samples, K, N_MC)
             The value of the survival function
         """
-        survival = np.exp(-(rel_risk).dot(indicator.T).T)
+        survival = np.exp(-rel_risk.dot(indicator.T).T)
         return survival
 
     def f_y_given_latent(self, extracted_features, S, beta):
@@ -442,9 +442,9 @@ class QNMCEM(Learner):
             The value of the f(Y, T, delta| S, G ; theta)
         """
         theta, alpha = self.theta, self.fixed_effect_time_order
+        L = self.n_long_features
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        E_func = EstepFunctions(X, T, T_u, delta, extracted_features, alpha,
-                                self.asso_functions, theta)
+        E_func = EstepFunctions(T_u, L, alpha, self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         E_func.compute_AssociationFunctions(S)
@@ -605,10 +605,9 @@ class QNMCEM(Learner):
         bounds_xi = [(0, None)] * 2 * p
 
         # Instanciates E-step and M-step functions
-        E_func = EstepFunctions(X, T, T_u, delta, ext_feat, alpha,
-                                asso_functions, self.theta)
-        F_func = MstepFunctions(fit_intercept, X, T, delta, L, p, self.l_pen_EN,
-                                self.eta_elastic_net, alpha, asso_functions)
+        E_func = EstepFunctions(T_u, L, alpha, asso_functions, self.theta)
+        F_func = MstepFunctions(fit_intercept, X, delta, p, self.l_pen_EN,
+                                self.eta_elastic_net)
 
         S = E_func.construct_MC_samples(N)
         f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)

@@ -7,6 +7,13 @@ class AssociationFunctionFeatures:
 
     Parameters
     ----------
+    asso_functions : `list`
+        List of association functions wanted. The available functions are :
+            - 'lp' : linear predictor
+            - 're' : random effects
+            - 'tps' : time dependent slope
+            - 'ce' : cumulative effects
+
     T_u : `np.ndarray`, shape=(J,)
         The J unique training censored times of the event of interest
 

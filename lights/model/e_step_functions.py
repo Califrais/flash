@@ -2,7 +2,6 @@
 import numpy as np
 from lights.model.associations import AssociationFunctionFeatures
 from sklearn.preprocessing import StandardScaler
-from lights.base.base import get_times_infos
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
@@ -13,23 +12,11 @@ class EstepFunctions:
 
     Parameters
     ----------
-    X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
-
-    T : `np.ndarray`, shape=(n_samples,)
-        The censored times of the event of interest
-
     T_u : `np.ndarray`, shape=(J,)
         The J unique training censored times of the event of interest
 
-    delta : `np.ndarray`, shape=(n_samples,)
-        The censoring indicator
-
-    extracted_features :  `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
+    n_long_features :  `int`,
+            Number of longitudinal features
 
     fixed_effect_time_order : `int`
         Order of the higher time monomial considered for the representations
@@ -50,20 +37,14 @@ class EstepFunctions:
         model
     """
 
-    def __init__(self, X, T, T_u, delta, extracted_features,
-                 fixed_effect_time_order, asso_functions_list, theta):
-        self.K = 2  # 2 latent groups
-        self.X, self.T, self.delta = X, T, delta
-        self.T_u, self.n_samples = T_u, len(T)
-        self.J, self.ind_1, _ = get_times_infos(T, T_u)
-        self.extracted_features, self.theta = extracted_features, theta
-        self.n_long_features = len(extracted_features[1][0])
-        self.n_time_indep_features = X.shape[1]
+    def __init__(self, T_u, n_long_features, fixed_effect_time_order,
+                 asso_functions_list, theta):
+        self.theta = theta
+        self.n_long_features = n_long_features
         self.fixed_effect_time_order = fixed_effect_time_order
         alpha, L = self.fixed_effect_time_order, self.n_long_features
         self.F_f, self.F_r = AssociationFunctionFeatures(asso_functions_list,
                                                 T_u, alpha, L).get_asso_feat()
-        self.g6_, self.g2_ = None, None
         self.asso_funcs = None
 
     def compute_AssociationFunctions(self, S):
