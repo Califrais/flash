@@ -32,7 +32,9 @@ source .env/bin/activate
 Then, to download all required modules and initialize the project run the following commands:
 ```shell script
 pip install -r requirements.txt
+pip install -e .
 ```
+The second command installs the project as a package, making the main module importable from anywhere.
 
 ### Unittest
 
