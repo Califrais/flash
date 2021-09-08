@@ -9,10 +9,7 @@ alabaster==0.7.12
     #   -r requirements.in
     #   sphinx
 appnope==0.1.0
-    # via
-    #   -r requirements.in
-    #   ipykernel
-    #   ipython
+    # via -r requirements.in
 argon2-cffi==20.1.0
     # via
     #   -r requirements.in
@@ -269,7 +266,7 @@ pickleshare==0.7.5
     # via
     #   -r requirements.in
     #   ipython
-pillow==8.2.0
+pillow==8.3.2
     # via -r requirements.in
 pluggy==0.13.1
     # via
