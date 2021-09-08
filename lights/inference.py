@@ -38,8 +38,8 @@ class QNMCEM(Learner):
         of L1 and L2
 
     eta_sp_gp_l1: `float`, default=0.1
-        The Sparse Group l1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
-        For eta_sp_gp_l1 = 1 this is
+        The Sparse Group L1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
+        For eta_sp_gp_l1 = 1 this is Group L1
 
     max_iter : `int`, default=100
         Maximum number of iterations of the solver
@@ -694,7 +694,7 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL = self.l_pen_SGL
             prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            copt_max_iter = 50
+            copt_max_iter = 5000
             args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
@@ -716,7 +716,7 @@ class QNMCEM(Learner):
                 step=self.copt_step,
                 accelerated=self.copt_accelerate)
 
-            print(res0)
+            # print(res0)
             gamma_0 = res0.x.reshape(-1, 1)
 
             # gamma_1 update

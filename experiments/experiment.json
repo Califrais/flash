@@ -2,7 +2,7 @@
     "l_pen_EN" : 0.01,
     "l_pen_SGL" : 0.1,
     "eta_sp_gp_l1" : 1,
-    "max_iter" : 30,
+    "max_iter" : 20,
     "std_error" : 4,
-    "n_samples" : 400
+    "n_samples" : 100
 }
