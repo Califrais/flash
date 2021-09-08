@@ -3,8 +3,9 @@
     "l_pen_SGL" : 0.1,
     "eta_sp_gp_l1" : 1,
     "max_iter" : 10,
+    "max_iter_lbfgs" : 10,
+    "max_iter_proxg" : 10,
     "std_error" : 4,
     "n_samples" : 100,
-    "n_MC" : 50,
-    "max_iter_copt" : 10
+    "n_MC" : 50
 }
