@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.model_selection import KFold
-from lights.inference import QNMCEM
+from lights.inference import prox_QNMCEM
 
 
 def cross_validate(X, Y, T, delta, n_folds=10, eta=0.1,

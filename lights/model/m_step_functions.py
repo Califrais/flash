@@ -4,7 +4,7 @@ from lights.model.regularizations import ElasticNet
 
 
 class MstepFunctions:
-    """A class to define functions relative to the M-step of the QNMCEM
+    """A class to define functions relative to the M-step of the prox_QNMCEM
 
     Parameters
     ----------
@@ -42,7 +42,7 @@ class MstepFunctions:
 
     def P_pen_func(self, pi_est, xi_ext):
         """Computes the sub objective function P with penalty, to be minimized
-        at each QNMCEM iteration using fmin_l_bfgs_b.
+        at each prox_QNMCEM iteration using fmin_l_bfgs_b.
 
         Parameters
         ----------
@@ -57,7 +57,7 @@ class MstepFunctions:
         Returns
         -------
         output : `float`
-            The value of the P sub objective to be minimized at each QNMCEM step
+            The value of the P sub objective to be minimized at each prox_QNMCEM step
         """
         xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
         pen = self.ENet.pen(xi)

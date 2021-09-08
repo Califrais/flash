@@ -8,7 +8,7 @@ binding.set_option('SVML', '-vector-library=SVML')
 
 
 class EstepFunctions:
-    """A class to define functions relative to the E-step of the QNMCEM
+    """A class to define functions relative to the E-step of the prox_QNMCEM
 
     Parameters
     ----------

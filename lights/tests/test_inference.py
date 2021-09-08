@@ -2,20 +2,20 @@
 # Author: Simon Bussy <simon.bussy@gmail.com>
 
 import unittest
-from lights.inference import QNMCEM
+from lights.inference import prox_QNMCEM
 from lights.tests.test_simu import get_train_data
 
 
 class Test(unittest.TestCase):
 
-    def test_QNMCEM(self):
-        """Tests QNMCEM Algorithm
+    def test_prox_QNMCEM(self):
+        """Tests prox_QNMCEM Algorithm
         """
         X, Y, T, delta = get_train_data(20)
-        qnmcem = QNMCEM(fixed_effect_time_order=1, max_iter=10,
+        learner = prox_QNMCEM(fixed_effect_time_order=1, max_iter=10,
                         print_every=1, asso_functions='all', compute_obj=True)
-        qnmcem.fit(X, Y, T, delta)
-        C_index = qnmcem.score(X, Y, T, delta)
+        learner.fit(X, Y, T, delta)
+        C_index = learner.score(X, Y, T, delta)
         print(C_index)
 
 

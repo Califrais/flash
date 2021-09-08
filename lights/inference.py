@@ -15,8 +15,8 @@ from lights.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 
 
-class QNMCEM(Learner):
-    """QNMCEM Algorithm for the lights model inference
+class prox_QNMCEM(Learner):
+    """prox-QNMCEM Algorithm for the lights model inference
 
     Parameters
     ----------
@@ -41,8 +41,14 @@ class QNMCEM(Learner):
         The Sparse Group L1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
         For eta_sp_gp_l1 = 1 this is Group L1
 
-    max_iter : `int`, default=100
-        Maximum number of iterations of the solver
+    max_iter: `int`, default=100
+        Maximum number of iterations of the prox-QNMCEM algorithm
+
+    max_iter_lbfgs: `int`, default=50
+        Maximum number of iterations of the L-BFGS-B solver
+
+    max_iter_proxg: `int`, default=10
+        Maximum number of iterations of the proximal gradient solver
 
     verbose : `bool`, default=True
         If `True`, we verbose things, otherwise the solver does not
@@ -66,6 +72,9 @@ class QNMCEM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
+    n_MC : `int`, default=50
+        Number of Monte Carlo sample used in the E-step
+
     asso_functions : `list` or `str`='all', default='all'
         List of association functions wanted or string 'all' to select all
         defined association functions. The available functions are :
@@ -83,7 +92,7 @@ class QNMCEM(Learner):
         gradient (FISTA), otherwise we use regular ISTA
 
     compute_obj : `bool`, default=False
-        If `True`, we compute the global objective to be minimized by the QNMCEM
+        If `True`, we compute the global objective to be minimized by the prox-QNMCEM
          algorithm and store it in history
 
     copt_solver_step : function or `str`='backtracking', default='backtracking'
@@ -92,12 +101,15 @@ class QNMCEM(Learner):
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
                  eta_elastic_net=.1, eta_sp_gp_l1=.1,
-                 max_iter=100, verbose=True, print_every=10, tol=1e-5,
-                 warm_start=True, fixed_effect_time_order=5,
+                 max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
+                 verbose=True, print_every=10, tol=1e-5,
+                 warm_start=True, fixed_effect_time_order=5, n_MC=50,
                  asso_functions='all', initialize=True, copt_accelerate=False,
                  compute_obj=False, copt_solver_step='backtracking'):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
+        self.max_iter_lbfgs = max_iter_lbfgs
+        self.max_iter_proxg = max_iter_proxg
         self.tol = tol
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
@@ -109,9 +121,10 @@ class QNMCEM(Learner):
         self.l_pen_SGL = l_pen_SGL
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
+        self.n_MC = n_MC
+        self.compute_obj = compute_obj
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
-        self.compute_obj = compute_obj
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -209,7 +222,7 @@ class QNMCEM(Learner):
         return prb
 
     def _func_obj(self, pi_xi, f_mean):
-        """The global objective to be minimized by the QNMCEM algorithm
+        """The global objective to be minimized by the prox-QNMCEM algorithm
         (including penalization)
 
         Parameters
@@ -559,7 +572,7 @@ class QNMCEM(Learner):
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        N = 50  # Number of Monte Carlo sample for S
+        N = self.n_MC
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
@@ -600,9 +613,10 @@ class QNMCEM(Learner):
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
                            phi=phi, baseline_hazard=baseline_hazard)
 
-        # Stopping criteria and bounds vector for the L-BGFS-B algorithm
-        maxiter, pgtol = 30, 1e-5
+        # Stopping criteria and bounds vector for the optim algorithm
+        max_iter_lbfgs, pgtol = self.max_iter_lbfgs, self.tol
         bounds_xi = [(0, None)] * 2 * p
+        max_iter_proxg = self.max_iter_proxg
 
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(T_u, L, alpha, asso_functions, self.theta)
@@ -666,7 +680,8 @@ class QNMCEM(Learner):
                 func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_),
                 x0=xi_init,
                 fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_),
-                disp=False, bounds=bounds_xi, maxiter=maxiter, pgtol=pgtol)[0]
+                disp=False, bounds=bounds_xi, maxiter=max_iter_lbfgs,
+                pgtol=pgtol)[0]
 
             # beta update
             K = 2
@@ -693,7 +708,6 @@ class QNMCEM(Learner):
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL = self.l_pen_SGL
             prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            copt_max_iter = 5000
             args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
@@ -710,7 +724,7 @@ class QNMCEM(Learner):
 
             res0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
-                max_iter=copt_max_iter,
+                max_iter=max_iter_proxg,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
                 step=self.copt_step,
                 accelerated=self.copt_accelerate)
@@ -727,7 +741,7 @@ class QNMCEM(Learner):
                       }
             gamma_1 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
-                max_iter=copt_max_iter,
+                max_iter=max_iter_proxg,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q,
                 step=self.copt_step,
                 accelerated=self.copt_accelerate).x.reshape(-1, 1)
