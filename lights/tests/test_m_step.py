@@ -29,9 +29,8 @@ class Test(unittest.TestCase):
         if 're' in asso_functions:
             nb_asso_param += L
         _, self.ind_1, self.ind_2 = get_times_infos(T, T_u)
-        self.M_func = MstepFunctions(fit_intercept, data.X, data.T, data.delta,
-                                     L, p, l_pen, eta_elastic_net, alpha,
-                                     asso_functions)
+        self.M_func = MstepFunctions(fit_intercept, data.X, data.delta,
+                                     p, l_pen, eta_elastic_net)
         self.xi_ext = np.array([0, 2, 1, 0])
         self.pi_est = np.array([[.2, .4, .7], [.8, .6, .3]])
         self.data = data
