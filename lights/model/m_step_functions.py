@@ -85,7 +85,8 @@ class MstepFunctions:
         """
         xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
         u = xi_0 + self.X.dot(xi)
-        P = (pi_est * logistic_loss(u)).mean()
+        P = ((1 - pi_est) * logistic_loss(-u) +
+             pi_est * logistic_loss(u)).mean()
         return P
 
     def grad_P(self, pi_est, xi_ext):
@@ -113,7 +114,7 @@ class MstepFunctions:
         if fit_intercept:
             X = np.concatenate((np.ones(n_samples).reshape(1, n_samples).T, X),
                                axis=1)
-        grad = X * (pi_est * np.exp(-logistic_loss(-u))).reshape(-1, 1)
+        grad = X * (pi_est - np.exp(-logistic_loss(u))).reshape(-1, 1)
         grad = - grad.mean(axis=0)
         grad_sub_obj = np.concatenate([grad, -grad])
         return grad_sub_obj
