@@ -263,6 +263,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.fixed_effect_coeffs = None
         self.asso_coeffs = None
         self.iotas = None
+        self.G = None
         self.hawkes = []
 
     @property
@@ -357,6 +358,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         pi_xi = logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
         G = (u < pi_xi).astype(int)
+        self.G = G
 
         # Simulation of the random effects components
         r_l = 2  # Affine random effects
@@ -390,7 +392,7 @@ class SimuJointLongitudinalSurvival(Simulation):
             # number of active features in each group
             # nb_active_features = int(sparsity * nb_asso_param)
 
-            #TODO : for testing
+            #TODO : for testing only group lasso first
             nb_active_features = nb_asso_param
 
             gamma = []

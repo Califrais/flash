@@ -7,5 +7,6 @@
     "max_iter_proxg" : 10,
     "std_error" : 4,
     "n_samples" : 100,
-    "n_MC" : 50
+    "n_MC" : 50,
+    "coeff_val_asso" : 1
 }
