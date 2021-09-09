@@ -11,6 +11,7 @@ bleach==3.3.0
 certifi==2020.4.5.2
 cffi==1.14.3
 chardet==3.0.4
+click==8.0.1
 copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
 cycler==0.10.0
 decorator==4.4.2
@@ -39,6 +40,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
+-e git+ssh://git@github.com/Califrais/lights.git@4e822ea1d79a94ffc9123d17d5df3d8e109f8759#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -57,9 +59,11 @@ pandas==1.2.5
 pandocfilters==1.4.2
 parso==0.7.0
 patsy==0.5.1
+pep517==0.11.0
 pexpect==4.8.0
 pickleshare==0.7.5
 Pillow==8.2.0
+pip-tools==6.2.0
 pluggy==0.13.1
 prometheus-client==0.8.0
 prompt-toolkit==3.0.5
@@ -94,6 +98,7 @@ terminado==0.8.3
 testpath==0.4.4
 threadpoolctl==2.1.0
 toml==0.10.2
+tomli==1.2.1
 tornado==6.1
 tqdm==4.54.1
 traitlets==4.3.3
