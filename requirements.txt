@@ -9,10 +9,7 @@ alabaster==0.7.12
     #   -r requirements.in
     #   sphinx
 appnope==0.1.0
-    # via
-    #   -r requirements.in
-    #   ipykernel
-    #   ipython
+    # via -r requirements.in
 argon2-cffi==20.1.0
     # via
     #   -r requirements.in
@@ -83,7 +80,6 @@ docutils==0.16
 entrypoints==0.3
     # via
     #   -r requirements.in
-    #   jupyter-client
     #   nbconvert
 external==0.0.1
     # via -r requirements.in
@@ -151,7 +147,7 @@ jsonschema==3.2.0
     #   nbformat
 jupyter==1.0.0
     # via -r requirements.in
-jupyter-client==7.0.2
+jupyter-client==6.1.12
     # via
     #   -r requirements.in
     #   ipykernel
@@ -214,7 +210,6 @@ nbformat==5.0.7
 nest-asyncio==1.5.1
     # via
     #   -r requirements.in
-    #   jupyter-client
     #   nbclient
 notebook==6.2.0
     # via
@@ -297,7 +292,7 @@ pycparser==2.20
     # via
     #   -r requirements.in
     #   cffi
-pygments==2.6.1
+pygments==2.7.4
     # via
     #   -r requirements.in
     #   ipython
