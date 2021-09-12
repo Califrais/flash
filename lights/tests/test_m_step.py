@@ -44,16 +44,16 @@ class Test(unittest.TestCase):
         """Tests the P function
         """
         self.setUp()
-        P = self.M_func.P_func(self.pi_est[0], self.xi_ext)
-        P_ = .093
+        P = self.M_func.P_func(self.pi_est[1], self.xi_ext)
+        P_ = 1.967
         np.testing.assert_almost_equal(P, P_, 3)
 
     def test_grad_P(self):
         """Tests the gradient of P function
         """
         self.setUp()
-        grad_P = self.M_func.grad_P(self.pi_est[0], self.xi_ext)
-        grad_P_ = np.array([-.133, -.069, .133, .069])
+        grad_P = self.M_func.grad_P(self.pi_est[1], self.xi_ext)
+        grad_P_ = np.array([-.131, .793, .131, -.793])
         np.testing.assert_almost_equal(grad_P, grad_P_, 3)
 
     def test_Q_func(self):
