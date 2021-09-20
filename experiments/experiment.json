@@ -1,12 +1,12 @@
 {
-    "l_pen_EN" : 0.01,
-    "l_pen_SGL" : 0.1,
+    "l_pen_EN" : 0.02,
+    "l_pen_SGL" : 0.03,
     "eta_sp_gp_l1" : 1,
-    "max_iter" : 10,
-    "max_iter_lbfgs" : 10,
-    "max_iter_proxg" : 10,
-    "std_error" : 4,
-    "n_samples" : 100,
+    "max_iter" : 20,
+    "max_iter_lbfgs" : 50,
+    "max_iter_proxg" : 50,
+    "std_error" : 2,
+    "n_samples" : 200,
     "n_MC" : 50,
-    "coeff_val_asso" : 1
+    "coeff_val_asso" : 0.5
 }
