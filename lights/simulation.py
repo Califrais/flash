@@ -149,17 +149,21 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
-    fixed_effect_mean_low_risk : `tuple`, default=(-.6, .2)
+    fixed_effect_mean_low_risk : `tuple`, default=(-.8, .2)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the low risk group
 
-    fixed_effect_mean_high_risk : `tuple`, default=(1, .5)
+    fixed_effect_mean_high_risk : `tuple`, default=(1.5, .8)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the high risk group
 
-    corr_fixed_effect : `float`, default=0.1
+    active_corr_fixed_effect : `float`, default=0.01
         Correlation value to use in the diagonal covariance matrix for the
-        fixed effect simulation
+        fixed effect simulation of active feature
+
+    non_active_corr_fixed_effect : `float`, default=0.001
+        Correlation value to use in the diagonal covariance matrix for the
+        fixed effect simulation of non-active feature
 
     std_error : `float`, default=0.5
         Standard deviation for the error term of the longitudinal processes
@@ -231,8 +235,10 @@ class SimuJointLongitudinalSurvival(Simulation):
                  high_risk_rate: float = .4, gap: float = .5,
                  n_long_features: int = 10, cov_corr_long: float = .001,
                  fixed_effect_mean_low_risk: tuple = (-.8, .2),
-                 fixed_effect_mean_high_risk: tuple = (2., 1.),
-                 corr_fixed_effect: float = .01, std_error: float = .5,
+                 fixed_effect_mean_high_risk: tuple = (1.5, .8),
+                 active_corr_fixed_effect: float = .01,
+                 non_active_corr_fixed_effect: float = .001,
+                 std_error: float = .5,
                  shape: float = .1, scale: float = .001,
                  censoring_factor: float = 2):
         Simulation.__init__(self, seed=seed, verbose=verbose)
@@ -249,7 +255,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.cov_corr_long = cov_corr_long
         self.fixed_effect_mean_low_risk = fixed_effect_mean_low_risk
         self.fixed_effect_mean_high_risk = fixed_effect_mean_high_risk
-        self.corr_fixed_effect = corr_fixed_effect
+        self.active_corr_fixed_effect = active_corr_fixed_effect
+        self.non_active_corr_fixed_effect = non_active_corr_fixed_effect
         self.std_error = std_error
         self.shape = shape
         self.scale = scale
@@ -327,7 +334,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         cov_corr_long = self.cov_corr_long
         fixed_effect_mean_low_risk = self.fixed_effect_mean_low_risk
         fixed_effect_mean_high_risk = self.fixed_effect_mean_high_risk
-        corr_fixed_effect = self.corr_fixed_effect
+        active_corr_fixed_effect = self.active_corr_fixed_effect
+        non_active_corr_fixed_effect = self.non_active_corr_fixed_effect
         std_error = self.std_error
         shape = self.shape
         scale = self.scale
@@ -366,22 +374,13 @@ class SimuJointLongitudinalSurvival(Simulation):
         b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
         self.long_cov = D
 
-        # Simulation of the fixed effect parameters
-        q = 2 * n_long_features  # linear time-varying features, so all q_l=2
-        mean_0 = fixed_effect_mean_low_risk * n_long_features
-        beta_0 = np.random.multivariate_normal(mean_0, np.diag(
-            corr_fixed_effect * np.ones(q)))
-        mean_1 = fixed_effect_mean_high_risk * n_long_features
-        beta_1 = np.random.multivariate_normal(mean_1, np.diag(
-            corr_fixed_effect * np.ones(q)))
-        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
-                                    beta_1.reshape(-1, 1)]
-
-        # Simulation of the association parameters
+        # Simulation of the fixed effect and association parameters
         nb_asso_param = 4
         nb_asso_features = n_long_features * nb_asso_param
+        fixed_effect_mean = [fixed_effect_mean_low_risk,
+                             fixed_effect_mean_high_risk]
 
-        def simu_sparse_asso_features():
+        def simu_sparse_params():
 
             K = 2
             nb_nonactive_group = n_long_features - int(sparsity * n_long_features)
@@ -396,17 +395,28 @@ class SimuJointLongitudinalSurvival(Simulation):
             nb_active_features = nb_asso_param
 
             gamma = []
+            beta = []
+            q_l = 2
             for k in range(K):
                 gamma_k = np.zeros(nb_asso_features)
+                beta_k = np.zeros(2 * n_long_features)
                 for l in range(n_long_features):
                     if l not in S_k[k]:
                         gamma_k[nb_asso_param * l:
                           nb_asso_param * l + nb_active_features] = coeff_val_asso
+                        mean_beta_k_l = fixed_effect_mean[k]
+                        cov_beta_k_l = np.diag(active_corr_fixed_effect * np.ones(q_l))
+                    else:
+                        mean_beta_k_l = np.zeros(q_l)
+                        cov_beta_k_l = np.diag(non_active_corr_fixed_effect * np.ones(q_l))
+                    beta_k[q_l * l: q_l * (l + 1)] = \
+                        np.random.multivariate_normal(mean_beta_k_l, cov_beta_k_l)
                 gamma.append(gamma_k)
-            return gamma
-
-        gamma_0, gamma_1 = simu_sparse_asso_features()
+                beta.append(beta_k)
+            return gamma, beta
+        [gamma_0, gamma_1], [beta_0, beta_1] = simu_sparse_params()
         self.asso_coeffs = [gamma_0, gamma_1]
+        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1), beta_1.reshape(-1, 1)]
 
         # Simulation of true times
         idx_2 = np.arange(0, nb_asso_features, 2)
