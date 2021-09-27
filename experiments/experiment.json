@@ -8,5 +8,7 @@
     "std_error" : 2,
     "n_samples" : 200,
     "n_MC" : 50,
-    "coeff_val_asso" : 0.2
+    "coeff_val_asso" : 0.2,
+    "fixed_effect_mean_low_risk" : [-0.8, 0.2],
+    "fixed_effect_mean_high_risk" : [1.5, 0.8]
 }
