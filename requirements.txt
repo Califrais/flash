@@ -59,7 +59,11 @@ chardet==3.0.4
     # via
     #   -r requirements.in
     #   requests
-git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
+click==8.0.1
+    # via
+    #   -r requirements.in
+    #   pip-tools
+copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
     # via -r requirements.in
 cycler==0.10.0
     # via
@@ -259,6 +263,10 @@ patsy==0.5.1
     # via
     #   -r requirements.in
     #   statsmodels
+pep517==0.11.0
+    # via
+    #   -r requirements.in
+    #   pip-tools
 pexpect==4.8.0
     # via
     #   -r requirements.in
@@ -267,7 +275,9 @@ pickleshare==0.7.5
     # via
     #   -r requirements.in
     #   ipython
-pillow==8.2.0
+pillow==8.3.2
+    # via -r requirements.in
+pip-tools==6.3.0
     # via -r requirements.in
 pluggy==0.13.1
     # via
@@ -427,6 +437,10 @@ toml==0.10.2
     # via
     #   -r requirements.in
     #   pytest
+tomli==1.2.1
+    # via
+    #   -r requirements.in
+    #   pep517
 tornado==6.1
     # via
     #   -r requirements.in
@@ -464,6 +478,8 @@ webencodings==0.5.1
     # via
     #   -r requirements.in
     #   bleach
+wheel==0.37.0
+    # via pip-tools
 widgetsnbextension==3.5.1
     # via
     #   -r requirements.in
@@ -474,4 +490,5 @@ zipp==3.4.1
     #   importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:
+# pip
 # setuptools
