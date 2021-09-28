@@ -137,7 +137,7 @@ jedi==0.17.0
     # via
     #   -r requirements.in
     #   ipython
-jinja2==2.11.2
+jinja2==2.11.3
     # via
     #   -r requirements.in
     #   nbconvert
@@ -218,7 +218,7 @@ nest-asyncio==1.5.1
     # via
     #   -r requirements.in
     #   nbclient
-notebook==6.2.0
+notebook==6.4.1
     # via
     #   -r requirements.in
     #   jupyter
@@ -305,7 +305,7 @@ pycparser==2.20
     # via
     #   -r requirements.in
     #   cffi
-pygments==2.6.1
+pygments==2.7.4
     # via
     #   -r requirements.in
     #   ipython
