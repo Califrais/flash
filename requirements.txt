@@ -9,10 +9,7 @@ alabaster==0.7.12
     #   -r requirements.in
     #   sphinx
 appnope==0.1.0
-    # via
-    #   -r requirements.in
-    #   ipykernel
-    #   ipython
+    # via -r requirements.in
 argon2-cffi==20.1.0
     # via
     #   -r requirements.in
@@ -63,7 +60,7 @@ click==8.0.1
     # via
     #   -r requirements.in
     #   pip-tools
-copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
+git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
     # via -r requirements.in
 cycler==0.10.0
     # via
@@ -218,7 +215,7 @@ nest-asyncio==1.5.1
     # via
     #   -r requirements.in
     #   nbclient
-notebook==6.2.0
+notebook==6.4.1
     # via
     #   -r requirements.in
     #   jupyter
