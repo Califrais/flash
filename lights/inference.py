@@ -606,7 +606,10 @@ class prox_QNMCEM(Learner):
         D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
-        gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
+        #TODO: hardcode for testing
+        sparsity = .7
+        nb_rnd_param = L * int((nb_asso_param) * (1 - sparsity) / sparsity)
+        gamma_0 = 1e-4 * np.ones((L * nb_asso_param + nb_rnd_param, 1))
         gamma_1 = gamma_0.copy()
 
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,

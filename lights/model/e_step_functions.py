@@ -60,10 +60,16 @@ class EstepFunctions:
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
         self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
               self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
-        shape = self.asso_funcs.shape
-        reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, shape[-1]))
+        asso_funcs_shape = self.asso_funcs.shape
+        reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, asso_funcs_shape[-1]))
+        nb_rnd_param = self.theta["gamma_0"].shape[0] - asso_funcs_shape[-1]
+        # TODO: hardcode
+        var_rnd_param = .01
+        rnd_asso = np.random.normal(0, var_rnd_param,
+                                    size=(reshaped_asso_funcs.shape[0], nb_rnd_param))
+        reshaped_asso_funcs = np.hstack((reshaped_asso_funcs, rnd_asso))
         self.asso_funcs = StandardScaler().fit_transform(
-            reshaped_asso_funcs).reshape(shape)
+            reshaped_asso_funcs).reshape((asso_funcs_shape[:-1] + (-1,)))
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation

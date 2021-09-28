@@ -1,8 +1,8 @@
 {
     "l_pen_EN" : 0.02,
-    "l_pen_SGL" : 0.05,
-    "eta_sp_gp_l1" : 1,
-    "max_iter" : 10,
+    "l_pen_SGL" : 0.1,
+    "eta_sp_gp_l1" : 0.5,
+    "max_iter" : 20,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 50,
     "std_error" : 2,
