@@ -1,7 +1,7 @@
 {
     "l_pen_EN" : 0.02,
-    "l_pen_SGL" : 0.1,
-    "eta_sp_gp_l1" : 0.5,
+    "l_pen_SGL" : 0.05,
+    "eta_sp_gp_l1" : 0.9,
     "max_iter" : 20,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 50,
@@ -10,5 +10,6 @@
     "n_MC" : 50,
     "coeff_val_asso" : 0.2,
     "fixed_effect_mean_low_risk" : [-0.8, 0.2],
-    "fixed_effect_mean_high_risk" : [1.5, 0.8]
+    "fixed_effect_mean_high_risk" : [1.5, 0.8],
+    "std_rnd_param" : 0.1
 }

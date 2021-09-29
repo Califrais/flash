@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
+import matplotlib.pyplot as plt
 
 
 class EstepFunctions:
@@ -47,7 +48,7 @@ class EstepFunctions:
                                                 T_u, alpha, L).get_asso_feat()
         self.asso_funcs = None
 
-    def compute_AssociationFunctions(self, S):
+    def compute_AssociationFunctions(self, S, std_rnd_param):
         """
         Compute the value of association functions
 
@@ -56,20 +57,31 @@ class EstepFunctions:
         S : `np.ndarray`, shape=(N_MC, r)
             Set of constructed Monte Carlo samples, with N_MC = 2 * N
 
+        std_rnd_param : `int`
+            Standard deviation for random association
+
         """
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
         self.asso_funcs = (self.F_f.dot(beta.T)[:, :, :, None] +
               self.F_r.dot(S.T)[:, :, None, :]).swapaxes(1, 3)
-        asso_funcs_shape = self.asso_funcs.shape
-        reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, asso_funcs_shape[-1]))
-        nb_rnd_param = self.theta["gamma_0"].shape[0] - asso_funcs_shape[-1]
+        origin_shape = self.asso_funcs.shape
+        reshaped_asso_funcs = self.asso_funcs.copy().reshape((-1, origin_shape[-1]))
+        self.asso_funcs = StandardScaler().fit_transform(reshaped_asso_funcs)\
+            .reshape(origin_shape)
+
         # TODO: hardcode
-        var_rnd_param = .01
-        rnd_asso = np.random.normal(0, var_rnd_param,
-                                    size=(reshaped_asso_funcs.shape[0], nb_rnd_param))
-        reshaped_asso_funcs = np.hstack((reshaped_asso_funcs, rnd_asso))
-        self.asso_funcs = StandardScaler().fit_transform(
-            reshaped_asso_funcs).reshape((asso_funcs_shape[:-1] + (-1,)))
+        # just for test
+        L = self.n_long_features
+        tmp_shape = reshaped_asso_funcs.shape
+        nb_asso_param = tmp_shape[1] // L
+        nb_rnd_param = (self.theta["gamma_0"].shape[0] - origin_shape[-1]) // L
+        tmp = np.zeros((tmp_shape[0], L, (nb_asso_param + nb_rnd_param)))
+        reshaped_asso = self.asso_funcs.reshape((-1, L, nb_asso_param))
+        for l in range(self.n_long_features):
+            rnd_asso = np.random.normal(0, std_rnd_param,
+                                        size=(tmp_shape[0], nb_rnd_param))
+            tmp[:, l] = np.hstack((reshaped_asso[:, l], rnd_asso))
+        self.asso_funcs = tmp.reshape((origin_shape[:-1] + (-1,)))
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
