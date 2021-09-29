@@ -40,6 +40,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
+-e git+https://github.com/Califrais/lights.git@2055b1749d526cdb8fd5dd0b2e78ef96e8955620#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -96,6 +97,7 @@ statsmodels==0.12.2
 terminado==0.8.3
 testpath==0.4.4
 threadpoolctl==2.1.0
+tick==0.7.0.1
 toml==0.10.2
 tomli==1.2.1
 tornado==6.1

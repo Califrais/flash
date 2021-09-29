@@ -4,6 +4,8 @@
 #
 #    pip-compile requirements.in
 #
+-e git+https://github.com/Califrais/lights.git@2055b1749d526cdb8fd5dd0b2e78ef96e8955620#egg=lights
+    # via -r requirements.in
 alabaster==0.7.12
     # via
     #   -r requirements.in
@@ -79,7 +81,9 @@ defusedxml==0.6.0
     #   -r requirements.in
     #   nbconvert
 dill==0.3.1.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   tick
 docutils==0.16
     # via
     #   -r requirements.in
@@ -194,6 +198,7 @@ matplotlib==3.2.1
     # via
     #   -r requirements.in
     #   lifelines
+    #   tick
 matplotlib-inline==0.1.2
     # via -r requirements.in
 mistune==0.8.4
@@ -238,8 +243,11 @@ numpy==1.21.0
     #   scikit-learn
     #   scipy
     #   statsmodels
+    #   tick
 numpydoc==1.0.0
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   tick
 packaging==20.4
     # via
     #   -r requirements.in
@@ -251,6 +259,7 @@ pandas==1.2.5
     #   -r requirements.in
     #   lifelines
     #   statsmodels
+    #   tick
 pandocfilters==1.4.2
     # via
     #   -r requirements.in
@@ -358,6 +367,7 @@ scikit-learn==0.24.2
     # via
     #   -r requirements.in
     #   sklearn
+    #   tick
 scipy==1.7.0
     # via
     #   -r requirements.in
@@ -366,6 +376,7 @@ scipy==1.7.0
     #   lifelines
     #   scikit-learn
     #   statsmodels
+    #   tick
 send2trash==1.5.0
     # via
     #   -r requirements.in
@@ -395,6 +406,7 @@ sphinx==3.1.0
     # via
     #   -r requirements.in
     #   numpydoc
+    #   tick
 sphinxcontrib-applehelp==1.0.2
     # via
     #   -r requirements.in
@@ -433,6 +445,8 @@ threadpoolctl==2.1.0
     # via
     #   -r requirements.in
     #   scikit-learn
+tick==0.7.0.1
+    # via -r requirements.in
 toml==0.10.2
     # via
     #   -r requirements.in
