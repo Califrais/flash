@@ -64,28 +64,27 @@ class AssociationFunctionFeatures:
 
         Returns
         -------
-        fixed_feat : `np.ndarray`, shape=(J, A*r, q)
+        fixed_feat : `np.ndarray`, shape=(J, A, q_l)
             Feature corresponding to fixed effects
 
-        rand_feat : `np.ndarray`, shape=(J, A*r, r)
+        rand_feat : `np.ndarray`, shape=(J, A, r_l)
             Feature corresponding to random effects
         """
         L = self.n_long_features
         q_l, r_l = self.q_l, 2
-        r, q = L * r_l, L * q_l
         J = self.J
         asso_functions = self.asso_functions
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
             nb_asso_param += 1
-        fixed_feat = np.zeros(shape=(J, nb_asso_param * L, q))
-        rand_feat = np.zeros(shape=(J, nb_asso_param * L, r))
+        fixed_feat = np.zeros(shape=(J, nb_asso_param, q_l))
+        rand_feat = np.zeros(shape=(J, nb_asso_param, r_l))
         for j in range(J):
             tmp_U = np.array([]).reshape(0, q_l)
             tmp_V = np.array([]).reshape(0, r_l)
             for asso_function in asso_functions:
                 tmp_U = np.vstack((tmp_U, self.fixed_feat[asso_function][j]))
                 tmp_V = np.vstack((tmp_V, self.rand_feat[asso_function][j]))
-            fixed_feat[j] = block_diag((tmp_U,) * L)
-            rand_feat[j] = block_diag((tmp_V,) * L)
+            fixed_feat[j] = tmp_U
+            rand_feat[j] = tmp_V
         return fixed_feat, rand_feat

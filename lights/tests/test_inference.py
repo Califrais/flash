@@ -11,10 +11,10 @@ class Test(unittest.TestCase):
     def test_prox_QNMCEM(self):
         """Tests prox_QNMCEM Algorithm
         """
-        X, Y, T, delta = get_train_data(20)
+        X, Y, T, delta, S_k = get_train_data(20)
         learner = prox_QNMCEM(fixed_effect_time_order=1, max_iter=10,
                         print_every=1, asso_functions='all', compute_obj=True)
-        learner.fit(X, Y, T, delta)
+        learner.fit(X, Y, T, delta, S_k)
         C_index = learner.score(X, Y, T, delta)
         print(C_index)
 

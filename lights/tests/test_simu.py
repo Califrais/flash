@@ -29,12 +29,15 @@ def get_train_data(n_samples: int = 100):
 
     delta : `np.ndarray`, shape=(n_samples,)
         The simulated censoring indicator
+
+    S_k : `list`
+        Set of nonactive group for 2 classes
     """
     simu = SimuJointLongitudinalSurvival(n_samples=n_samples,
                                          n_time_indep_features=5,
                                          n_long_features=3, seed=123)
-    X, Y, T, delta = simu.simulate()
-    return X, Y, T, delta
+    X, Y, T, delta, S_k = simu.simulate()
+    return X, Y, T, delta, S_k
 
 
 class Test(unittest.TestCase):

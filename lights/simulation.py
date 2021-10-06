@@ -334,6 +334,10 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         delta : `np.ndarray`, shape=(n_samples,)
             The simulated censoring indicator
+
+        S_k : `list`
+            Set of nonactive group for 2 classes
+
         """
         seed = self.seed
         n_samples = self.n_samples
@@ -541,4 +545,4 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.latent_class = G
         self.N_il = N_il
 
-        return X, Y, np.ceil(T), delta
+        return X, Y, np.ceil(T), delta, S_k

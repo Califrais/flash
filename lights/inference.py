@@ -98,8 +98,9 @@ class prox_QNMCEM(Learner):
     copt_solver_step : function or `str`='backtracking', default='backtracking'
         Step size for optimization algorithm used in Copt colver
 
-    std_rnd_param : `int
-            Standard deviation for random association
+    simu : `bool`, defaut=True
+        If `True` we do the inference with simulated data.
+
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
@@ -108,8 +109,7 @@ class prox_QNMCEM(Learner):
                  verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5, n_MC=50,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj=False, copt_solver_step='backtracking',
-                 std_rnd_param=.1 ):
+                 compute_obj=False, copt_solver_step='backtracking', simu=True):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -129,7 +129,7 @@ class prox_QNMCEM(Learner):
         self.compute_obj = compute_obj
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
-        self.std_rnd_param = std_rnd_param
+        self.simu = simu
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -465,7 +465,7 @@ class prox_QNMCEM(Learner):
         E_func = EstepFunctions(T_u, L, alpha, self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        E_func.compute_AssociationFunctions(S, self.std_rnd_param)
+        E_func.compute_AssociationFunctions(S, self.simu, self.S_k)
         g4 = E_func.g4(gamma_0, gamma_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g4.swapaxes(1, 2) * baseline_val
@@ -535,7 +535,7 @@ class prox_QNMCEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta):
+    def fit(self, X, Y, T, delta, S_k=None):
         """Fits the lights model
 
         Parameters
@@ -552,6 +552,10 @@ class prox_QNMCEM(Learner):
 
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
+
+        S_k : `list`
+            Set of nonactive group for 2 classes (will be useful in case of
+            simulated data)
         """
         self._start_solve()
         verbose = self.verbose
@@ -563,6 +567,7 @@ class prox_QNMCEM(Learner):
         alpha = self.fixed_effect_time_order
         n_samples, p = X.shape
         L = Y.shape[1]
+        self.S_k = S_k
         self.n_samples = n_samples
         self.n_time_indep_features = p
         self.n_long_features = L
@@ -571,8 +576,11 @@ class prox_QNMCEM(Learner):
         if fit_intercept:
             p += 1
 
-        if self.asso_functions == 'all':
+        if self.simu:
+            self.asso_functions = ['lp', 're', 'tps']
+        elif self.asso_functions == 'all':
             self.asso_functions = ['lp', 're', 'tps', 'ce']
+
         asso_functions = self.asso_functions
         nb_asso_param = len(asso_functions)
         if 're' in asso_functions:
@@ -607,16 +615,20 @@ class prox_QNMCEM(Learner):
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         #TODO: just for testing, remove later
-        phi = np.array([16, 16, 16]).reshape(-1, 1)
+        phi = 16 * np.ones(L).reshape(-1, 1)
         D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
-        #TODO: hardcode for testing
-        sparsity = .7
-        nb_rnd_param = int((nb_asso_param) * (1 - sparsity) / sparsity)
-        gamma_0 = 1e-4 * np.ones((L * (nb_asso_param + nb_rnd_param), 1))
+        if self.simu:
+            #TODO: hardcode for testing
+            sparsity = .5
+            nb_noise_asso_param = np.ceil((nb_asso_param) * (1 - sparsity)
+                                          / sparsity).astype(int)
+            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param
+                                           + nb_noise_asso_param), 1))
+        else:
+            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param), 1))
         gamma_1 = gamma_0.copy()
-
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
                            phi=phi, baseline_hazard=baseline_hazard)
@@ -721,7 +733,7 @@ class prox_QNMCEM(Learner):
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
                         "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
-            E_func.compute_AssociationFunctions(S, self.std_rnd_param)
+            E_func.compute_AssociationFunctions(S, self.simu, self.S_k)
             gamma_0_prev = gamma_0.copy()
             args_0 = {"group": 0,
                       "E_g3": E_g3(),
