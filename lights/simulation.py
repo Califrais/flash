@@ -159,13 +159,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the high risk group
 
-    active_corr_fixed_effect : `float`, default=0.01
+    corr_fixed_effect : `float`, default=0.01
         Correlation value to use in the diagonal covariance matrix for the
-        fixed effect simulation of active feature
-
-    non_active_corr_fixed_effect : `float`, default=0.001
-        Correlation value to use in the diagonal covariance matrix for the
-        fixed effect simulation of non-active feature
+        fixed effect simulated feature
 
     std_error : `float`, default=0.5
         Standard deviation for the error term of the longitudinal processes
@@ -250,8 +246,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  n_long_features: int = 10, cov_corr_long: float = .01,
                  fixed_effect_mean_low_risk: tuple = (-.8, .2),
                  fixed_effect_mean_high_risk: tuple = (1.5, .8),
-                 active_corr_fixed_effect: float = .01,
-                 non_active_corr_fixed_effect: float = .001,
+                 corr_fixed_effect: float = .01,
                  std_error: float = .5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
@@ -271,8 +266,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.cov_corr_long = cov_corr_long
         self.fixed_effect_mean_low_risk = fixed_effect_mean_low_risk
         self.fixed_effect_mean_high_risk = fixed_effect_mean_high_risk
-        self.active_corr_fixed_effect = active_corr_fixed_effect
-        self.non_active_corr_fixed_effect = non_active_corr_fixed_effect
+        self.corr_fixed_effect = corr_fixed_effect
         self.std_error = std_error
         self.decay = decay
         self.baseline_hawkes_uniform_bounds = baseline_hawkes_uniform_bounds
@@ -354,8 +348,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         cov_corr_long = self.cov_corr_long
         fixed_effect_mean_low_risk = self.fixed_effect_mean_low_risk
         fixed_effect_mean_high_risk = self.fixed_effect_mean_high_risk
-        active_corr_fixed_effect = self.active_corr_fixed_effect
-        non_active_corr_fixed_effect = self.non_active_corr_fixed_effect
+        corr_fixed_effect = self.corr_fixed_effect
         std_error = self.std_error
         decay = self.decay
         baseline_hawkes_uniform_bounds = self.baseline_hawkes_uniform_bounds
@@ -396,6 +389,17 @@ class SimuJointLongitudinalSurvival(Simulation):
         r = r_l * n_long_features
         b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
         self.long_cov = D
+
+        # Simulation of the fixed effect parameters
+        q = 2 * n_long_features  # linear time-varying features, so all q_l=2
+        mean_0 = fixed_effect_mean_low_risk * n_long_features
+        beta_0 = np.random.multivariate_normal(mean_0, np.diag(
+            corr_fixed_effect * np.ones(q)))
+        mean_1 = fixed_effect_mean_high_risk * n_long_features
+        beta_1 = np.random.multivariate_normal(mean_1, np.diag(
+            corr_fixed_effect * np.ones(q)))
+        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
+                                    beta_1.reshape(-1, 1)]
 
         # Simulation of the fixed effect and association parameters
         nb_asso_param = 4
