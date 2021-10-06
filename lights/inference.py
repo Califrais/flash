@@ -428,14 +428,11 @@ class prox_QNMCEM(Learner):
 
         return log_lik
 
-    def f_data_given_latent(self, X, extracted_features, T, T_u, delta, S):
+    def f_data_given_latent(self, extracted_features, T, T_u, delta, S):
         """Estimates the data density given latent variables
 
         Parameters
         ----------
-        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
-            The time-independent features matrix
-
         extracted_features :  `tuple, tuple`,
             The extracted features from longitudinal data.
             Each tuple is a combination of fixed-effect design features,
@@ -514,7 +511,7 @@ class prox_QNMCEM(Learner):
             # predictions for alive subjects only
             delta_prediction = np.zeros(n_samples)
             T_u = self.T_u
-            f = self.f_data_given_latent(X, ext_feat, prediction_times, T_u,
+            f = self.f_data_given_latent(ext_feat, prediction_times, T_u,
                                          delta_prediction, self.S)
             pi_xi = self._get_proba(X)
             marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
@@ -644,7 +641,7 @@ class prox_QNMCEM(Learner):
                                 self.eta_elastic_net)
 
         S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(X, ext_feat, T, self.T_u, delta, S)
+        f = self.f_data_given_latent(ext_feat, T, self.T_u, delta, S)
         Lambda_1 = E_func.Lambda_g(np.ones(shape=(2 * N)), f)
         pi_xi = self._get_proba(X)
 
@@ -749,7 +746,6 @@ class prox_QNMCEM(Learner):
                 step=self.copt_step,
                 accelerated=self.copt_accelerate)
 
-            # print(res0)
             gamma_0 = res0.x.reshape(-1, 1)
 
             # gamma_1 update
@@ -801,7 +797,7 @@ class prox_QNMCEM(Learner):
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
             S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(X, ext_feat, T, T_u, delta, S)
+            f = self.f_data_given_latent(ext_feat, T, T_u, delta, S)
 
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             prev_theta = self.theta.copy()
