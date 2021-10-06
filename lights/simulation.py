@@ -404,44 +404,40 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the fixed effect and association parameters
         nb_asso_param = 4
         nb_asso_features = n_long_features * nb_asso_param
-        fixed_effect_mean = [fixed_effect_mean_low_risk,
-                             fixed_effect_mean_high_risk]
+        nb_noise_asso_param = np.ceil((1 - sparsity) * nb_asso_param
+                                      / sparsity).astype(int)
+        nb_noise_asso_features = n_long_features * nb_noise_asso_param
+        nb_total_asso_param = nb_asso_param + nb_noise_asso_param
+        nb_total_asso_features = n_long_features * nb_total_asso_param
 
         def simu_sparse_params():
 
             K = 2
             nb_nonactive_group = n_long_features - int(sparsity * n_long_features)
 
-            # set of nonactive group for 2 classes
-            S_k = np.array_split(np.random.choice(n_long_features,
-                                K * nb_nonactive_group, replace=False), K)
-            # number of active features in each group
-            # nb_active_features = int(sparsity * nb_asso_param)
-
-            #TODO : for testing only group lasso first
-            nb_active_features = nb_asso_param
-
             gamma = []
-            beta = []
-            q_l = 2
+            gamma_wo_noise = []
+            S_k = []
             for k in range(K):
-                gamma_k = np.zeros(nb_asso_features)
-                beta_k = np.zeros(2 * n_long_features)
+                # set of nonactive group
+                S_k.append(np.random.choice(n_long_features, nb_nonactive_group,
+                                                      replace=False))
+                # gamma vector without the noise coefficient
+                gamma_k_wo_noise = np.zeros(nb_asso_features)
+                # gamma vector with the noise coefficient
+                gamma_k = np.zeros(nb_total_asso_features)
                 for l in range(n_long_features):
                     if l not in S_k[k]:
-                        gamma_k[nb_asso_param * l:
-                          nb_asso_param * l + nb_active_features] = coeff_val_asso
-                        mean_beta_k_l = fixed_effect_mean[k]
-                        cov_beta_k_l = np.diag(active_corr_fixed_effect * np.ones(q_l))
-                    else:
-                        mean_beta_k_l = np.zeros(q_l)
-                        cov_beta_k_l = np.diag(non_active_corr_fixed_effect * np.ones(q_l))
-                    beta_k[q_l * l: q_l * (l + 1)] = \
-                        np.random.multivariate_normal(mean_beta_k_l, cov_beta_k_l)
+                        start_idx = nb_asso_param * l
+                        stop_idx = nb_asso_param * (l + 1)
+                        gamma_k_wo_noise[start_idx : stop_idx] = coeff_val_asso
+                        start_idx = nb_total_asso_param * l
+                        stop_idx = nb_total_asso_param * l + nb_asso_param
+                        gamma_k[start_idx : stop_idx] = coeff_val_asso
                 gamma.append(gamma_k)
-                beta.append(beta_k)
-            return gamma, beta
-        [gamma_0, gamma_1], [beta_0, beta_1] = simu_sparse_params()
+                gamma_wo_noise.append(gamma_k_wo_noise)
+            return gamma_wo_noise, gamma, S_k
+        [gamma_0_wo_noise, gamma_1_wo_noise], [gamma_0, gamma_1], S_k = simu_sparse_params()
         self.asso_coeffs = [gamma_0, gamma_1]
         self.fixed_effect_coeffs = [beta_0.reshape(-1, 1), beta_1.reshape(-1, 1)]
 
@@ -453,15 +449,17 @@ class SimuJointLongitudinalSurvival(Simulation):
         idx_34.sort()
         idx_3 = np.arange(0, 2 * n_long_features, 2) + 1
 
-        tmp_0 = np.add.reduceat(gamma_0, idx_2)
-        tmp_1 = np.add.reduceat(gamma_1, idx_2)
+        tmp_0 = np.add.reduceat(gamma_0_wo_noise, idx_2)
+        tmp_1 = np.add.reduceat(gamma_1_wo_noise, idx_2)
 
         iota_01 = b[G == 0].dot(tmp_0)
-        iota_01 += gamma_0[idx_34].dot(beta_0)
-        iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(gamma_0[idx_4])
+        iota_01 += gamma_0_wo_noise[idx_34].dot(beta_0)
+        iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(
+            gamma_0_wo_noise[idx_4])
         iota_11 = b[G == 1].dot(tmp_1)
-        iota_11 += gamma_1[idx_34].dot(beta_1)
-        iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(gamma_1[idx_4])
+        iota_11 += gamma_1_wo_noise[idx_34].dot(beta_1)
+        iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(
+            gamma_1_wo_noise[idx_4])
         self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
 
         T_star = np.zeros(n_samples)
