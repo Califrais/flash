@@ -90,10 +90,14 @@ class EstepFunctions:
                     stop_idx = nb_total_asso_param * l + nb_asso_param
                     if l not in S_k[k]:
                         tmp = (self.F_f.dot(beta[k, r_l * l : r_l * (l + 1)]).T +
-                        self.F_r.dot(S[:, q_l * l : q_l * (l + 1)].T).T).T
+                        self.F_r.dot(S[:, q_l * l : q_l * (l + 1)].T).T).T.swapaxes(1, -1)
                         shape = tmp.shape
                         tmp_reshaped = tmp.reshape(-1, shape[-1])
-                        self.asso_funcs[:, start_idx: stop_idx, k] = StandardScaler().fit_transform(tmp_reshaped).reshape(shape)
+                        scaler = StandardScaler()
+                        self.asso_funcs[:, start_idx: stop_idx, k] = \
+                        scaler.fit_transform(tmp_reshaped).reshape(shape)\
+                            .swapaxes(1, -1)
+
                     else:
                         self.asso_funcs[:, start_idx : stop_idx, k] = \
                         features_normal_cov_toeplitz(J * N_MC, nb_asso_param,
