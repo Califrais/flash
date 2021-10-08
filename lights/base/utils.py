@@ -264,3 +264,28 @@ def visualize_vect_learning(learner, name, symbol = None, true_coeffs = None,
 
     fig.tight_layout()
     plt.show()
+
+def visualize_vect_per_group(vector, n_groups, ax):
+    """
+
+    Parameters
+    ----------
+    vector : `np.ndarray`
+        The visualized vector
+
+    n_groups : `int`
+        Number of group
+    ax : `matplotlib.axes.Axes`, default=None
+        Axe instance to which the graph is plotted.
+
+    """
+    n_coeffs_cum = 0
+    n_coeffs = len(vector) // n_groups
+    for l in range(n_groups - 1):
+        label = ''
+        if l == 0:
+            label = r'l-features'
+        ax.axvline(n_coeffs_cum + n_coeffs - .4, c='m', ls='--',
+                   alpha=.8, lw=1, label=label)
+        n_coeffs_cum += n_coeffs
+        ax.legend()
