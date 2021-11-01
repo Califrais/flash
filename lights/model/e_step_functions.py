@@ -5,7 +5,6 @@ from sklearn.preprocessing import StandardScaler
 import numba as nb
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-import matplotlib.pyplot as plt
 from lights.simulation import features_normal_cov_toeplitz
 
 
