@@ -241,7 +241,9 @@ class SimuJointLongitudinalSurvival(Simulation):
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
                  sparsity: float = .7, coeff_val_time_indep: float = 1.,
-                 coeff_val_asso: float = .1, cov_corr_time_indep: float = .5,
+                 coeff_val_asso_low_risk: float = .1,
+                 coeff_val_asso_high_risk: float = .1,
+                 cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5,
                  n_long_features: int = 10, cov_corr_long: float = .001,
                  fixed_effect_mean_low_risk: tuple = (-.8, .2),
@@ -250,15 +252,17 @@ class SimuJointLongitudinalSurvival(Simulation):
                  std_error: float = .5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
-                 shape: float = .1, scale: float = .001,
+                 shape: float = .05, scale: float = 0.01,
                  censoring_factor: float = 2):
+        # shape: float = .05, scale: float = 0.1,
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
         self.n_time_indep_features = n_time_indep_features
         self.sparsity = sparsity
         self.coeff_val_time_indep = coeff_val_time_indep
-        self.coeff_val_asso = coeff_val_asso
+        self.coeff_val_asso_low_risk = coeff_val_asso_low_risk
+        self.coeff_val_asso_high_risk = coeff_val_asso_high_risk
         self.cov_corr_time_indep = cov_corr_time_indep
         self.high_risk_rate = high_risk_rate
         self.gap = gap
@@ -344,7 +348,8 @@ class SimuJointLongitudinalSurvival(Simulation):
         n_time_indep_features = self.n_time_indep_features
         sparsity = self.sparsity
         coeff_val_time_indep = self.coeff_val_time_indep
-        coeff_val_asso = self.coeff_val_asso
+        coeff_val_asso_low_risk = self.coeff_val_asso_low_risk
+        coeff_val_asso_high_risk = self.coeff_val_asso_high_risk
         cov_corr_time_indep = self.cov_corr_time_indep
         high_risk_rate = self.high_risk_rate
         gap = self.gap
@@ -422,6 +427,7 @@ class SimuJointLongitudinalSurvival(Simulation):
             gamma = []
             gamma_wo_noise = []
             S_k = []
+            coeff_val_asso = [coeff_val_asso_low_risk, coeff_val_asso_high_risk]
             for k in range(K):
                 # set of nonactive group
                 S_k.append(np.random.choice(n_long_features, nb_nonactive_group,
@@ -434,10 +440,10 @@ class SimuJointLongitudinalSurvival(Simulation):
                     if l not in S_k[k]:
                         start_idx = nb_asso_param * l
                         stop_idx = nb_asso_param * (l + 1)
-                        gamma_k_wo_noise[start_idx : stop_idx] = coeff_val_asso
+                        gamma_k_wo_noise[start_idx : stop_idx] = coeff_val_asso[k]
                         start_idx = nb_total_asso_param * l
                         stop_idx = nb_total_asso_param * l + nb_asso_param
-                        gamma_k[start_idx : stop_idx] = coeff_val_asso
+                        gamma_k[start_idx : stop_idx] = coeff_val_asso[k]
                 gamma.append(gamma_k)
                 gamma_wo_noise.append(gamma_k_wo_noise)
             return gamma_wo_noise, gamma, S_k
