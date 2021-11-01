@@ -5,8 +5,9 @@ async-generator==1.10
 attrs==19.3.0
 autograd==1.3
 autograd-gamma==0.4.2
-Babel==2.8.0
+Babel==2.9.1
 backcall==0.2.0
+backports.zoneinfo==0.2.1
 bleach==3.3.0
 certifi==2020.4.5.2
 cffi==1.14.3
@@ -40,7 +41,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
--e git+https://github.com/Califrais/lights.git@2055b1749d526cdb8fd5dd0b2e78ef96e8955620#egg=lights
+-e git+https://github.com/Califrais/lights.git@660c546896d9ffcba8804fae6bf45650bf03d2a4#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -76,12 +77,15 @@ pyrsistent==0.16.0
 pytest==6.2.1
 python-dateutil==2.8.1
 pytz==2020.1
+pytz-deprecation-shim==0.1.0.post0
 pyzmq==19.0.1
 qtconsole==4.7.4
 QtPy==1.9.0
 requests==2.23.0
+rpy2==3.4.5
 scikit-learn==0.24.2
 scipy==1.7.0
+seaborn==0.11.2
 Send2Trash==1.5.0
 six==1.15.0
 sklearn==0.0
@@ -103,6 +107,8 @@ tomli==1.2.1
 tornado==6.1
 tqdm==4.54.1
 traitlets==4.3.3
+tzdata==2021.5
+tzlocal==4.0.2
 urllib3==1.25.9
 wcwidth==0.2.4
 webencodings==0.5.1
