@@ -109,7 +109,15 @@ class EstepFunctions:
                 self.asso_funcs[:, :, k] = StandardScaler().fit_transform(
                     tmp_reshaped).copy().reshape(shape)
         else:
-            #TODO: Build matrice of asso feat for real data
+            for k in range(K):
+                for l in range(L):
+                    start_idx = nb_total_asso_param * l
+                    stop_idx = nb_total_asso_param * l + nb_asso_param
+                    beta_tmp = beta[k, r_l * l: r_l * (l + 1)]
+                    S_tmp = S[:, q_l * l: q_l * (l + 1)].T
+                    tmp = (self.F_f.dot(beta_tmp).T +
+                            self.F_r.dot(S_tmp).T).T.swapaxes(1, -1)
+                    self.asso_funcs[:, :, k, start_idx: stop_idx] = tmp
             pass
 
     def construct_MC_samples(self, N_MC):
