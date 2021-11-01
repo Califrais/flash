@@ -77,39 +77,40 @@ class EstepFunctions:
         nb_total_asso_param = nb_total_asso_features // L
         nb_asso_param = self.F_f.shape[1]
         nb_noise_param = nb_total_asso_param - nb_asso_param
-        self.asso_funcs = np.zeros((J, nb_total_asso_features, K, N_MC))
+        self.asso_funcs = np.zeros((J, N_MC, K, nb_total_asso_features))
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
         #TODO: Hardcode
         # Correlation coefficient of the toeplitz correlation matrix
         rho = .05
 
+        # TODO: Refactor
         if simu:
             for k in range(K):
                 for l in range(L):
                     start_idx = nb_total_asso_param * l
                     stop_idx = nb_total_asso_param * l + nb_asso_param
                     if l not in S_k[k]:
-                        tmp = (self.F_f.dot(beta[k, r_l * l : r_l * (l + 1)]).T +
-                        self.F_r.dot(S[:, q_l * l : q_l * (l + 1)].T).T).T.swapaxes(1, -1)
-                        shape = tmp.shape
-                        tmp_reshaped = tmp.reshape(-1, shape[-1])
-                        scaler = StandardScaler()
-                        self.asso_funcs[:, start_idx: stop_idx, k] = \
-                        scaler.fit_transform(tmp_reshaped).reshape(shape)\
-                            .swapaxes(1, -1)
+                        beta_tmp = beta[k, r_l * l: r_l * (l + 1)]
+                        S_tmp = S[:, q_l * l: q_l * (l + 1)].T
+                        tmp = (self.F_f.dot(beta_tmp).T +
+                               self.F_r.dot(S_tmp).T).T.swapaxes(1, -1)
+                        self.asso_funcs[:, :, k, start_idx: stop_idx] = tmp
+                        self.asso_funcs[:, :, k, nb_asso_param + nb_total_asso_param * l
+                        : nb_total_asso_param * (l + 1)] = features_normal_cov_toeplitz(
+                            J * N_MC,nb_noise_param, rho, .1)[0].reshape(J, N_MC, -1)
 
                     else:
-                        self.asso_funcs[:, start_idx : stop_idx, k] = \
-                        features_normal_cov_toeplitz(J * N_MC, nb_asso_param,
-                                rho, 1)[0].reshape(J, N_MC, -1).swapaxes(-1,1)
-                    self.asso_funcs[:, nb_asso_param + nb_total_asso_param * l
-                                       : nb_total_asso_param * (l + 1), k] = \
-                        features_normal_cov_toeplitz(J * N_MC, nb_noise_param,
-                                rho, 1)[0].reshape(J, N_MC, -1).swapaxes(-1, 1)
+                        self.asso_funcs[:, :, k, nb_total_asso_param * l : nb_total_asso_param * (l + 1)] = \
+                        features_normal_cov_toeplitz(J * N_MC, nb_total_asso_param,
+                                rho, .1)[0].reshape(J, N_MC, -1)
+                # normalize features
+                shape = self.asso_funcs[:, :, k].shape
+                tmp_reshaped = self.asso_funcs[:, :, k].copy().reshape(-1, shape[-1])
+                self.asso_funcs[:, :, k] = StandardScaler().fit_transform(
+                    tmp_reshaped).copy().reshape(shape)
         else:
             #TODO: Build matrice of asso feat for real data
             pass
-        self.asso_funcs = self.asso_funcs.swapaxes(-1, 1)
 
     def construct_MC_samples(self, N_MC):
         """Constructs the set of samples used for Monte Carlo approximation
