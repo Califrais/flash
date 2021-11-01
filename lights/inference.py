@@ -386,7 +386,6 @@ class prox_QNMCEM(Learner):
                 for s in range(N_MC):
                     mean = U_i.dot(beta[k].flatten()) + V_i.dot(S[s])
                     f_y[i, k, s] = multivariate_normal.pdf(y_i, mean, cov)
-
         return f_y
 
     def mlmm_density(self, extracted_features):
@@ -574,7 +573,7 @@ class prox_QNMCEM(Learner):
             p += 1
 
         if self.simu:
-            self.asso_functions = ['lp', 're', 'tps']
+            self.asso_functions = ['lp', 're']
         elif self.asso_functions == 'all':
             self.asso_functions = ['lp', 're', 'tps', 'ce']
 
@@ -624,7 +623,7 @@ class prox_QNMCEM(Learner):
             gamma_0 = 1e-4 * np.ones((L * (nb_asso_param
                                            + nb_noise_asso_param), 1))
         else:
-            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param), 1))
+            gamma_0 = 1e-1 * np.ones((L * (nb_asso_param), 1))
         gamma_1 = gamma_0.copy()
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
@@ -686,7 +685,11 @@ class prox_QNMCEM(Learner):
 
             if warm_start:
                 xi_init = xi_ext
-                gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
+                if self.simu:
+                    gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
+                else:
+                    gamma_init = [1e-1 * np.ones((L * (nb_asso_param))),
+                                  1e-1 * np.ones((L * (nb_asso_param)))]
             else:
                 xi_init = np.zeros(2 * p)
                 gamma_init = [np.zeros(L * nb_asso_param),
@@ -730,6 +733,7 @@ class prox_QNMCEM(Learner):
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
                         "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
+
             E_func.compute_AssociationFunctions(S, self.simu, self.S_k)
             gamma_0_prev = gamma_0.copy()
             args_0 = {"group": 0,
@@ -738,14 +742,12 @@ class prox_QNMCEM(Learner):
                       "E_log_g4": lambda v: E_log_g4(v, gamma_1),
                       "E_g5": lambda v: E_g5(v, gamma_1)
                       }
-
             res0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=max_iter_proxg,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
                 step=self.copt_step,
                 accelerated=self.copt_accelerate)
-
             gamma_0 = res0.x.reshape(-1, 1)
 
             # gamma_1 update
