@@ -406,7 +406,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                                     beta_1.reshape(-1, 1)]
 
         # Simulation of the fixed effect and association parameters
-        nb_asso_param = 4
+        nb_asso_param = 3
         nb_asso_features = n_long_features * nb_asso_param
         nb_noise_asso_param = np.ceil((1 - sparsity) * nb_asso_param
                                       / sparsity).astype(int)
@@ -446,22 +446,20 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.fixed_effect_coeffs = [beta_0.reshape(-1, 1), beta_1.reshape(-1, 1)]
 
         # Simulation of true times
-        idx_2 = np.arange(0, nb_asso_features, 2)
-        idx_4 = np.arange(0, nb_asso_features, 4)
-        idx_34 = np.concatenate((idx_4, (idx_4 - 1)[1:],
-                                 [nb_asso_features - 1]))
-        idx_34.sort()
-        idx_3 = np.arange(0, 2 * n_long_features, 2) + 1
+        idx_2 = np.arange(0, r_l * n_long_features, r_l)
+        idx_3 = np.arange(0, r_l * n_long_features, r_l) + 1
+        idx_4 = np.arange(0, nb_asso_features, 3)
+        idx_12 = np.concatenate(((idx_4 + 1), (idx_4 + 2)))
+        idx_12.sort()
 
-        tmp_0 = np.add.reduceat(gamma_0_wo_noise, idx_2)
-        tmp_1 = np.add.reduceat(gamma_1_wo_noise, idx_2)
-
-        iota_01 = b[G == 0].dot(tmp_0)
-        iota_01 += gamma_0_wo_noise[idx_34].dot(beta_0)
+        iota_01 = (beta_0[idx_2] + b[G == 0][:, idx_2]).dot(
+            gamma_0_wo_noise[idx_4]) + X[G == 0].dot(.1 * xi)
+        iota_01 += b[G == 0].dot(gamma_0_wo_noise[idx_12])
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(
             gamma_0_wo_noise[idx_4])
-        iota_11 = b[G == 1].dot(tmp_1)
-        iota_11 += gamma_1_wo_noise[idx_34].dot(beta_1)
+        iota_11 = (beta_1[idx_2] + b[G == 1][:, idx_2]).dot(
+            gamma_1_wo_noise[idx_4]) + X[G == 1].dot(.1 * xi)
+        iota_11 += b[G == 1].dot(gamma_1_wo_noise[idx_12])
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(
             gamma_1_wo_noise[idx_4])
         self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
