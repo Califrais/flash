@@ -611,7 +611,7 @@ class prox_QNMCEM(Learner):
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         #TODO: just for testing, remove later
-        phi = 16 * np.ones(L).reshape(-1, 1)
+        phi = 25 * np.ones(L).reshape(-1, 1)
         D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
@@ -757,12 +757,13 @@ class prox_QNMCEM(Learner):
                       "E_log_g4": lambda v: E_log_g4(gamma_0_prev, v),
                       "E_g5": lambda v: E_g5(gamma_0_prev, v)
                       }
-            gamma_1 = copt.minimize_proximal_gradient(
+            res1 = (copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=max_iter_proxg,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q,
                 step=self.copt_step,
-                accelerated=self.copt_accelerate).x.reshape(-1, 1)
+                accelerated=self.copt_accelerate))
+            gamma_1 = res1.x.reshape(-1, 1)
 
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)

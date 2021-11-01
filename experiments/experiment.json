@@ -1,7 +1,7 @@
 {
     "l_pen_EN" : 0.08,
-    "l_pen_SGL" : 0.1,
-    "eta_sp_gp_l1" : 0.7,
+    "l_pen_SGL" : 0.08,
+    "eta_sp_gp_l1" : 0.3,
     "max_iter" : 10,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 50,
