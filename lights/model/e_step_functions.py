@@ -177,10 +177,6 @@ class EstepFunctions:
 
     def g3(self):
         """Computes g3
-        Parameters
-        ----------
-        broadcast : `boolean`, default=True
-            Indicate to expand the dimension or not
         Returns
         -------
         g3 : `np.ndarray`, shape=(N_MC, J, dim, K)
