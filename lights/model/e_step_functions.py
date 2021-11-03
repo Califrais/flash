@@ -51,7 +51,7 @@ class EstepFunctions:
                                                 T_u, alpha, L).get_asso_feat()
         self.asso_funcs = None
 
-    def compute_AssociationFunctions(self, S, simu, S_k=None):
+    def compute_AssociationFunctions(self, S, simu, cov_corr_rdn_long=None, S_k=None):
         """
         Compute the value of association functions
 
@@ -62,6 +62,10 @@ class EstepFunctions:
 
         simu : `bool`, defaut=True
             If `True` we comute the asso feat with simulated data.
+
+        cov_corr_rdn_long : `float`
+            Correlation coefficient of the toeplitz correlation matrix of
+            random longitudinal features.
 
         S_k : `list`
             Set of nonactive group for 2 classes (will be useful in case of
@@ -78,12 +82,9 @@ class EstepFunctions:
         nb_noise_param = nb_total_asso_param - nb_asso_param
         self.asso_funcs = np.zeros((J, N_MC, K, nb_total_asso_features))
         beta = np.hstack((self.theta["beta_0"], self.theta["beta_1"])).T
-        #TODO: Hardcode
-        # Correlation coefficient of the toeplitz correlation matrix
-        rho = .05
-
-        # TODO: Refactor
         if simu:
+            # Correlation coefficient of the toeplitz correlation matrix
+            rho = cov_corr_rdn_long
             for k in range(K):
                 for l in range(L):
                     start_idx = nb_total_asso_param * l
@@ -96,7 +97,7 @@ class EstepFunctions:
                         self.asso_funcs[:, :, k, start_idx: stop_idx] = tmp
                         self.asso_funcs[:, :, k, nb_asso_param + nb_total_asso_param * l
                         : nb_total_asso_param * (l + 1)] = features_normal_cov_toeplitz(
-                            J * N_MC,nb_noise_param, rho, .1)[0].reshape(J, N_MC, -1)
+                            J * N_MC,nb_noise_param, rho)[0].reshape(J, N_MC, -1)
 
                     else:
                         self.asso_funcs[:, :, k, nb_total_asso_param * l : nb_total_asso_param * (l + 1)] = \

@@ -461,7 +461,8 @@ class prox_QNMCEM(Learner):
         E_func = EstepFunctions(T_u, L, alpha, self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        E_func.compute_AssociationFunctions(S, self.simu, self.S_k)
+        E_func.compute_AssociationFunctions(S, self.simu,
+                                            self.cov_corr_rdn_long, self.S_k)
         g4 = E_func.g4(gamma_0, gamma_1)
         baseline_val = baseline_hazard.values.flatten()
         rel_risk = g4.swapaxes(1, 2) * baseline_val
@@ -531,7 +532,7 @@ class prox_QNMCEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, S_k=None):
+    def fit(self, X, Y, T, delta, S_k=None, cov_corr_rdn_long=.05):
         """Fits the lights model
 
         Parameters
@@ -551,7 +552,12 @@ class prox_QNMCEM(Learner):
 
         S_k : `list`
             Set of nonactive group for 2 classes (will be useful in case of
-            simulated data)
+            simulated data).
+
+        cov_corr_rdn_long : `float`
+            Correlation coefficient of the toeplitz correlation matrix of
+            random longitudinal features (will be useful in case of
+            simulated data).
         """
         self._start_solve()
         verbose = self.verbose
@@ -563,7 +569,6 @@ class prox_QNMCEM(Learner):
         alpha = self.fixed_effect_time_order
         n_samples, p = X.shape
         L = Y.shape[1]
-        self.S_k = S_k
         self.n_samples = n_samples
         self.n_time_indep_features = p
         self.n_long_features = L
@@ -572,8 +577,12 @@ class prox_QNMCEM(Learner):
         if fit_intercept:
             p += 1
 
+        self.S_k = None
+        self.cov_corr_rdn_long = None
         if self.simu:
             self.asso_functions = ['lp', 're']
+            self.S_k = S_k
+            self.cov_corr_rdn_long = cov_corr_rdn_long
         elif self.asso_functions == 'all':
             self.asso_functions = ['lp', 're', 'tps', 'ce']
 
@@ -734,7 +743,8 @@ class prox_QNMCEM(Learner):
                         "extracted_features": ext_feat,
                         "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
 
-            E_func.compute_AssociationFunctions(S, self.simu, self.S_k)
+            E_func.compute_AssociationFunctions(S, self.simu,
+                                                self.cov_corr_rdn_long,self.S_k)
             gamma_0_prev = gamma_0.copy()
             args_0 = {"group": 0,
                       "E_g3": E_g3(),

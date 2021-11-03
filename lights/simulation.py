@@ -10,7 +10,7 @@ import pandas as pd
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
-                                 rho: float = 0.5, cst: float = 1.):
+                                 rho: float = 0.5, cst: float = .1):
     """Features obtained as samples of a centered Gaussian vector
     with a toeplitz covariance matrix
 
@@ -25,7 +25,7 @@ def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
     rho : `float`, default=0.5
         Correlation coefficient of the toeplitz correlation matrix
 
-    cst : `float`, default=1.
+    cst : `float`, default=.1
         Multiplicative constant
 
     Returns
@@ -118,10 +118,10 @@ class SimuJointLongitudinalSurvival(Simulation):
     n_samples : `int`, default=1000
         Number of samples
 
-    n_time_indep_features : `int`, default=20
+    n_time_indep_features : `int`, default=10
         Number of time-independent features
 
-    sparsity : `float`, default=0.7
+    sparsity : `float`, default=.7
         Proportion of both time-independent and association features active
         coefficients vector. Must be in [0, 1].
 
@@ -133,21 +133,21 @@ class SimuJointLongitudinalSurvival(Simulation):
         Value of the coefficients parameter used in the association coefficient
         vectors
 
-    cov_corr_time_indep : `float`, default=0.5
+    cov_corr_time_indep : `float`, default=.5
         Correlation to use in the Toeplitz covariance matrix for the
         time-independent features
 
-    high_risk_rate : `float`, default=0.4
+    high_risk_rate : `float`, default=.4
         Proportion of desired high risk samples rate
 
-    gap : `float`, default=0.5
+    gap : `float`, default=.5
         Gap value to create high/low risk groups in the time-independent
         features
 
     n_long_features : `int`, default=5
         Number of longitudinal features
 
-    cov_corr_long : `float`, default=0.1
+    cov_corr_long : `float`, default=.001
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
@@ -159,11 +159,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the high risk group
 
-    corr_fixed_effect : `float`, default=0.01
+    corr_fixed_effect : `float`, default=.01
         Correlation value to use in the diagonal covariance matrix for the
         fixed effect simulated feature
 
-    std_error : `float`, default=0.5
+    std_error : `float`, default=.5
         Standard deviation for the error term of the longitudinal processes
 
     decay : `float`, default=3.0
@@ -252,9 +252,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  std_error: float = .5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
-                 shape: float = .05, scale: float = 0.01,
+                 shape: float = .1, scale: float = .001,
                  censoring_factor: float = 2):
-        # shape: float = .05, scale: float = 0.1,
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
@@ -374,7 +373,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of time-independent features
         X = features_normal_cov_toeplitz(n_samples, n_time_indep_features,
-                                         cov_corr_time_indep)[0]
+                                         cov_corr_time_indep, cst=1.)[0]
         # Add class relative information on the design matrix
         H = np.random.choice(range(n_samples), replace=False,
                              size=int(high_risk_rate * n_samples))
@@ -396,7 +395,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the random effects components
         r_l = 2  # Affine random effects
         r = r_l * n_long_features
-        b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long, .1)
+        b, D = features_normal_cov_toeplitz(n_samples, r, cov_corr_long)
         self.long_cov = D
 
         # Simulation of the fixed effect parameters
