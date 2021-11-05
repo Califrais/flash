@@ -41,7 +41,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
--e git+https://github.com/Califrais/lights.git@660c546896d9ffcba8804fae6bf45650bf03d2a4#egg=lights
+-e git+https://github.com/Califrais/lights.git@204e3f1964288e7776b8a67ff29eb4d13625bd8f#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -82,7 +82,6 @@ pyzmq==19.0.1
 qtconsole==4.7.4
 QtPy==1.9.0
 requests==2.23.0
-rpy2==3.4.5
 scikit-learn==0.24.2
 scipy==1.7.0
 seaborn==0.11.2

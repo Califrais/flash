@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
--e git+https://github.com/Califrais/lights.git@660c546896d9ffcba8804fae6bf45650bf03d2a4#egg=lights
+-e git+https://github.com/Califrais/lights.git@204e3f1964288e7776b8a67ff29eb4d13625bd8f#egg=lights
     # via -r requirements.in
 alabaster==0.7.12
     # via
@@ -62,7 +62,6 @@ cffi==1.14.3
     # via
     #   -r requirements.in
     #   argon2-cffi
-    #   rpy2
 chardet==3.0.4
     # via
     #   -r requirements.in
@@ -153,7 +152,6 @@ jinja2==2.11.3
     #   nbconvert
     #   notebook
     #   numpydoc
-    #   rpy2
     #   sphinx
 joblib==0.15.1
     # via
@@ -355,7 +353,6 @@ pytz==2020.1
     #   -r requirements.in
     #   babel
     #   pandas
-    #   rpy2
 pytz-deprecation-shim==0.1.0.post0
     # via
     #   -r requirements.in
@@ -378,8 +375,6 @@ requests==2.23.0
     # via
     #   -r requirements.in
     #   sphinx
-rpy2==3.4.5
-    # via -r requirements.in
 scikit-learn==0.24.2
     # via
     #   -r requirements.in
@@ -505,9 +500,7 @@ tzdata==2021.5
     #   -r requirements.in
     #   pytz-deprecation-shim
 tzlocal==4.0.2
-    # via
-    #   -r requirements.in
-    #   rpy2
+    # via -r requirements.in
 urllib3==1.25.9
     # via
     #   -r requirements.in
