@@ -38,13 +38,6 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     n_folds : `int`, default=10
         Number of folds. Must be at least 2.
 
-    eta_elastic_net : `float`, default=0.1
-        The ElasticNet mixing parameter, with 0 <= eta <= 1.
-        For eta = 0 this is ridge (L2) regularization
-        For eta = 1 this is lasso (L1) regularization
-        For 0 < eta < 1, the regularization is a linear combination
-        of L1 and L2
-
     adaptative_grid_el : `bool`, default=True
         If `True`, adapt the ElasticNet strength parameter grid using the
         KKT conditions
@@ -62,20 +55,39 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     metric : 'log_lik', 'C-index', default='C-index'
         Either computes log-likelihood or C-index
 
-    max_iter: `int`, default=100
-        Maximum number of iterations of the prox-QNMCEM algorithm
+    tol : `float`, default=1e-5
+        The tolerance of the solver (iterations stop when the stopping
+        criterion is below it). By default the solver does ``max_iter``
+        iterations
 
-    max_iter_lbfgs: `int`, default=50
-        Maximum number of iterations of the L-BFGS-B solver
+    warm_start : `bool`, default=True
+        If true, learning will start from the last reached solution
 
-    max_iter_proxg: `int`, default=10
-        Maximum number of iterations of the proximal gradient solver
+    eta_elastic_net : `float`, default=0.1
+        The ElasticNet mixing parameter, with 0 <= eta <= 1.
+        For eta = 0 this is ridge (L2) regularization
+        For eta = 1 this is lasso (L1) regularization
+        For 0 < eta < 1, the regularization is a linear combination
+        of L1 and L2
+
+    eta_sp_gp_l1: `float`, default=0.1
+        The Sparse Group L1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
+        For eta_sp_gp_l1 = 1 this is Group L1
 
     zeta_gamma_max: `float`
         The interval upper bound for gamma
 
     zeta_xi_max: `float`
         The interval upper bound for xi
+
+    max_iter: `int`, default=100
+        Maximum number of iterations of the prox-QNMCEM algorithm
+
+    max_iter_lbfgs: `int`, default=50
+        Maximum number of iterations of the L-BFGS-B solver
+
+    max_iter_proxg: `int`, default=50
+        Maximum number of iterations of the proximal gradient solver
     """
     n_samples = T.shape[0]
     cv = KFold(n_splits=n_folds, shuffle=shuffle)
