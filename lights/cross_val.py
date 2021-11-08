@@ -94,15 +94,12 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
 
     if adaptative_grid_el:
         # from KKT conditions
-        zeta_xi_max = np.log10(1. / (1. - eta_elastic_net) * (.5 / n_samples)
-            * np.absolute(X).sum(axis=0).max())
-    else:
-        zeta_xi_max = np.log10(zeta_xi_max)
-    zeta_gamma_max = np.log10(zeta_gamma_max)
+        zeta_xi_max = 1. / (1. - eta_elastic_net) * (.5 / n_samples) \
+                      * np.absolute(X).sum(axis=0).max()
 
-    grid_elastic_net = np.logspace(zeta_xi_max - 4, zeta_xi_max, grid_size)
-    gird_sgl1 = np.logspace(zeta_gamma_max - 4, zeta_gamma_max, grid_size)
-    grid_params = [tuple(x) for x in itertools.product(grid_elastic_net, gird_sgl1)]
+    grid_params = np.random.uniform([zeta_xi_max * 1e-4, zeta_gamma_max *1e-4],
+                                    [zeta_xi_max, zeta_gamma_max],
+                                    (grid_size, 2))
 
     learners = [
         prox_QNMCEM(verbose=False, tol=tol, warm_start=warm_start, simu=simu,
@@ -117,7 +114,8 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
         verbose = verbose
     for idx, params in enumerate(grid_params):
         if verbose:
-            print("Testing l_pen_EN=%.2e, l_pen_SGL=%.2e" % params, "on fold ", end="")
+            print("Testing l_pen_EN=%.2e, l_pen_SGL=%.2e" % tuple(params),
+                  "on fold ", end="")
         for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
             if verbose:
                 print(" " + str(n_fold), end="")
@@ -143,4 +141,7 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     std_scores = scores.std(1)
     idx_best = avg_scores.argmax()
     params_best = grid_params[idx_best]
+    if verbose:
+        print("Best hyper-parameters are l_pen_EN=%.2e, l_pen_SGL=%.2e"
+              % tuple(params_best))
     return params_best
