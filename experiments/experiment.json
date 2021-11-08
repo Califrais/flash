@@ -2,7 +2,7 @@
     "l_pen_EN" : 0.08,
     "l_pen_SGL" : 0.08,
     "eta_sp_gp_l1" : 0.3,
-    "max_iter" : 10,
+    "max_iter" : 5,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 50,
     "std_error" : 2,
@@ -16,5 +16,8 @@
     "sparsity" : 0.5,
     "baseline_shape" : 0.05,
     "baseline_scale" : 0.01,
-    "cov_corr_rdn_long" : 0.05
+    "cov_corr_rdn_long" : 0.05,
+    "n_folds" : 2,
+    "grid_size" : 2,
+    "zeta_gamma_max" : 0.2
 }
