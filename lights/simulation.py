@@ -36,7 +36,9 @@ def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
     cov : `np.ndarray`, shape=(n_features, n_features)
         The simulated variance-covariance matrix
     """
-    cov = (cst ** 2) * toeplitz(rho ** np.arange(0, n_features))
+    cov = toeplitz(rho ** np.arange(0, n_features))
+    # The cst is to reduce the variance of covariance matrix
+    np.fill_diagonal(cov, (cst ** 2) * np.diagonal(cov))
     features = np.random.multivariate_normal(
         np.zeros(n_features), cov, size=n_samples)
     return features, cov
@@ -46,7 +48,6 @@ def simulation_method(simulate_method):
     """A decorator for simulation methods.
     It simply calls _start_simulation and _end_simulation methods
     """
-
     def decorated_simulate_method(self):
         self._start_simulation()
         result = simulate_method(self)
