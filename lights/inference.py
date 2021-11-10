@@ -101,6 +101,15 @@ class prox_QNMCEM(Learner):
     simu : `bool`, defaut=True
         If `True` we do the inference with simulated data.
 
+    S_k : `list`
+        Set of nonactive group for 2 classes (will be useful in case of
+        simulated data).
+
+    cov_corr_rdn_long : `float`
+        Correlation coefficient of the toeplitz correlation matrix of
+        random longitudinal features (will be useful in case of
+        simulated data).
+
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
@@ -109,7 +118,8 @@ class prox_QNMCEM(Learner):
                  verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5, n_MC=50,
                  asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj=False, copt_solver_step='backtracking', simu=True):
+                 compute_obj=False, copt_solver_step='backtracking', simu=True,
+                 S_k=None, cov_corr_rdn_long=.05):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -130,6 +140,9 @@ class prox_QNMCEM(Learner):
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.simu = simu
+        if self.simu:
+            self.S_k = S_k
+            self.cov_corr_rdn_long = cov_corr_rdn_long
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -532,7 +545,7 @@ class prox_QNMCEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, S_k=None, cov_corr_rdn_long=.05):
+    def fit(self, X, Y, T, delta):
         """Fits the lights model
 
         Parameters
@@ -549,15 +562,6 @@ class prox_QNMCEM(Learner):
 
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
-
-        S_k : `list`
-            Set of nonactive group for 2 classes (will be useful in case of
-            simulated data).
-
-        cov_corr_rdn_long : `float`
-            Correlation coefficient of the toeplitz correlation matrix of
-            random longitudinal features (will be useful in case of
-            simulated data).
         """
         self._start_solve()
         verbose = self.verbose
@@ -576,13 +580,8 @@ class prox_QNMCEM(Learner):
         r_l = 2  # Affine random effects
         if fit_intercept:
             p += 1
-
-        self.S_k = None
-        self.cov_corr_rdn_long = None
         if self.simu:
             self.asso_functions = ['lp', 're']
-            self.S_k = S_k
-            self.cov_corr_rdn_long = cov_corr_rdn_long
         elif self.asso_functions == 'all':
             self.asso_functions = ['lp', 're', 'tps', 'ce']
 

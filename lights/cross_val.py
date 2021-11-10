@@ -104,7 +104,8 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     learners = [
         prox_QNMCEM(verbose=False, tol=tol, warm_start=warm_start, simu=simu,
                     fixed_effect_time_order=1, max_iter=max_iter,
-                    max_iter_lbfgs=max_iter_lbfgs, max_iter_proxg=max_iter_proxg)
+                    max_iter_lbfgs=max_iter_lbfgs, max_iter_proxg=max_iter_proxg,
+                    S_k=S_k)
         for _ in range(n_folds)
     ]
 
@@ -125,10 +126,7 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
             delta_train, delta_test = delta[idx_train], delta[idx_test]
             learner = learners[n_fold]
             learner.l_pen_EN, learner.l_pen_SGL = params
-            if simu:
-                learner.fit(X_train, Y_train, T_train, delta_train, S_k)
-            else:
-                learner.fit(X_train, Y_train, T_train, delta_train)
+            learner.fit(X_train, Y_train, T_train, delta_train)
             if metric == "C-index":
                 scores[idx, n_fold] = learner.score(X_test, Y_test, T_test, delta_test)
             else:
