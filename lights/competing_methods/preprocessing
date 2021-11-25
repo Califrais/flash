@@ -1,0 +1,38 @@
+defaultW <- getOption("warn")
+options(warn = -1)
+library("JMbayes")
+
+preprocessing <- function(simu=False, data=NULL) {
+
+    if (simu) {
+        data <- NULL
+    }
+    else {
+        data(pbc2, package = "JMbayes")
+        colnames <- names(pbc2)
+        data <- pbc2
+        data$T_long <- data$year
+        data$T_survival <- data$years
+        data$delta <- data$status2
+        data$SGOT <- log(data$SGOT)
+        data$serBilir <- log(data$serBilir)
+        data$albumin <- log(data$albumin)
+        tmax <- 4
+    }
+
+
+    # Select training and test samples
+    data$id <- as.numeric(data$id)
+    set.seed(2020)
+    lenght_id <- length(unique(data$id))
+    id_test <- sample(unique(data$id), round(lenght_id/5))
+
+    # training dataset
+    data_training <- data[which(!(data$id %in% id_test)), ]
+    data_training.id <- unique(data_training[, c("id", "T_survival", "delta", "drug", "sex", "age")])
+
+    # testing dataset
+    data_testing <- data[which(pbc2$id %in% id_test), ]
+    data_testing.id <- unique(data_testing[, c("id", "T_survival", "delta", "drug", "sex", "age")])
+    return(list(data_training, data_testing, data_training.id, data_testing.id, tmax))
+}
