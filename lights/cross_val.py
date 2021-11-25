@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.model_selection import KFold
 from lights.inference import prox_QNMCEM
 import itertools
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 
 def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
@@ -97,49 +98,31 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
         zeta_xi_max = 1. / (1. - eta_elastic_net) * (.5 / n_samples) \
                       * np.absolute(X).sum(axis=0).max()
 
-    grid_params = np.random.uniform([zeta_xi_max * 1e-4, zeta_gamma_max *1e-4],
-                                    [zeta_xi_max, zeta_gamma_max],
-                                    (grid_size, 2))
-
-    learners = [
-        prox_QNMCEM(verbose=False, tol=tol, warm_start=warm_start, simu=simu,
-                    fixed_effect_time_order=1, max_iter=max_iter,
-                    max_iter_lbfgs=max_iter_lbfgs, max_iter_proxg=max_iter_proxg,
-                    S_k=S_k)
-        for _ in range(n_folds)
-    ]
-
-    n_grid = len(grid_params)
-    scores = np.empty((n_grid, n_folds))
-    if verbose is not None:
-        verbose = verbose
-    for idx, params in enumerate(grid_params):
-        if verbose:
-            print("Testing l_pen_EN=%.2e, l_pen_SGL=%.2e" % tuple(params),
-                  "on fold ", end="")
+    def learners(params):
+        scores = []
         for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
-            if verbose:
-                print(" " + str(n_fold), end="")
+            learner = prox_QNMCEM(verbose=False, tol=tol,
+                                   warm_start=warm_start, simu=simu,
+                                   fixed_effect_time_order=1, max_iter=max_iter,
+                                   max_iter_lbfgs=max_iter_lbfgs,
+                                   max_iter_proxg=max_iter_proxg, S_k=S_k)
             X_train, X_test = X[idx_train], X[idx_test]
             T_train, T_test = T[idx_train], T[idx_test]
             Y_train, Y_test = Y.iloc[idx_train, :], Y.iloc[idx_test, :]
             delta_train, delta_test = delta[idx_train], delta[idx_test]
-            learner = learners[n_fold]
-            learner.l_pen_EN, learner.l_pen_SGL = params
+            learner.l_pen_EN = params['l_pen_EN']
+            learner.l_pen_SGL = params['l_pen_SGL']
             learner.fit(X_train, Y_train, T_train, delta_train)
-            if metric == "C-index":
-                scores[idx, n_fold] = learner.score(X_test, Y_test, T_test, delta_test)
-            else:
-                #TODO: Code for others cases
-                scores = None
-        if verbose:
-            print(": avg_score=%.2e" % scores[idx, :].mean())
+            scores.append(learner.score(X_test, Y_test, T_test, delta_test))
+        return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
-    avg_scores = scores.mean(1)
-    std_scores = scores.std(1)
-    idx_best = avg_scores.argmax()
-    params_best = grid_params[idx_best]
-    if verbose:
-        print("Best hyper-parameters are l_pen_EN=%.2e, l_pen_SGL=%.2e"
-              % tuple(params_best))
-    return params_best
+    fspace = {
+        'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-4, zeta_xi_max),
+        'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-4, zeta_gamma_max)
+    }
+
+    trials = Trials()
+    best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=2,
+                trials=trials)
+
+    return best
