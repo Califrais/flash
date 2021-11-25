@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
--e git+https://github.com/Califrais/lights.git@204e3f1964288e7776b8a67ff29eb4d13625bd8f#egg=lights
+-e git+https://github.com/Califrais/lights.git@728665f60cca7312b1afbfbc781d3d84a177110f#egg=lights
     # via -r requirements.in
 alabaster==0.7.12
     # via
@@ -70,6 +70,10 @@ click==8.0.1
     # via
     #   -r requirements.in
     #   pip-tools
+cloudpickle==2.0.0
+    # via
+    #   -r requirements.in
+    #   hyperopt
 copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
     # via -r requirements.in
 cycler==0.10.0
@@ -103,6 +107,9 @@ future==0.18.2
     # via
     #   -r requirements.in
     #   autograd
+    #   hyperopt
+hyperopt==0.2.7
+    # via -r requirements.in
 idna==2.9
     # via
     #   -r requirements.in
@@ -229,6 +236,10 @@ nest-asyncio==1.5.1
     # via
     #   -r requirements.in
     #   nbclient
+networkx==2.6.3
+    # via
+    #   -r requirements.in
+    #   hyperopt
 notebook==6.4.1
     # via
     #   -r requirements.in
@@ -241,6 +252,7 @@ numpy==1.21.0
     #   -r requirements.in
     #   autograd
     #   copt
+    #   hyperopt
     #   lifelines
     #   matplotlib
     #   numba
@@ -300,6 +312,8 @@ pluggy==0.13.1
     # via
     #   -r requirements.in
     #   pytest
+prettytable==2.4.0
+    # via -r requirements.in
 prometheus-client==0.8.0
     # via
     #   -r requirements.in
@@ -318,6 +332,10 @@ py==1.10.0
     # via
     #   -r requirements.in
     #   pytest
+py4j==0.10.9.3
+    # via
+    #   -r requirements.in
+    #   hyperopt
 pycparser==2.20
     # via
     #   -r requirements.in
@@ -385,6 +403,7 @@ scipy==1.7.0
     #   -r requirements.in
     #   autograd-gamma
     #   copt
+    #   hyperopt
     #   lifelines
     #   scikit-learn
     #   seaborn
@@ -403,6 +422,7 @@ six==1.15.0
     #   bleach
     #   copt
     #   cycler
+    #   hyperopt
     #   jsonschema
     #   packaging
     #   patsy
@@ -481,6 +501,7 @@ tqdm==4.54.1
     # via
     #   -r requirements.in
     #   copt
+    #   hyperopt
 traitlets==4.3.3
     # via
     #   -r requirements.in
@@ -508,6 +529,7 @@ urllib3==1.25.9
 wcwidth==0.2.4
     # via
     #   -r requirements.in
+    #   prettytable
     #   prompt-toolkit
 webencodings==0.5.1
     # via

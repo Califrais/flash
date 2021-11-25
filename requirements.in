@@ -13,6 +13,7 @@ certifi==2020.4.5.2
 cffi==1.14.3
 chardet==3.0.4
 click==8.0.1
+cloudpickle==2.0.0
 copt @ git+https://github.com/openopt/copt.git@21a0caf0f8c6fbc58de05ea8bc70e36c83fb62be
 cycler==0.10.0
 decorator==4.4.2
@@ -22,6 +23,7 @@ docutils==0.16
 entrypoints==0.3
 external==0.0.1
 future==0.18.2
+hyperopt==0.2.7
 idna==2.9
 imagesize==1.2.0
 importlib-metadata==1.6.1
@@ -41,7 +43,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
--e git+https://github.com/Califrais/lights.git@204e3f1964288e7776b8a67ff29eb4d13625bd8f#egg=lights
+-e git+https://github.com/Califrais/lights.git@728665f60cca7312b1afbfbc781d3d84a177110f#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -51,6 +53,7 @@ nbclient==0.5.3
 nbconvert==5.6.1
 nbformat==5.0.7
 nest-asyncio==1.5.1
+networkx==2.6.3
 notebook==6.4.1
 numba==0.53.1
 numpy==1.21.0
@@ -66,10 +69,12 @@ pickleshare==0.7.5
 Pillow==8.3.2
 pip-tools==6.3.0
 pluggy==0.13.1
+prettytable==2.4.0
 prometheus-client==0.8.0
 prompt-toolkit==3.0.5
 ptyprocess==0.6.0
 py==1.10.0
+py4j==0.10.9.3
 pycparser==2.20
 Pygments==2.7.4
 pyparsing==2.4.7
