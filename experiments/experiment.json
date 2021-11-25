@@ -20,5 +20,6 @@
     "cov_corr_rdn_long" : 0.005,
     "n_folds" : 2,
     "grid_size" : 2,
-    "zeta_gamma_max" : 0.2
+    "zeta_gamma_max" : 0.2,
+    "max_eval_cross" : 2
 }

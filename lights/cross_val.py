@@ -10,7 +10,8 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
                    verbose=True, metric='C-index', tol=1e-5, warm_start=True,
                    eta_elastic_net=.1, eta_sp_gp_l1=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
-                   max_iter=100, max_iter_lbfgs=50, max_iter_proxg=50):
+                   max_iter=100, max_iter_lbfgs=50, max_iter_proxg=50,
+                   max_eval=50):
     """Apply n_folds randomized search cross-validation using the given
     data, to select the best penalization hyper-parameters
 
@@ -89,6 +90,9 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
 
     max_iter_proxg: `int`, default=50
         Maximum number of iterations of the proximal gradient solver
+
+    max_eval: `int`, default=50
+        Maximum number of trials of the Hyperopt
     """
     n_samples = T.shape[0]
     cv = KFold(n_splits=n_folds, shuffle=shuffle)
@@ -122,7 +126,7 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     }
 
     trials = Trials()
-    best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=2,
+    best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=max_eval,
                 trials=trials)
 
     return best
