@@ -1,14 +1,12 @@
 import numpy as np
 from sklearn.model_selection import KFold
 from lights.inference import prox_QNMCEM
-import itertools
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 
 def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
-                   adaptative_grid_el=True, grid_size=30, shuffle=True,
-                   verbose=True, metric='C-index', tol=1e-5, warm_start=True,
-                   eta_elastic_net=.1, eta_sp_gp_l1=.1,
+                   adaptative_grid_el=True, shuffle=True, tol=1e-5,
+                   warm_start=True, eta_elastic_net=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
                    max_iter=100, max_iter_lbfgs=50, max_iter_proxg=50,
                    max_eval=50):
@@ -44,18 +42,8 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
         If `True`, adapt the ElasticNet strength parameter grid using the
         KKT conditions
 
-    grid_size : `int`, default=30
-        Grid size if adaptative_grid_el=`True`
-
     shuffle : `bool`, default=True
         Whether to shuffle the data before splitting into batches
-
-    verbose : `bool`, default=True
-        If `True`, we verbose things, otherwise the solver does not
-        print anything (but records information in history anyway)
-
-    metric : 'log_lik', 'C-index', default='C-index'
-        Either computes log-likelihood or C-index
 
     tol : `float`, default=1e-5
         The tolerance of the solver (iterations stop when the stopping
@@ -71,10 +59,6 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
         For eta = 1 this is lasso (L1) regularization
         For 0 < eta < 1, the regularization is a linear combination
         of L1 and L2
-
-    eta_sp_gp_l1: `float`, default=0.1
-        The Sparse Group L1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
-        For eta_sp_gp_l1 = 1 this is Group L1
 
     zeta_gamma_max: `float`
         The interval upper bound for gamma
