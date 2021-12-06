@@ -116,8 +116,13 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
             delta_train, delta_test = delta[idx_train], delta[idx_test]
             learner.l_pen_EN = params['l_pen_EN']
             learner.l_pen_SGL = params['l_pen_SGL']
-            learner.fit(X_train, Y_train, T_train, delta_train)
-            scores.append(learner.score(X_test, Y_test, T_test, delta_test))
+            try:
+                learner.fit(X_train, Y_train, T_train, delta_train)
+            except ValueError:
+                scores = np.array([1])
+                break
+            else:
+                scores.append(learner.score(X_test, Y_test, T_test, delta_test))
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
     fspace = {

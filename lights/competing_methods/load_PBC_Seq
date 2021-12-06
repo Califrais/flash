@@ -2,10 +2,10 @@ defaultW <- getOption("warn")
 options(warn = -1)
 library("JMbayes")
 
-preprocessing <- function(simu=False, data=NULL) {
+preprocessing <- function(simu=False, data=NULL, time_indep_feat) {
 
     if (simu) {
-        data <- NULL
+        tmax <- 4
     }
     else {
         data(pbc2, package = "JMbayes")
@@ -28,11 +28,15 @@ preprocessing <- function(simu=False, data=NULL) {
     id_test <- sample(unique(data$id), round(lenght_id/5))
 
     # training dataset
+    u_cols = c("id", "T_survival", "delta")
+    for(i in 1:length(time_indep_feat)){
+        u_cols <- append(u_cols,  time_indep_feat[[i]])
+    }
     data_training <- data[which(!(data$id %in% id_test)), ]
-    data_training.id <- unique(data_training[, c("id", "T_survival", "delta", "drug", "sex", "age")])
+    data_training.id <- unique(data_training[, u_cols])
 
     # testing dataset
     data_testing <- data[which(pbc2$id %in% id_test), ]
-    data_testing.id <- unique(data_testing[, c("id", "T_survival", "delta", "drug", "sex", "age")])
+    data_testing.id <- unique(data_testing[, u_cols])
     return(list(data_training, data_testing, data_training.id, data_testing.id, tmax))
 }
