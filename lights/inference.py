@@ -140,9 +140,8 @@ class prox_QNMCEM(Learner):
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.simu = simu
-        if self.simu:
-            self.S_k = S_k
-            self.cov_corr_rdn_long = cov_corr_rdn_long
+        self.S_k = S_k
+        self.cov_corr_rdn_long = cov_corr_rdn_long
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -631,7 +630,7 @@ class prox_QNMCEM(Learner):
             gamma_0 = 1e-4 * np.ones((L * (nb_asso_param
                                            + nb_noise_asso_param), 1))
         else:
-            gamma_0 = 1e-1 * np.ones((L * (nb_asso_param), 1))
+            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param), 1))
         gamma_1 = gamma_0.copy()
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
@@ -696,8 +695,8 @@ class prox_QNMCEM(Learner):
                 if self.simu:
                     gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
                 else:
-                    gamma_init = [1e-1 * np.ones((L * (nb_asso_param))),
-                                  1e-1 * np.ones((L * (nb_asso_param)))]
+                    gamma_init = [1e-4 * np.ones((L * (nb_asso_param))),
+                                  1e-4 * np.ones((L * (nb_asso_param)))]
             else:
                 xi_init = np.zeros(2 * p)
                 gamma_init = [np.zeros(L * nb_asso_param),
