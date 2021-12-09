@@ -3,7 +3,7 @@
     "l_pen_SGL" : 0.08,
     "eta_elastic_net" : 0.1,
     "eta_sp_gp_l1" : 0.1,
-    "max_iter" : 3,
+    "max_iter" : 5,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 10,
     "std_error" : 2,
@@ -19,7 +19,6 @@
     "baseline_scale" : 0.01,
     "cov_corr_rdn_long" : 0.005,
     "n_folds" : 2,
-    "grid_size" : 2,
     "zeta_gamma_max" : 0.2,
-    "max_eval_cross" : 2
+    "max_eval_cross" : 5
 }

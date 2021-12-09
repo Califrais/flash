@@ -118,4 +118,4 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
     best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=max_eval,
                 trials=trials)
 
-    return best
+    return best, trials
