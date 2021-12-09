@@ -118,8 +118,8 @@ def normalize(X):
     X_norm : `np.ndarray`, shape=(n, d)
         The corresponding normilized matrix with mean 0 and std 1
     """
-    mean = X.mean(0)
-    std = X.std(0)
+    mean = X.mean(axis=0)
+    std = X.std(axis=0)
     X_norm = (X - mean) / std
 
     return X_norm
