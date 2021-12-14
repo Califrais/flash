@@ -512,11 +512,19 @@ class prox_QNMCEM(Learner):
             n_samples = X.shape[0]
             theta, alpha = self.theta, self.fixed_effect_time_order
             ext_feat = extract_features(Y, alpha)
-            last_measurement = np.array(list(map(max, ext_feat[0][2])))
+            n_samples, n_long_features = Y.shape
+            last_measurement = np.zeros(n_samples)
+            for i in range(n_samples):
+                t_i_max = 0
+                Y_i = Y.iloc[i]
+                for l in range(n_long_features):
+                    times_il = Y_i[l].index.values
+                    t_i_max = max(t_i_max, np.array(times_il).max())
+                last_measurement[i] = t_i_max
             if prediction_times is None:
                 prediction_times = last_measurement
             else:
-                if not (prediction_times > last_measurement).all():
+                if not (prediction_times >= last_measurement).all():
                     raise ValueError('Prediction times must be greater than the'
                                      ' last measurement times for each subject')
 
