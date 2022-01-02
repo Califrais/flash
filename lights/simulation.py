@@ -562,4 +562,4 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.latent_class = G
         self.N_il = N_il
 
-        return X, Y, np.ceil(T), delta, S_k
+        return X, Y, np.ceil(T), delta, S_k, t_max
