@@ -189,6 +189,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         Level of censoring. Increasing censoring_factor leads to less censored
         times and conversely.
 
+    run_all : `bool`, default=False
+        Indicator whether the simulated data is used for running on R scripts
+        or not.
+
     Attributes
     ----------
     time_indep_features : `np.array`, shape=(n_samples, n_time_indep_features)
@@ -254,7 +258,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
                  shape: float = .1, scale: float = .001,
-                 censoring_factor: float = 2):
+                 censoring_factor: float = 2, run_all: bool = False):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
@@ -278,6 +282,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.shape = shape
         self.scale = scale
         self.censoring_factor = censoring_factor
+        self.run_all = run_all
 
         # Attributes that will be instantiated afterwards
         self.latent_class = None
@@ -521,7 +526,21 @@ class SimuJointLongitudinalSurvival(Simulation):
             hawkes.simulate()
             self.hawkes += [hawkes]
             times_i = hawkes.timestamps
-
+            if self.run_all:
+                if len(times_i[0]) > 10:
+                    tmp = np.sort(
+                        np.random.choice(times_i[0], size=10, replace=False))
+                    if t_max[i] not in tmp:
+                        tmp = np.append(tmp, t_max[i])
+                times_i = [tmp] * n_long_features
+            else:
+                for l in range(n_long_features):
+                    if len(times_i[l]) > 10:
+                        times_i[l] = np.sort(
+                            np.random.choice(times_i[l], size=10,
+                                             replace=False))
+                    if t_max[i] not in times_i[l]:
+                        times_i[l] = np.append(times_i[l], t_max[i])
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
@@ -530,12 +549,6 @@ class SimuJointLongitudinalSurvival(Simulation):
                     beta_l = beta_1[2 * l:2 * l + 2]
 
                 b_l = b[i, 2 * l:2 * l + 2]
-                if t_max[i] not in times_i[l]:
-                    times_i[l] = np.append(times_i[l], t_max[i])
-                if len(times_i[l]) > 10:
-                    times_i[l] = np.sort(np.random.choice(times_i[l],
-                                                          size=10,
-                                                          replace=False))
                 n_il = len(times_i[l])
                 N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
