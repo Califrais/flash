@@ -103,7 +103,7 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
             try:
                 learner.fit(X_train, Y_train, T_train, delta_train)
             except ValueError:
-                scores = np.array([0])
+                scores = np.nan
                 break
             else:
                 scores.append(learner.score(X_test, Y_test, T_test, delta_test))
