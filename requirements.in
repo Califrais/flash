@@ -43,7 +43,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
--e git+https://github.com/Califrais/lights.git@c98f3613db6f97098abd5288e0f16491a99f9255#egg=lights
+-e git+https://github.com/Califrais/lights.git@6ad656765ed914bd2df84e8511ea39ce22c72359#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -69,7 +69,6 @@ pickleshare==0.7.5
 Pillow==8.3.2
 pip-tools==6.3.0
 plotly==5.4.0
-plotpy==1.2.0
 pluggy==0.13.1
 prettytable==2.4.0
 prometheus-client==0.8.0

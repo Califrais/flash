@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
--e git+https://github.com/Califrais/lights.git@c98f3613db6f97098abd5288e0f16491a99f9255#egg=lights
+-e git+https://github.com/Califrais/lights.git@6ad656765ed914bd2df84e8511ea39ce22c72359#egg=lights
     # via -r requirements.in
 alabaster==0.7.12
     # via
@@ -65,7 +65,6 @@ cffi==1.14.3
 chardet==3.0.4
     # via
     #   -r requirements.in
-    #   plotpy
     #   requests
 click==8.0.1
     # via
@@ -109,8 +108,6 @@ future==0.18.2
     #   -r requirements.in
     #   autograd
     #   hyperopt
-h5py==2.8.0
-    # via plotpy
 hyperopt==0.2.7
     # via -r requirements.in
 idna==2.9
@@ -255,14 +252,12 @@ numpy==1.21.0
     #   -r requirements.in
     #   autograd
     #   copt
-    #   h5py
     #   hyperopt
     #   lifelines
     #   matplotlib
     #   numba
     #   pandas
     #   patsy
-    #   plotpy
     #   pythonqwt
     #   scikit-learn
     #   scipy
@@ -311,14 +306,10 @@ pickleshare==0.7.5
     #   -r requirements.in
     #   ipython
 pillow==8.3.2
-    # via
-    #   -r requirements.in
-    #   plotpy
+    # via -r requirements.in
 pip-tools==6.3.0
     # via -r requirements.in
 plotly==5.4.0
-    # via -r requirements.in
-plotpy==1.2.0
     # via -r requirements.in
 pluggy==0.13.1
     # via
@@ -379,9 +370,7 @@ python-dateutil==2.8.1
     #   matplotlib
     #   pandas
 pythonqwt==0.9.0
-    # via
-    #   -r requirements.in
-    #   plotpy
+    # via -r requirements.in
 pytz==2020.1
     # via
     #   -r requirements.in
@@ -422,7 +411,6 @@ scipy==1.7.0
     #   copt
     #   hyperopt
     #   lifelines
-    #   plotpy
     #   scikit-learn
     #   seaborn
     #   statsmodels
@@ -440,7 +428,6 @@ six==1.15.0
     #   bleach
     #   copt
     #   cycler
-    #   h5py
     #   hyperopt
     #   jsonschema
     #   packaging
