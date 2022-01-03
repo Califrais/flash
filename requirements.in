@@ -23,6 +23,7 @@ docutils==0.16
 entrypoints==0.3
 external==0.0.1
 future==0.18.2
+h5py==2.8.0
 hyperopt==0.2.7
 idna==2.9
 imagesize==1.2.0
@@ -43,7 +44,7 @@ jupyter-core==4.6.3
 jupyterlab-pygments==0.1.2
 kiwisolver==1.2.0
 lifelines==0.24.9
--e git+https://github.com/Califrais/lights.git@728665f60cca7312b1afbfbc781d3d84a177110f#egg=lights
+-e git+https://github.com/Califrais/lights.git@517fcbd1f8c7b45d2d378c18bffa0b0caf782e46#egg=lights
 llvmlite==0.36.0
 MarkupSafe==1.1.1
 matplotlib==3.2.1
@@ -68,6 +69,8 @@ pexpect==4.8.0
 pickleshare==0.7.5
 Pillow==8.3.2
 pip-tools==6.3.0
+plotly==5.4.0
+plotpy==1.2.0
 pluggy==0.13.1
 prettytable==2.4.0
 prometheus-client==0.8.0
@@ -81,6 +84,7 @@ pyparsing==2.4.7
 pyrsistent==0.16.0
 pytest==6.2.1
 python-dateutil==2.8.1
+PythonQwt==0.9.0
 pytz==2020.1
 pytz-deprecation-shim==0.1.0.post0
 pyzmq==19.0.1
@@ -102,6 +106,7 @@ sphinxcontrib-jsmath==1.0.1
 sphinxcontrib-qthelp==1.0.3
 sphinxcontrib-serializinghtml==1.1.4
 statsmodels==0.12.2
+tenacity==8.0.1
 terminado==0.8.3
 testpath==0.4.4
 threadpoolctl==2.1.0
