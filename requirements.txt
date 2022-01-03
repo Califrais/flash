@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
--e git+https://github.com/Califrais/lights.git@517fcbd1f8c7b45d2d378c18bffa0b0caf782e46#egg=lights
+-e git+https://github.com/Califrais/lights.git@c98f3613db6f97098abd5288e0f16491a99f9255#egg=lights
     # via -r requirements.in
 alabaster==0.7.12
     # via
@@ -110,9 +110,7 @@ future==0.18.2
     #   autograd
     #   hyperopt
 h5py==2.8.0
-    # via
-    #   -r requirements.in
-    #   plotpy
+    # via plotpy
 hyperopt==0.2.7
     # via -r requirements.in
 idna==2.9
