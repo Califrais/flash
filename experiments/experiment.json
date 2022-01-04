@@ -1,13 +1,13 @@
 {
     "l_pen_EN" : 0.08,
     "l_pen_SGL" : 0.08,
-    "eta_elastic_net" : 0.1,
+    "eta_elastic_net" : 0.99,
     "eta_sp_gp_l1" : 0.1,
     "max_iter" : 20,
     "max_iter_lbfgs" : 50,
     "max_iter_proxg" : 10,
     "std_error" : 2,
-    "n_samples" : 400,
+    "n_samples" : 200,
     "n_MC" : 50,
     "coeff_val_asso_low_risk" : 0.1,
     "coeff_val_asso_high_risk" : 0.1,
@@ -19,7 +19,7 @@
     "baseline_scale" : 0.01,
     "cov_corr_rdn_long" : 0.005,
     "n_folds" : 2,
-    "zeta_gamma_max" : 0.2,
-    "max_eval_cross" : 5,
+    "zeta_gamma_max" : 10,
+    "max_eval_cross" : 10,
     "max_iter_cross" : 5
 }
