@@ -432,20 +432,18 @@ class prox_QNMCEM(Learner):
         E_func = EstepFunctions(T_u, L, alpha, self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        E_func.compute_AssociationFunctions(S, self.simu,
-                                            self.cov_corr_rdn_long, self.S_k)
-        g4 = E_func.g4(gamma_0, gamma_1)
+        gamma_stack = np.hstack((gamma_0, gamma_1))
+        tmp = np.exp(asso_feats.dot(gamma_stack))
         baseline_val = baseline_hazard.values.flatten()
-        rel_risk = g4.swapaxes(1, 2) * baseline_val
         _, ind_1, ind_2 = get_times_infos(T, T_u)
-        intensity = self.intensity(rel_risk, ind_1)
-        survival = self.survival(rel_risk, ind_2)
-        f = (intensity ** delta).T * survival
-        f_y = self.f_y_given_latent(extracted_features, S, [beta_0, beta_1])
+        intensity = tmp.T * (ind_1.dot(baseline_val))
+        survival = np.exp(-tmp.T * (ind_2.dot(baseline_val)))
+        f = ((intensity ** delta) * survival).T
+        f_y = self.f_y_given_latent(extracted_features, [beta_0, beta_1])
         f *= f_y
         return f
 
-    def predict_marker(self, X, Y, prediction_times=None):
+    def predict_marker(self, X, Y, asso_feats, prediction_times=None):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -456,6 +454,9 @@ class prox_QNMCEM(Learner):
         Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
             The longitudinal data. Each element of the dataframe is
             a pandas.Series
+
+        asso_feats : `np.ndarray`, shape=(n_samples, n_asso_params)
+            Association features extracted from tsfresh
 
         prediction_times : `np.ndarray`, shape=(n_samples,), default=None
             Times for prediction, that is up to which one has longitudinal data.
@@ -490,10 +491,10 @@ class prox_QNMCEM(Learner):
             # predictions for alive subjects only
             delta_prediction = np.zeros(n_samples)
             T_u = self.T_u
-            f = self.f_data_given_latent(ext_feat, prediction_times, T_u,
-                                         delta_prediction, self.S)
+            f = self.f_data_given_latent(ext_feat, asso_feats, prediction_times
+                                         , T_u, delta_prediction)
             pi_xi = self._get_proba(X)
-            marker = self._get_post_proba(pi_xi, f.mean(axis=-1))
+            marker = self._get_post_proba(pi_xi, f)
             return marker
         else:
             raise ValueError('You must fit the model first')
@@ -511,7 +512,7 @@ class prox_QNMCEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta):
+    def fit(self, X, Y, T, delta, asso_feats):
         """Fits the lights model
 
         Parameters
@@ -544,19 +545,11 @@ class prox_QNMCEM(Learner):
         self.n_long_features = L
         q_l = alpha + 1
         r_l = 2  # Affine random effects
+        K = 2
         if fit_intercept:
             p += 1
-        if self.simu:
-            self.asso_functions = ['lp', 're']
-        elif self.asso_functions == 'all':
-            self.asso_functions = ['lp', 're', 'tps', 'ce']
 
-        asso_functions = self.asso_functions
-        nb_asso_param = len(asso_functions)
-        if 're' in asso_functions:
-            nb_asso_param += 1
-        N = self.n_MC
-
+        nb_asso_param = asso_feats.shape[1] // L
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
         T_u = np.unique(T)
@@ -609,19 +602,18 @@ class prox_QNMCEM(Learner):
         max_iter_proxg = self.max_iter_proxg
 
         # Instanciates E-step and M-step functions
-        E_func = EstepFunctions(T_u, L, alpha, asso_functions, self.theta)
+        E_func = EstepFunctions(T_u, L, alpha, asso_feats, self.theta)
+        E_func.b_stats(ext_feat)
         F_func = MstepFunctions(fit_intercept, X, delta, p, self.l_pen_EN,
                                 self.eta_elastic_net)
 
-        S = E_func.construct_MC_samples(N)
-        f = self.f_data_given_latent(ext_feat, T, self.T_u, delta, S)
-        Lambda_1 = E_func.Lambda_g(np.ones(shape=(2 * N)), f)
+        f = self.f_data_given_latent(ext_feat, asso_feats, T, self.T_u, delta)
+        Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
         pi_xi = self._get_proba(X)
 
         # Store init values
         if self.compute_obj:
-            f_mean = f.mean(axis=-1)
-            obj = self._func_obj(pi_xi, f_mean)
+            obj = self._func_obj(pi_xi, f)
             self.history.update(n_iter=0, obj=obj,
                                 rel_obj=np.inf, theta=self.theta)
         else:
@@ -636,23 +628,8 @@ class prox_QNMCEM(Learner):
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
             self.pi_est = pi_est
-            E_g1 = E_func.Eg(E_func.g1(S), Lambda_1, pi_xi, f)
-            E_g2 = E_func.Eg(E_func.g2(S), Lambda_1, pi_xi, f)
-
-            def E_g3():
-                return E_func.Eg(E_func.g3(), Lambda_1, pi_xi, f)
-
-            def E_g4(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g4(gamma_0_, gamma_1_),
-                                 Lambda_1, pi_xi, f)
-
-            def E_log_g4(gamma_0_, gamma_1_):
-                return E_func.Eg(np.log(E_func.g4(gamma_0_, gamma_1_)),
-                                 Lambda_1, pi_xi, f)
-
-            def E_g5(gamma_0_, gamma_1_):
-                return E_func.Eg(E_func.g5(gamma_0_, gamma_1_),
-                    Lambda_1, pi_xi, f)
+            E_g1 = E_func.Eg(E_func.Eb, Lambda_1, pi_xi, f)
+            E_g2 = E_func.Eg(E_func.EbbT, Lambda_1, pi_xi, f)
 
             # M-Step
             D = E_g2.sum(axis=0) / n_samples  # D update
@@ -798,15 +775,14 @@ class prox_QNMCEM(Learner):
 
             if (n_iter + 1 > max_iter) or (stopping_criterion_count == 3):
                 self._fitted = True
-                self.S = S  # useful for predictions
                 break
             else:
                 # Update for next iteration
-                Lambda_1 = E_func.Lambda_g(np.ones((2 * N)), f)
+                Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
 
         self._end_solve()
 
-    def score(self, X, Y, T, delta):
+    def score(self, X, Y, T, delta, asso_feats):
         """Computes the C-index score with the trained parameters on the given
         data
 
@@ -831,7 +807,7 @@ class prox_QNMCEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            c_index = c_index_score(T, self.predict_marker(X, Y), delta)
+            c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
             return max(c_index, 1 - c_index)
         else:
             raise ValueError('You must fit the model first')
