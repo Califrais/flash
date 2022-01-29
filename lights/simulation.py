@@ -7,6 +7,7 @@ from scipy.sparse import random
 from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
+from tsfresh import extract_features
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
@@ -405,24 +406,18 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.long_cov = D
 
         # Simulation of the fixed effect parameters
-        q = 2 * n_long_features  # linear time-varying features, so all q_l=2
+        q_l = 2
+        q = q_l * n_long_features  # linear time-varying features, so all q_l=2
         mean_0 = fixed_effect_mean_low_risk * n_long_features
         beta_0 = np.random.multivariate_normal(mean_0, np.diag(
             corr_fixed_effect * np.ones(q)))
         mean_1 = fixed_effect_mean_high_risk * n_long_features
         beta_1 = np.random.multivariate_normal(mean_1, np.diag(
             corr_fixed_effect * np.ones(q)))
-        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
-                                    beta_1.reshape(-1, 1)]
 
         # Simulation of the fixed effect and association parameters
         nb_asso_param = 3
         nb_asso_features = n_long_features * nb_asso_param
-        nb_noise_asso_param = np.ceil((1 - sparsity) * nb_asso_param
-                                      / sparsity).astype(int)
-        nb_noise_asso_features = n_long_features * nb_noise_asso_param
-        nb_total_asso_param = nb_asso_param + nb_noise_asso_param
-        nb_total_asso_features = n_long_features * nb_total_asso_param
 
         def simu_sparse_params():
 
@@ -430,29 +425,35 @@ class SimuJointLongitudinalSurvival(Simulation):
             nb_nonactive_group = n_long_features - int(sparsity * n_long_features)
 
             gamma = []
-            gamma_wo_noise = []
             S_k = []
             coeff_val_asso = [coeff_val_asso_low_risk, coeff_val_asso_high_risk]
+            active_beta_idx = [[], []]
+            active_rdn_effect_idx = [[], []]
             for k in range(K):
                 # set of nonactive group
                 S_k.append(np.random.choice(n_long_features, nb_nonactive_group,
                                                       replace=False))
-                # gamma vector without the noise coefficient
-                gamma_k_wo_noise = np.zeros(nb_asso_features)
-                # gamma vector with the noise coefficient
-                gamma_k = np.zeros(nb_total_asso_features)
+                gamma_k = np.zeros(nb_asso_features)
                 for l in range(n_long_features):
                     if l not in S_k[k]:
+                        active_beta_idx[k] += [1] * q_l
+                        active_rdn_effect_idx[k] += [1] * r_l
                         start_idx = nb_asso_param * l
                         stop_idx = nb_asso_param * (l + 1)
-                        gamma_k_wo_noise[start_idx : stop_idx] = coeff_val_asso[k]
-                        start_idx = nb_total_asso_param * l
-                        stop_idx = nb_total_asso_param * l + nb_asso_param
                         gamma_k[start_idx : stop_idx] = coeff_val_asso[k]
+                    else:
+                        active_beta_idx[k] += [0] * q_l
+                        active_rdn_effect_idx[k] += [0] * r_l
                 gamma.append(gamma_k)
-                gamma_wo_noise.append(gamma_k_wo_noise)
-            return gamma_wo_noise, gamma, S_k
-        [gamma_0_wo_noise, gamma_1_wo_noise], [gamma_0, gamma_1], S_k = simu_sparse_params()
+            return gamma, S_k, np.array(active_beta_idx), np.array(active_rdn_effect_idx)
+        [gamma_0, gamma_1], S_k, active_beta_idx, active_rdn_effect_idx = \
+            simu_sparse_params()
+        beta_0 = beta_0 * active_beta_idx[0]
+        beta_1 = beta_1 * active_beta_idx[1]
+        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
+                                    beta_1.reshape(-1, 1)]
+        b[G == 0] = b[G == 0] * active_rdn_effect_idx[0]
+        b[G == 1] = b[G == 1] * active_rdn_effect_idx[1]
         self.asso_coeffs = [gamma_0, gamma_1]
         self.fixed_effect_coeffs = [beta_0.reshape(-1, 1), beta_1.reshape(-1, 1)]
 
@@ -464,15 +465,15 @@ class SimuJointLongitudinalSurvival(Simulation):
         idx_12.sort()
 
         iota_01 = (beta_0[idx_2] + b[G == 0][:, idx_2]).dot(
-            gamma_0_wo_noise[idx_4]) + X[G == 0].dot(.1 * xi)
-        iota_01 += b[G == 0].dot(gamma_0_wo_noise[idx_12])
+            gamma_0[idx_4]) + X[G == 0].dot(.1 * xi)
+        iota_01 += b[G == 0].dot(gamma_0[idx_12])
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(
-            gamma_0_wo_noise[idx_4])
+            gamma_0[idx_4])
         iota_11 = (beta_1[idx_2] + b[G == 1][:, idx_2]).dot(
-            gamma_1_wo_noise[idx_4]) + X[G == 1].dot(.1 * xi)
-        iota_11 += b[G == 1].dot(gamma_1_wo_noise[idx_12])
+            gamma_1[idx_4]) + X[G == 1].dot(.1 * xi)
+        iota_11 += b[G == 1].dot(gamma_1[idx_12])
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(
-            gamma_1_wo_noise[idx_4])
+            gamma_1[idx_4])
         self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
 
         T_star = np.zeros(n_samples)
@@ -542,6 +543,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                     if t_max[i] not in times_i[l]:
                         times_i[l] = np.append(times_i[l], t_max[i])
             y_i = []
+            Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
             for l in range(n_long_features):
                 if G[i] == 0:
                     beta_l = beta_0[2 * l:2 * l + 2]
@@ -553,13 +555,26 @@ class SimuJointLongitudinalSurvival(Simulation):
                 N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
-                y_i += [pd.Series(U_il.dot(beta_l) + U_il.dot(b_l) + eps_il,
-                                  index=times_i[l])]
+                y_il = U_il.dot(beta_l) + U_il.dot(b_l) + eps_il
+                y_i += [pd.Series(y_il, index=times_i[l])]
+                tmp = {"id": [i] * n_il,
+                       "time": times_i[l],
+                       "kind": ["long_feat_" + str(i)] * n_il,
+                       "value": y_il}
+                Y_tsfresh = Y_tsfresh.append(pd.DataFrame(tmp),
+                                             ignore_index=True)
 
             Y.loc[i] = y_i
+
         self.event_times = T_star
         self.long_features = Y
         self.latent_class = G
         self.N_il = N_il
 
-        return X, Y, np.ceil(T), delta, S_k, t_max
+        # TODO: Extract asso_feat using tsfresh (not work yet)
+        # asso_features = extract_features(Y_tsfresh, column_id="id",
+        #                                  column_sort="time",
+        #                                  column_kind="kind",
+        #                                  column_value="value")
+        asso_features = np.random.uniform(-5, 5, (n_samples, 3 * n_long_features))
+        return X, Y, np.ceil(T), delta, S_k, t_max, asso_features
