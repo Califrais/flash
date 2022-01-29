@@ -700,12 +700,12 @@ class prox_QNMCEM(Learner):
             # beta, gamma needs to be updated before the baseline
             self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
             E_func.theta = self.theta
-            E_g4 = E_func.Eg(E_func.g4(gamma_0, gamma_1), Lambda_1, pi_xi, f)
 
             # baseline hazard update
+            tmp = np.exp(asso_feats.dot(np.hstack((gamma_0, gamma_1))))
             baseline_hazard = pd.Series(
                 data=  (((ind_1.T * delta).sum(axis=1)) /
-                      ((E_g4.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
+                      ((ind_2.T[..., None] * tmp) * pi_est_K.T)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
             # phi update
