@@ -217,7 +217,7 @@ class prox_QNMCEM(Learner):
         return rel
 
     @staticmethod
-    def _log_lik(pi_xi, f_mean):
+    def _log_lik(pi_xi, f):
         """Computes the approximation of the likelihood of the lights model
 
         Parameters
@@ -226,8 +226,8 @@ class prox_QNMCEM(Learner):
             Probability estimates for being on the high-risk group given
             time-independent features
 
-        f_mean : `np.ndarray`, shape=(n_samples, K)
-            The mean value of f(Y, T, delta| S, G ; theta) over S
+        f : `np.ndarray`, shape=(n_samples, K)
+            The value of f(Y, T, delta| b, G, asso_feats ; theta)
 
         Returns
         -------
@@ -235,10 +235,10 @@ class prox_QNMCEM(Learner):
             The approximated log-likelihood computed on the given data
         """
         pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
-        prb = np.log((pi_xi_ * f_mean).sum(axis=-1)).mean()
+        prb = np.log((pi_xi_ * f).sum(axis=-1)).mean()
         return prb
 
-    def _func_obj(self, pi_xi, f_mean):
+    def _func_obj(self, pi_xi, f):
         """The global objective to be minimized by the prox-QNMCEM algorithm
         (including penalization)
 
@@ -248,8 +248,8 @@ class prox_QNMCEM(Learner):
             Probability estimates for being on the high-risk group given
             time-independent features
 
-        f_mean : `np.ndarray`, shape=(n_samples, K)
-            The mean value of f(Y, T, delta| S, G ; theta) over S
+        f : `np.ndarray`, shape=(n_samples, K)
+            The value of f(Y, T, delta|b, G, asso_feats ; theta)
 
         Returns
         -------
@@ -260,7 +260,7 @@ class prox_QNMCEM(Learner):
         eta_sp_gp_l1 = self.eta_sp_gp_l1
         l_pen_SGL = self.l_pen_SGL
         theta = self.theta
-        log_lik = self._log_lik(pi_xi, f_mean)
+        log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
         xi = theta["xi"]
         xi_pen = self.ENet.pen(xi)
@@ -318,47 +318,7 @@ class prox_QNMCEM(Learner):
         pi_est = tmp[:, 1] / tmp.sum(axis=1)
         return pi_est
 
-    @staticmethod
-    def intensity(rel_risk, indicator):
-        """Compute the intensity of f_data_given_latent
-
-        Parameters
-        ----------
-        rel_risk: `np.ndarray`, shape=(N_MC, K, J)
-            The relative risk
-
-        indicator: `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T == T_u)
-
-        Returns
-        -------
-        intensity : `np.ndarray`, shape=(N_MC, K, n_samples)
-            The value of intensity
-        """
-        intensity = rel_risk.dot(indicator.T)
-        return intensity
-
-    @staticmethod
-    def survival(rel_risk, indicator):
-        """Computes the survival function
-
-        Parameters
-        ----------
-        rel_risk: `np.ndarray`, shape=(N_MC, K, J)
-            The relative risk
-
-        indicator: `np.ndarray`, shape=(n_samples, J)
-            The indicator matrix for comparing event times (T <= T_u)
-
-        Returns
-        -------
-        survival : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the survival function
-        """
-        survival = np.exp(-rel_risk.dot(indicator.T).T)
-        return survival
-
-    def f_y_given_latent(self, extracted_features, S, beta):
+    def f_y_given_latent(self, extracted_features, beta):
         """Computes the density of the longitudinal processes given latent
         variables
 
@@ -370,34 +330,30 @@ class prox_QNMCEM(Learner):
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
 
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
-
         beta : `list`
             list of fixed effect parameters
 
         Returns
         -------
-        f_y : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y | S, G ; theta)
+        f_y : `np.ndarray`, shape=(n_samples, K)
+            The value of the f(Y | G ; theta)
         """
         (U_list, V_list, y_list, N_list) = extracted_features[0]
         n_samples, n_long_features = len(y_list), self.n_long_features
         phi = self.theta["phi"]
-        N_MC = S.shape[0]
+        D = self.theta["long_cov"]
         K = 2  # 2 latent groups
-        f_y = np.ones(shape=(n_samples, K, N_MC))
+        f_y = np.ones(shape=(n_samples, K))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], \
                                  np.array(y_list[i]).flatten(), N_list[i]
             inv_Phi_i = []
             for l in range(n_long_features):
                 inv_Phi_i += [phi[l, 0]] * N_list[i][l]
-            cov = np.diag(inv_Phi_i)
+            cov = np.diag(inv_Phi_i) + multi_dot([V_i, D, V_i.T])
             for k in range(K):
-                for s in range(N_MC):
-                    mean = U_i.dot(beta[k].flatten()) + V_i.dot(S[s])
-                    f_y[i, k, s] = multivariate_normal.pdf(y_i, mean, cov)
+                mean = U_i.dot(beta[k].flatten())
+                f_y[i, k] = multivariate_normal.pdf(y_i, mean, cov)
         return f_y
 
     def mlmm_density(self, extracted_features):
@@ -439,7 +395,7 @@ class prox_QNMCEM(Learner):
 
         return log_lik
 
-    def f_data_given_latent(self, extracted_features, T, T_u, delta, S):
+    def f_data_given_latent(self, extracted_features, asso_feats, T, T_u, delta):
         """Estimates the data density given latent variables
 
         Parameters
@@ -449,6 +405,9 @@ class prox_QNMCEM(Learner):
             Each tuple is a combination of fixed-effect design features,
             random-effect design features, outcomes, number of the longitudinal
             measurements for all subject or arranged by l-th order.
+
+        asso_feats : `np.ndarray`, shape=(n_samples, n_asso_params)
+            Association features extracted from tsfresh
 
         T : `np.ndarray`, shape=(n_samples,)
             Censored times of the event of interest
@@ -464,8 +423,8 @@ class prox_QNMCEM(Learner):
 
         Returns
         -------
-        f : `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y, T, delta| S, G ; theta)
+        f : `np.ndarray`, shape=(n_samples, K)
+            The value of the f(Y, T, delta| asso_feats, b, G ; theta)
         """
         theta, alpha = self.theta, self.fixed_effect_time_order
         L = self.n_long_features
