@@ -683,17 +683,10 @@ class prox_QNMCEM(Learner):
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
                         "extracted_features": ext_feat,
-                        "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
+                        "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma,
+                        "asso_feats": asso_feats}
 
-            E_func.compute_AssociationFunctions(S, self.simu,
-                                                self.cov_corr_rdn_long,self.S_k)
-            gamma_0_prev = gamma_0.copy()
-            args_0 = {"group": 0,
-                      "E_g3": E_g3(),
-                      "E_g4": lambda v: E_g4(v, gamma_1),
-                      "E_log_g4": lambda v: E_log_g4(v, gamma_1),
-                      "E_g5": lambda v: E_g5(v, gamma_1)
-                      }
+            args_0 = {"group": 0}
             res0 = copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
                 max_iter=max_iter_proxg,
@@ -703,12 +696,7 @@ class prox_QNMCEM(Learner):
             gamma_0 = res0.x.reshape(-1, 1)
 
             # gamma_1 update
-            args_1 = {"group": 1,
-                      "E_g3": E_g3(),
-                      "E_g4": lambda v: E_g4(gamma_0_prev, v),
-                      "E_log_g4": lambda v: E_log_g4(gamma_0_prev, v),
-                      "E_g5": lambda v: E_g5(gamma_0_prev, v)
-                      }
+            args_1 = {"group": 1}
             res1 = (copt.minimize_proximal_gradient(
                 fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
                 max_iter=max_iter_proxg,
