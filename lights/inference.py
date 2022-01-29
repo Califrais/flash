@@ -731,16 +731,15 @@ class prox_QNMCEM(Learner):
                                long_cov=D, xi=xi_ext)
             pi_xi = self._get_proba(X)
             E_func.theta = self.theta
-            S = E_func.construct_MC_samples(N)
-            f = self.f_data_given_latent(ext_feat, T, T_u, delta, S)
+            E_func.b_stats(ext_feat)
+            f = self.f_data_given_latent(ext_feat, asso_feats, T, T_u, delta)
 
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
                 if self.compute_obj:
                     prev_obj = obj
-                    f_mean = f.mean(axis=-1)
-                    obj = self._func_obj(pi_xi, f_mean)
+                    obj = self._func_obj(pi_xi, f)
                     rel_obj = abs(obj - prev_obj) / abs(prev_obj)
                     self.history.update(n_iter=n_iter, theta=self.theta,
                                         obj=obj, rel_obj=rel_obj)
