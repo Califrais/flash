@@ -3,7 +3,6 @@ import pandas as pd
 import copt
 import warnings
 from scipy.optimize import fmin_l_bfgs_b
-from numpy.linalg import multi_dot
 from lifelines.utils import concordance_index as c_index_score
 from lights.base.base import Learner, extract_features, normalize, block_diag, \
     get_xi_from_xi_ext, logistic_grad, get_times_infos
@@ -13,6 +12,7 @@ from lights.model.e_step_functions import EstepFunctions
 from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
+from numpy.linalg import multi_dot
 
 
 class prox_QNMCEM(Learner):
@@ -116,9 +116,9 @@ class prox_QNMCEM(Learner):
                  eta_elastic_net=.1, eta_sp_gp_l1=.1,
                  max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
                  verbose=True, print_every=10, tol=1e-5,
-                 warm_start=True, fixed_effect_time_order=5, n_MC=50,
-                 asso_functions='all', initialize=True, copt_accelerate=False,
-                 compute_obj=False, copt_solver_step='backtracking', simu=True,
+                 warm_start=True, fixed_effect_time_order=5, initialize=True,
+                 copt_accelerate=False, compute_obj=False,
+                 copt_solver_step='backtracking', simu=True,
                  S_k=None, cov_corr_rdn_long=.05):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
@@ -128,14 +128,12 @@ class prox_QNMCEM(Learner):
         self.warm_start = warm_start
         self.fit_intercept = fit_intercept
         self.fixed_effect_time_order = fixed_effect_time_order
-        self.asso_functions = asso_functions
         self.initialize = initialize
         self.copt_accelerate = copt_accelerate
         self.l_pen_EN = l_pen_EN
         self.l_pen_SGL = l_pen_SGL
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
-        self.n_MC = n_MC
         self.compute_obj = compute_obj
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
@@ -147,7 +145,6 @@ class prox_QNMCEM(Learner):
         self.n_samples = None
         self.n_time_indep_features = None
         self.n_long_features = None
-        self.S = None
         self.T_u = None
         self.theta = {
             "beta_0": np.empty(1),
@@ -160,17 +157,6 @@ class prox_QNMCEM(Learner):
             "gamma_1": np.empty(1)
         }
         self.copt_step = copt_solver_step
-
-    @property
-    def asso_functions(self):
-        return self._asso_functions
-
-    @asso_functions.setter
-    def asso_functions(self, val):
-        if not (val == 'all' or set(val).issubset({'lp', 're', 'tps', 'ce'})):
-            raise ValueError("``asso_functions`` must be either 'all', or a "
-                             "`list` in ['lp', 're', 'tps', 'ce']")
-        self._asso_functions = val
 
     @property
     def copt_accelerate(self):
@@ -272,7 +258,6 @@ class prox_QNMCEM(Learner):
         gamma_0_pen = SGL1.pen(gamma_0)
         gamma_1_pen = SGL1.pen(gamma_1)
         pen = xi_pen + gamma_0_pen + gamma_1_pen
-
         return -log_lik + pen
 
     def _get_proba(self, X):
@@ -427,9 +412,7 @@ class prox_QNMCEM(Learner):
             The value of the f(Y, T, delta| asso_feats, b, G ; theta)
         """
         theta, alpha = self.theta, self.fixed_effect_time_order
-        L = self.n_long_features
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        E_func = EstepFunctions(T_u, L, alpha, self.asso_functions, theta)
         beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
         gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
         gamma_stack = np.hstack((gamma_0, gamma_1))
@@ -469,7 +452,6 @@ class prox_QNMCEM(Learner):
             group
         """
         if self._fitted:
-            n_samples = X.shape[0]
             theta, alpha = self.theta, self.fixed_effect_time_order
             ext_feat = extract_features(Y, alpha)
             n_samples, n_long_features = Y.shape
@@ -647,7 +629,6 @@ class prox_QNMCEM(Learner):
                 pgtol=pgtol)[0]
 
             # beta update
-            K = 2
             pi_est_K = np.vstack((1 - pi_est, pi_est))
             (U_list, V_list, y_list, _) = ext_feat[0]
             num = np.zeros((K, L * q_l))
@@ -659,7 +640,6 @@ class prox_QNMCEM(Learner):
                 for k in range(K):
                     num[k] += pi_est_K[k, i] * tmp_num
                     den[k] += pi_est_K[k, i] * tmp_den
-
             beta_0 = np.linalg.inv(den[0]).dot(num[0]).reshape(-1, 1)
             beta_1 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
             self._update_theta(beta_0=beta_0, beta_1=beta_1)
