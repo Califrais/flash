@@ -578,19 +578,11 @@ class prox_QNMCEM(Learner):
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
 
         #TODO: just for testing, remove later
-        phi = 25 * np.ones(L).reshape(-1, 1)
+        phi = np.ones(L).reshape(-1, 1)
         D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
-        if self.simu:
-            #TODO: hardcode for testing
-            sparsity = .5
-            nb_noise_asso_param = np.ceil((nb_asso_param) * (1 - sparsity)
-                                          / sparsity).astype(int)
-            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param
-                                           + nb_noise_asso_param), 1))
-        else:
-            gamma_0 = 1e-4 * np.ones((L * (nb_asso_param), 1))
+        gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
         gamma_1 = gamma_0.copy()
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
                            gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
