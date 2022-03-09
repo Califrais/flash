@@ -727,12 +727,8 @@ class prox_QNMCEM(Learner):
                     self.history.update(n_iter=n_iter, theta=self.theta)
                 if verbose:
                     self.history.print_history()
-            if rel_theta < tol:
-                stopping_criterion_count += 1
-            else:
-                stopping_criterion_count = 0
 
-            if (n_iter + 1 > max_iter) or (stopping_criterion_count == 3):
+            if (n_iter + 1 > max_iter) or (rel_theta < tol):
                 self._fitted = True
                 break
             else:
