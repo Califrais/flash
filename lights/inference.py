@@ -15,8 +15,8 @@ from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
 
 
-class prox_QNMCEM(Learner):
-    """prox-QNMCEM Algorithm for the lights model inference
+class prox_QNEM(Learner):
+    """prox-QNEM Algorithm for the lights model inference
 
     Parameters
     ----------
@@ -42,7 +42,7 @@ class prox_QNMCEM(Learner):
         For eta_sp_gp_l1 = 1 this is Group L1
 
     max_iter: `int`, default=100
-        Maximum number of iterations of the prox-QNMCEM algorithm
+        Maximum number of iterations of the prox-QNEM algorithm
 
     max_iter_lbfgs: `int`, default=50
         Maximum number of iterations of the L-BFGS-B solver
@@ -92,7 +92,7 @@ class prox_QNMCEM(Learner):
         gradient (FISTA), otherwise we use regular ISTA
 
     compute_obj : `bool`, default=False
-        If `True`, we compute the global objective to be minimized by the prox-QNMCEM
+        If `True`, we compute the global objective to be minimized by the prox-QNEM
          algorithm and store it in history
 
     copt_solver_step : function or `str`='backtracking', default='backtracking'
@@ -225,7 +225,7 @@ class prox_QNMCEM(Learner):
         return prb
 
     def _func_obj(self, pi_xi, f):
-        """The global objective to be minimized by the prox-QNMCEM algorithm
+        """The global objective to be minimized by the prox-QNEM algorithm
         (including penalization)
 
         Parameters
