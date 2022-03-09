@@ -168,7 +168,8 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         pi_est = arg["pi_est"][group]
         tmp = asso_feats.dot(gamma_k)
-        sub_obj = tmp * delta - np.exp(tmp) * ind_2.dot(baseline_val)
+        sub_obj = (tmp * ind_1).sum(axis=1) * delta  - \
+                  ((np.exp(tmp) * baseline_val) * ind_2).sum(axis=1)
         sub_obj = (pi_est * sub_obj).sum()
         return -sub_obj / n_samples
 
@@ -193,6 +194,7 @@ class MstepFunctions:
         baseline_val = arg["baseline_hazard"].values.flatten()
         pi_est = arg["pi_est"][group]
         tmp = asso_feats.dot(gamma_k)
-        grad = asso_feats.T * (delta - np.exp(tmp) * (ind_2.dot(baseline_val)))
+        grad = (asso_feats.T * ind_1.T).sum(axis=1) * delta - \
+               ((asso_feats.T * np.exp(tmp).T).swapaxes(1, 2) * baseline_val * ind_2).sum(axis=-1)
         grad = (grad * pi_est).sum(axis=-1)
         return -grad / n_samples
