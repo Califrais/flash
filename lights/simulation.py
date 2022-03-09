@@ -250,7 +250,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  coeff_val_asso_high_risk: float = .1,
                  cov_corr_time_indep: float = .5,
                  high_risk_rate: float = .4, gap: float = .5,
-                 n_long_features: int = 10, cov_corr_long: float = .001,
+                 n_long_features: int = 10, cov_corr_long: float = .01,
                  fixed_effect_mean_low_risk: tuple = (-.8, .2),
                  fixed_effect_mean_high_risk: tuple = (1.5, .8),
                  corr_fixed_effect: float = .01,
