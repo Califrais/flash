@@ -419,8 +419,8 @@ class prox_QNMCEM(Learner):
         tmp = np.exp(asso_feats.dot(gamma_stack))
         baseline_val = baseline_hazard.values.flatten()
         _, ind_1, ind_2 = get_times_infos(T, T_u)
-        intensity = tmp.T * (ind_1.dot(baseline_val))
-        survival = np.exp(-tmp.T * (ind_2.dot(baseline_val)))
+        intensity = (tmp.T * ind_1.T).swapaxes(1, -1).dot(baseline_val)
+        survival = np.exp(-(tmp.T * ind_2.T).swapaxes(1, -1).dot(baseline_val))
         f = ((intensity ** delta) * survival).T
         f_y = self.f_y_given_latent(extracted_features, [beta_0, beta_1])
         f *= f_y
