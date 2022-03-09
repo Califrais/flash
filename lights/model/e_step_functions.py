@@ -76,12 +76,12 @@ class EstepFunctions:
         self.EbbT = np.zeros((n_samples, K, r, r))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
-            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
-            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
-            tmp_1 = np.linalg.inv(multi_dot([V_i.T, inv_Sigma_i, V_i]) + inv_D)
+            Phi_i = [[1 / phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            Sigma_i = np.diag(np.concatenate(Phi_i))
+            tmp_1 = np.linalg.inv(multi_dot([V_i.T, Sigma_i, V_i]) + inv_D)
             tmp_2 = y_i - U_i.dot(beta_stack)
             for k in range(K):
-                b_mean = multi_dot([tmp_1, V_i.T, inv_Sigma_i, tmp_2[:, k]]).reshape(-1, 1)
+                b_mean = multi_dot([tmp_1, V_i.T, Sigma_i, tmp_2[:, k]]).reshape(-1, 1)
                 b_cov = tmp_1
                 self.Eb[i, k] = b_mean.flatten()
                 self.EbbT[i, k] = b_cov + b_mean.dot(b_mean.T)
