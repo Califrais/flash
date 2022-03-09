@@ -531,7 +531,7 @@ class prox_QNMCEM(Learner):
         if fit_intercept:
             p += 1
 
-        nb_asso_param = asso_feats.shape[1] // L
+        nb_asso_param = asso_feats.shape[-1] // L
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
         T_u = np.unique(T)
