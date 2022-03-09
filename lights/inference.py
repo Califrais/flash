@@ -685,7 +685,7 @@ class prox_QNMCEM(Learner):
             tmp = np.exp(asso_feats.dot(np.hstack((gamma_0, gamma_1))))
             baseline_hazard = pd.Series(
                 data=  (((ind_1.T * delta).sum(axis=1)) /
-                      ((ind_2.T[..., None] * tmp) * pi_est_K.T)
+                      ((tmp.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
                       .sum(axis=2).sum(axis=1)), index=T_u)
 
             # phi update
