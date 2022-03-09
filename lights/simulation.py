@@ -7,7 +7,6 @@ from scipy.sparse import random
 from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
-from tsfresh import extract_features
 
 
 def features_normal_cov_toeplitz(n_samples: int = 200, n_features: int = 10,
@@ -519,6 +518,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
 
         N_il = np.zeros((n_samples, n_long_features))
+        Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
         # TODO : delete N_il after tests
         for i in range(n_samples):
             hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
@@ -543,7 +543,6 @@ class SimuJointLongitudinalSurvival(Simulation):
                     if t_max[i] not in times_i[l]:
                         times_i[l] = np.append(times_i[l], t_max[i])
             y_i = []
-            Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
             for l in range(n_long_features):
                 if G[i] == 0:
                     beta_l = beta_0[2 * l:2 * l + 2]
@@ -559,7 +558,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                 y_i += [pd.Series(y_il, index=times_i[l])]
                 tmp = {"id": [i] * n_il,
                        "time": times_i[l],
-                       "kind": ["long_feat_" + str(i)] * n_il,
+                       "kind": ["long_feat_" + str(l)] * n_il,
                        "value": y_il}
                 Y_tsfresh = Y_tsfresh.append(pd.DataFrame(tmp),
                                              ignore_index=True)
@@ -571,10 +570,4 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.latent_class = G
         self.N_il = N_il
 
-        # TODO: Extract asso_feat using tsfresh (not work yet)
-        # asso_features = extract_features(Y_tsfresh, column_id="id",
-        #                                  column_sort="time",
-        #                                  column_kind="kind",
-        #                                  column_value="value")
-        asso_features = np.random.uniform(-5, 5, (n_samples, 3 * n_long_features))
-        return X, Y, np.ceil(T), delta, S_k, t_max, asso_features
+        return X, Y, np.ceil(T), delta, S_k, t_max, Y_tsfresh
