@@ -239,6 +239,20 @@ def visualize_vect_learning(learner, name, symbol = None, true_coeffs = None,
         plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
         plot_history(learner, name="rel_obj", ax=ax, color='r', logy=True,
                      legend=False)
+    elif name in ["gamma_0", "gamma_1"]:
+        fig = plt.figure(figsize=(8, 4))
+        ax = fig.add_subplot(111)
+        plt.title("%s learning" % symbol, fontsize=fs + 2)
+        plt.xlabel('iterations', fontsize=fs + 2)
+        plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
+        cm = 'Dark2'
+        plot_history(learner, name=name, ax=ax, colormap=cm, alpha=.8)
+
+        legend1 = ax.legend(legend_est, loc='center right',
+                            bbox_to_anchor=(-0.1, 0.5), fontsize=fs)
+        plt.gca().add_artist(legend1)
+        fig.tight_layout()
+        plt.show()
     else:
         fig = plt.figure(figsize=(8, 4))
         ax = fig.add_subplot(111)
