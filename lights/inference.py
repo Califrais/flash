@@ -72,14 +72,6 @@ class prox_QNEM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
-    asso_functions : `list` or `str`='all', default='all'
-        List of association functions wanted or string 'all' to select all
-        defined association functions. The available functions are :
-            - 'lp' : linear predictor
-            - 're' : random effects
-            - 'tps' : time dependent slope
-            - 'ce' : cumulative effects
-
     initialize : `bool`, default=True
         If `True`, we initialize the parameters using MLMM model, otherwise we
         use arbitrarily chosen fixed initialization

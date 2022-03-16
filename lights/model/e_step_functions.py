@@ -22,27 +22,18 @@ class EstepFunctions:
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
-    asso_functions_list : `list` or `str`='all'
-        List of association functions wanted or string 'all' to select all
-        defined association functions. The available functions are :
-            - 'lp' : linear predictor
-            - 're' : random effects
-            - 'tps' : time dependent slope
-            - 'ce' : cumulative effects
-
     theta : `dict`
         Vector that concatenates all parameters to be inferred in the lights
         model
     """
 
-    def __init__(self, T_u, n_long_features, asso_feats,  fixed_effect_time_order, theta):
+    def __init__(self, T_u, n_long_features,  fixed_effect_time_order, theta):
         self.theta = theta
         self.n_long_features = n_long_features
         self.J = len(T_u)
         self.nb_total_asso_features = len(theta["gamma_0"])
         self.fixed_effect_time_order = fixed_effect_time_order
         self.q_l, self.r_l = fixed_effect_time_order + 1, 2
-        self.asso_feats = asso_feats
 
 
     def b_stats(self, extracted_features):
