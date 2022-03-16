@@ -716,7 +716,7 @@ class prox_QNEM(Learner):
                 if verbose:
                     self.history.print_history()
 
-            if (n_iter + 1 > max_iter) or (rel_theta < tol):
+            if (n_iter + 1 > max_iter) or (rel_obj < tol):
                 self._fitted = True
                 break
             else:
