@@ -88,7 +88,7 @@ class EstepFunctions:
 
     @staticmethod
     def Lambda_g(g, f):
-        """Approximated integral (see (15) in the lights paper)
+        """The calculation of integral (see (15) in the lights paper)
 
         Parameters
         ----------
@@ -105,7 +105,7 @@ class EstepFunctions:
         Returns
         -------
         Lambda_g : `np.array`, shape=(n_samples, K, shape(g))
-            The approximated integral computed for all subjects, all groups and
+            The integral computed for all subjects, all groups and
             all Monte Carlo samples. Each element could be real or matrices
             depending on Im(\tilde{g}_i)
         """
@@ -113,7 +113,7 @@ class EstepFunctions:
         return Lambda_g
 
     def Eg(self, g, Lambda_1, pi_xi, f):
-        """Computes approximated expectations of different functions g taking
+        """Computes expectations of different functions g taking
         random effects as input, conditional on the observed data and the
         current estimate of the parameters. See (13) in the lights paper
 
@@ -123,20 +123,20 @@ class EstepFunctions:
             The value of g function for all samples
 
         Lambda_1: `np.ndarray`, shape=(n_samples, K)
-            Approximated integral (see (17) in the lights paper) with
+            The computed integral (see (15) in the lights paper) with
             \tilde(g)=1
 
         pi_xi: `np.ndarray`, shape=(n_samples,)
             The posterior probability of the sample for being on the
             high-risk group given all observed data
 
-        f: `np.ndarray`, shape=(n_samples, K, N_MC)
-            The value of the f(Y, T, delta| S, G ; theta)
+        f: `np.ndarray`, shape=(n_samples, K)
+            The value of the f(Y, T, delta| G ; theta)
 
         Returns
         -------
         Eg : `np.ndarray`, shape=(n_samples, g.shape)
-            The approximated expectations for g
+            The expectations for g
         """
         Lambda_g = self.Lambda_g(g, f)
         Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (

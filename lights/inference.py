@@ -170,7 +170,7 @@ class prox_QNEM(Learner):
 
     @staticmethod
     def _log_lik(pi_xi, f):
-        """Computes the approximation of the likelihood of the lights model
+        """Computes the the likelihood of the lights model
 
         Parameters
         ----------
@@ -184,7 +184,7 @@ class prox_QNEM(Learner):
         Returns
         -------
         prb : `float`
-            The approximated log-likelihood computed on the given data
+            The log-likelihood computed on the given data
         """
         pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
         prb = np.log((pi_xi_ * f).sum(axis=-1)).mean()
@@ -256,7 +256,7 @@ class prox_QNEM(Learner):
             Comes from get_proba function
 
         Lambda_1 : `np.ndarray`, shape=(n_samples, K)
-            Approximated integral (see (15) in the lights paper) with
+            Computed integral (see (15) in the lights paper) with
             \tilde(g)=1
 
         Returns
