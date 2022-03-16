@@ -72,9 +72,6 @@ class prox_QNEM(Learner):
         dimension of the corresponding design matrix is then equal to
         fixed_effect_time_order + 1
 
-    n_MC : `int`, default=50
-        Number of Monte Carlo sample used in the E-step
-
     asso_functions : `list` or `str`='all', default='all'
         List of association functions wanted or string 'all' to select all
         defined association functions. The available functions are :
@@ -329,9 +326,6 @@ class prox_QNEM(Learner):
 
         delta : `np.ndarray`, shape=(n_samples,)
             Censoring indicator
-
-        S : `np.ndarray`, shape=(N_MC, r)
-            Set of constructed Monte Carlo samples
 
         Returns
         -------
