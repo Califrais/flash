@@ -1,12 +1,8 @@
 
 import numpy as np
-from lights.model.associations import AssociationFunctionFeatures
-from sklearn.preprocessing import StandardScaler
-import numba as nb
 from numpy.linalg import multi_dot
 from llvmlite import binding
 binding.set_option('SVML', '-vector-library=SVML')
-from lights.simulation import features_normal_cov_toeplitz
 
 
 class EstepFunctions:
