@@ -307,45 +307,6 @@ class prox_QNEM(Learner):
                 f_y[i, k] = multivariate_normal.pdf(y_i, mean, cov)
         return f_y
 
-    def mlmm_density(self, extracted_features):
-        """Computes the log-likelihood of the multivariate linear mixed model
-
-        Parameters
-        ----------
-        extracted_features : `tuple, tuple`,
-            The extracted features from longitudinal data.
-            Each tuple is a combination of fixed-effect design features,
-            random-effect design features, outcomes, number of the longitudinal
-            measurements for all subject or arranged by l-th order.
-
-        Returns
-        -------
-        output : `float`
-            The value of the log-likelihood
-        """
-        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
-        n_samples, n_long_features = len(U_list), len(U_L)
-        theta = self.theta
-        D, phi = theta["long_cov"], theta["phi"]
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        beta_stack = np.hstack((beta_0, beta_1))
-
-        log_lik = np.zeros((n_samples, 2))
-        for i in range(n_samples):
-            U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
-            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
-            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
-            tmp_1 = multi_dot([V_i, D, V_i.T]) + inv_Sigma_i
-            tmp_2 = y_i - U_i.dot(beta_stack)
-
-            op1 = n_i * np.log(2 * np.pi)
-            op2 = np.log(np.linalg.det(tmp_1))
-            op3 = np.diag(multi_dot([tmp_2.T, np.linalg.inv(tmp_1), tmp_2]))
-
-            log_lik[i] = np.exp(-.5 * (op1 + op2 + op3))
-
-        return log_lik
-
     def f_data_given_latent(self, extracted_features, asso_feats, T, T_u, delta):
         """Estimates the data density given latent variables
 
