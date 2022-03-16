@@ -558,7 +558,6 @@ class prox_QNEM(Learner):
         if verbose:
             self.history.print_history()
 
-        stopping_criterion_count = 0
         for n_iter in range(1, max_iter + 1):
 
             # E-Step
