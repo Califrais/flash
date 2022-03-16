@@ -169,34 +169,6 @@ class prox_QNEM(Learner):
         return self._fitted
 
     @staticmethod
-    def _rel_theta(theta, prev_theta, eps):
-        """Computes the relative difference of the current estimated parameters
-        with the previous one.
-
-        Parameters
-        ----------
-        theta : `dictionary`
-            Dictionary of current estimated parameters
-
-        prev_theta : `dictionary`
-            Dictionary of previous iteration estimated parameters
-
-        eps : float
-            The value of epsilon
-
-        Returns
-        -------
-        rel : `float`
-            The computed relative difference
-        """
-        rel = 0
-        for key_ in theta.keys():
-            tmp = np.linalg.norm(theta[key_] - prev_theta[key_]) / \
-                  (np.linalg.norm(theta[key_]) + eps)
-            rel = max(rel, tmp)
-        return rel
-
-    @staticmethod
     def _log_lik(pi_xi, f):
         """Computes the approximation of the likelihood of the lights model
 
@@ -586,7 +558,6 @@ class prox_QNEM(Learner):
         if verbose:
             self.history.print_history()
 
-        prev_theta = self.theta.copy()
         stopping_criterion_count = 0
         for n_iter in range(1, max_iter + 1):
 
@@ -705,8 +676,6 @@ class prox_QNEM(Learner):
             E_func.b_stats(ext_feat)
             f = self.f_data_given_latent(ext_feat, asso_feats, T, T_u, delta)
 
-            rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
-            prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
                 prev_obj = obj
                 obj = self._func_obj(pi_xi, f)
