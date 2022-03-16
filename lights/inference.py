@@ -91,10 +91,6 @@ class prox_QNEM(Learner):
         If `True`, we choose copt solver with accelerated proximal
         gradient (FISTA), otherwise we use regular ISTA
 
-    compute_obj : `bool`, default=False
-        If `True`, we compute the global objective to be minimized by the prox-QNEM
-         algorithm and store it in history
-
     copt_solver_step : function or `str`='backtracking', default='backtracking'
         Step size for optimization algorithm used in Copt colver
 
@@ -117,9 +113,8 @@ class prox_QNEM(Learner):
                  max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
                  verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5, initialize=True,
-                 copt_accelerate=False, compute_obj=False,
-                 copt_solver_step='backtracking', simu=True,
-                 S_k=None, cov_corr_rdn_long=.05):
+                 copt_accelerate=False, copt_solver_step='backtracking',
+                 simu=True, S_k=None, cov_corr_rdn_long=.05):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -134,7 +129,6 @@ class prox_QNEM(Learner):
         self.l_pen_SGL = l_pen_SGL
         self.eta_elastic_net = eta_elastic_net
         self.eta_sp_gp_l1 = eta_sp_gp_l1
-        self.compute_obj = compute_obj
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.simu = simu
@@ -586,12 +580,9 @@ class prox_QNEM(Learner):
         pi_xi = self._get_proba(X)
 
         # Store init values
-        if self.compute_obj:
-            obj = self._func_obj(pi_xi, f)
-            self.history.update(n_iter=0, obj=obj,
-                                rel_obj=np.inf, theta=self.theta)
-        else:
-            self.history.update(n_iter=0, theta=self.theta)
+        obj = self._func_obj(pi_xi, f)
+        self.history.update(n_iter=0, obj=obj,
+                            rel_obj=np.inf, theta=self.theta)
         if verbose:
             self.history.print_history()
 
@@ -717,14 +708,11 @@ class prox_QNEM(Learner):
             rel_theta = self._rel_theta(self.theta, prev_theta, 1e-2)
             prev_theta = self.theta.copy()
             if n_iter % print_every == 0:
-                if self.compute_obj:
-                    prev_obj = obj
-                    obj = self._func_obj(pi_xi, f)
-                    rel_obj = abs(obj - prev_obj) / abs(prev_obj)
-                    self.history.update(n_iter=n_iter, theta=self.theta,
-                                        obj=obj, rel_obj=rel_obj)
-                else:
-                    self.history.update(n_iter=n_iter, theta=self.theta)
+                prev_obj = obj
+                obj = self._func_obj(pi_xi, f)
+                rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+                self.history.update(n_iter=n_iter, theta=self.theta,
+                                    obj=obj, rel_obj=rel_obj)
                 if verbose:
                     self.history.print_history()
 
