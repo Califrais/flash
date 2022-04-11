@@ -189,10 +189,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         Level of censoring. Increasing censoring_factor leads to less censored
         times and conversely.
 
-    run_all : `bool`, default=False
-        Indicator whether the simulated data is used for running on R scripts
-        or not.
-
     Attributes
     ----------
     time_indep_features : `np.array`, shape=(n_samples, n_time_indep_features)
@@ -234,6 +230,11 @@ class SimuJointLongitudinalSurvival(Simulation):
     event_times : `np.ndarray`, shape=(n_samples,)
             The simulated times of the event of interest
 
+    gird_time : `bool`, defaut=True
+        If `True` we simulate data with the same time measurement for all
+        longitudinal features. Otherwise, we use multivariate Hawkes process to
+         simulate the time measurement for each longitudinal features.
+
     hawkes : `list` of `tick.hawkes.simulation.simu_hawkes_exp_kernels`
         Store the multivariate Hawkes processes with exponential kernels
         used to simulate measurement times for intensities plotting purpose
@@ -258,7 +259,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
                  shape: float = .1, scale: float = .001,
-                 censoring_factor: float = 2, run_all: bool = False):
+                 censoring_factor: float = 2, grid_time: bool = True):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
@@ -282,7 +283,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.shape = shape
         self.scale = scale
         self.censoring_factor = censoring_factor
-        self.run_all = run_all
+        self.grid_time = grid_time
 
         # Attributes that will be instantiated afterwards
         self.latent_class = None
@@ -521,20 +522,19 @@ class SimuJointLongitudinalSurvival(Simulation):
         Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
         # TODO : delete N_il after tests
         for i in range(n_samples):
-            hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
-                                          baseline=baseline, verbose=False,
-                                          end_time=t_max[i], seed=seed + i)
-            hawkes.simulate()
-            self.hawkes += [hawkes]
-            times_i = hawkes.timestamps
-            if self.run_all:
-                if len(times_i[0]) > 10:
-                    tmp = np.sort(
-                        np.random.choice(times_i[0], size=10, replace=False))
-                    if t_max[i] not in tmp:
-                        tmp = np.append(tmp, t_max[i])
+            if self.grid_time:
+                nb_time_measurement = np.random.randint(1, 10)
+                tmp = np.sort(np.random.uniform(0, t_max[i], nb_time_measurement))
+                if t_max[i] not in tmp:
+                    tmp = np.append(tmp, t_max[i])
                 times_i = [tmp] * n_long_features
             else:
+                hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
+                                              baseline=baseline, verbose=False,
+                                              end_time=t_max[i], seed=seed + i)
+                hawkes.simulate()
+                self.hawkes += [hawkes]
+                times_i = hawkes.timestamps
                 for l in range(n_long_features):
                     if len(times_i[l]) > 10:
                         times_i[l] = np.sort(
