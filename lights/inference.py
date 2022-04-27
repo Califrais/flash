@@ -13,7 +13,7 @@ from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
-
+from lights.base.base import tsfresh_extraction
 
 class prox_QNEM(Learner):
     """prox-QNEM Algorithm for the lights model inference
@@ -103,7 +103,7 @@ class prox_QNEM(Learner):
                  verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5, initialize=True,
                  copt_accelerate=False, copt_solver_step='backtracking',
-                 simu=True, S_k=None, cov_corr_rdn_long=.05):
+                 simu=True, S_k=None, cov_corr_rdn_long=.05, fc_parameters=None):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -140,6 +140,7 @@ class prox_QNEM(Learner):
             "gamma_1": np.empty(1)
         }
         self.copt_step = copt_solver_step
+        self.fc_parameters = fc_parameters
 
     @property
     def copt_accelerate(self):
@@ -407,7 +408,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, asso_feats):
+    def fit(self, X, Y, T, delta, Y_tsfresh):
         """Fits the lights model
 
         Parameters
@@ -444,12 +445,14 @@ class prox_QNEM(Learner):
         if fit_intercept:
             p += 1
 
-        nb_asso_param = asso_feats.shape[-1] // L
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, alpha)  # Features extraction
         T_u = np.unique(T)
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
+
+        asso_feats = tsfresh_extraction(Y_tsfresh, T_u, self.fc_parameters)
+        nb_asso_param = asso_feats.shape[-1] // L
 
         # Initialization
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
@@ -489,7 +492,7 @@ class prox_QNEM(Learner):
         max_iter_proxg = self.max_iter_proxg
 
         # Instanciates E-step and M-step functions
-        E_func = EstepFunctions(T_u, L, alpha, asso_feats, self.theta)
+        E_func = EstepFunctions(T_u, L, alpha, self.theta)
         E_func.b_stats(ext_feat)
         F_func = MstepFunctions(fit_intercept, X, delta, p, self.l_pen_EN,
                                 self.eta_elastic_net)
@@ -640,7 +643,7 @@ class prox_QNEM(Learner):
 
         self._end_solve()
 
-    def score(self, X, Y, T, delta, asso_feats):
+    def score(self, X, Y, T, delta, Y_tsfresh):
         """Computes the C-index score with the trained parameters on the given
         data
 
@@ -665,6 +668,7 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
+            asso_feats = tsfresh_extraction(Y_tsfresh, self.T_u, self.fc_parameters)
             c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
             return max(c_index, 1 - c_index)
         else:
