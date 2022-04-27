@@ -8,7 +8,6 @@
     "max_iter_proxg" : 10,
     "std_error" : 2,
     "n_samples" : 200,
-    "n_MC" : 50,
     "coeff_val_asso_low_risk" : 0.1,
     "coeff_val_asso_high_risk" : 0.1,
     "fixed_effect_mean_low_risk" : [-0.8, 0.2],
