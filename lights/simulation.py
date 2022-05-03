@@ -348,6 +348,12 @@ class SimuJointLongitudinalSurvival(Simulation):
         S_k : `list`
             Set of nonactive group for 2 classes
 
+        t_max : `np.ndarray`, shape=(n_samples,)
+            The time up to which subject has longitudinal data.
+
+        Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, 4)
+            The longitudinal data in the format to be used by tsfresh.
+
         """
         seed = self.seed
         n_samples = self.n_samples
@@ -502,38 +508,55 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the time up to which one has longitudinal data
         t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
 
-        # Simulation of the longitudinal features
-        decays = decay * np.ones((n_long_features, n_long_features))
         Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
                                   for l in range(n_long_features)])
-
-        # Simulation of the measurement times of the longitudinal processes
-        # using multivariate Hawkes
-        a_, b_ = adjacency_hawkes_uniform_bounds
-        rvs_adjacency = uniform(a_, b_).rvs
-        adjacency = random(n_long_features, n_long_features, density=0.3,
-                           data_rvs=rvs_adjacency, random_state=seed).todense()
-        np.fill_diagonal(adjacency, rvs_adjacency(size=n_long_features))
-
-        a_, b_ = baseline_hawkes_uniform_bounds
-        baseline = uniform(a_, b_).rvs(size=n_long_features, random_state=seed)
-
         N_il = np.zeros((n_samples, n_long_features))
         Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
+        Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
+                                  for l in range(n_long_features)])
         # TODO : delete N_il after tests
+        if self.grid_time:
+            # Simulation of the measurement times of the
+            # longitudinal processes using univarite Hawkes
+            decays = decay
+            a_, b_ = adjacency_hawkes_uniform_bounds
+            adjacency = uniform(a_, b_).rvs((1, 1))
+            a_, b_ = baseline_hawkes_uniform_bounds
+            baseline = uniform(a_, b_).rvs(1, random_state=seed)
+
+        else:
+            # Simulation of the measurement times of the longitudinal
+            # processes using multivariate Hawkes
+            decays = decay * np.ones((n_long_features, n_long_features))
+            a_, b_ = adjacency_hawkes_uniform_bounds
+            rvs_adjacency = uniform(a_, b_).rvs
+            adjacency = random(n_long_features, n_long_features,
+                               density=0.3,
+                               data_rvs=rvs_adjacency,
+                               random_state=seed).todense()
+            np.fill_diagonal(adjacency, rvs_adjacency(size=n_long_features))
+            a_, b_ = baseline_hawkes_uniform_bounds
+            baseline = uniform(a_, b_).rvs(size=n_long_features,
+                                           random_state=seed)
+
         for i in range(n_samples):
+            hawkes = SimuHawkesExpKernels(adjacency=adjacency,
+                                          decays=decays,
+                                          baseline=baseline, verbose=False,
+                                          end_time=t_max[i], seed=seed + i)
+            hawkes.simulate()
+            self.hawkes += [hawkes]
             if self.grid_time:
-                nb_time_measurement = np.random.randint(1, 10)
-                tmp = np.sort(np.random.uniform(0, t_max[i], nb_time_measurement))
+                tmp = hawkes.timestamps[0]
+                if len(tmp) > 10:
+                    tmp = np.sort(
+                        np.random.choice(tmp, size=10,
+                                         replace=False))
                 if t_max[i] not in tmp:
                     tmp = np.append(tmp, t_max[i])
+
                 times_i = [tmp] * n_long_features
             else:
-                hawkes = SimuHawkesExpKernels(adjacency=adjacency, decays=decays,
-                                              baseline=baseline, verbose=False,
-                                              end_time=t_max[i], seed=seed + i)
-                hawkes.simulate()
-                self.hawkes += [hawkes]
                 times_i = hawkes.timestamps
                 for l in range(n_long_features):
                     if len(times_i[l]) > 10:
