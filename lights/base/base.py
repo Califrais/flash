@@ -2,6 +2,8 @@ from datetime import datetime
 from lights.base.history import History
 from time import time
 import numpy as np
+import pandas as pd
+from tsfresh import extract_features as tsfresh_extract_features
 
 
 class Learner:
@@ -378,3 +380,47 @@ def clean_xi_ext(xi_ext, fit_intercept):
         n_time_indep_features = len(xi_ext) // 2
         xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
     return xi_ext
+
+def tsfresh_extraction(Y_tsfresh, T_u, fc_parameters):
+    """
+
+    Parameters
+    ----------
+    Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, 4)
+        The longitudinal data in the format to be used by tsfresh.
+
+    T_u : `np.ndarray`, shape=(J,)
+        The unique time to event.
+
+    fc_parameters : `dict`
+        Parameters to control which features are calculated by tsfresh.
+
+    Returns
+    -------
+    asso_features : `np.ndarray`, shape=(J,)
+        Extracted features.
+    """
+    J = len(T_u)
+    for j in range(J):
+        t = T_u[j]
+        tmp = Y_tsfresh[Y_tsfresh.time < t]
+        ext_feat = tsfresh_extract_features(tmp, column_id="id",
+                                    column_sort="time",
+                                    column_kind="kind",
+                                    column_value="value",
+                                    default_fc_parameters=fc_parameters,
+                                    impute_function=None
+                                    )
+        columns = np.sort(ext_feat.columns)
+        ext_feat["id"] = ext_feat.index.values
+        ext_feat = pd.merge(Y_tsfresh["id"].drop_duplicates(), ext_feat,
+                            how="left", on=["id"]).fillna(0)
+        if j == 0:
+            asso_features = np.zeros((J, ) + ext_feat[columns].shape)
+            asso_features[j] = ext_feat[columns]
+        else:
+            asso_features[j] = ext_feat[columns]
+
+    asso_features = asso_features.swapaxes(0, 1)
+
+    return asso_features
