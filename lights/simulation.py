@@ -507,9 +507,6 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of the time up to which one has longitudinal data
         t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
-
-        Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
-                                  for l in range(n_long_features)])
         N_il = np.zeros((n_samples, n_long_features))
         Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
         Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
