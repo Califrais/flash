@@ -127,7 +127,7 @@ def normalize(X):
     return X_norm
 
 
-def from_ts_to_design_features(Y_il, fixed_effect_time_order):
+def from_ts_to_design_features(Y_il, fixed_effect_time_order, t_max=None):
     """Extracts the design features from a given longitudinal trajectory
 
     Parameters
@@ -148,8 +148,15 @@ def from_ts_to_design_features(Y_il, fixed_effect_time_order):
     n_il : `list`
         The corresponding number of measurements
     """
-    times_il = Y_il.index.values
-    y_il = Y_il.values.reshape(-1, 1)
+    times_il_ = Y_il.index.values
+    if t_max is not None:
+        times_il_bool = times_il_ <= t_max
+        times_il = times_il_[times_il_bool]
+        y_il = Y_il.values[times_il_bool].reshape(-1, 1)
+    else:
+        times_il = times_il_
+        y_il = Y_il.values.reshape(-1, 1)
+
     n_il = len(times_il)
     U_il = np.ones(n_il)
     for t in range(1, fixed_effect_time_order + 1):
@@ -160,7 +167,7 @@ def from_ts_to_design_features(Y_il, fixed_effect_time_order):
     return U_il, V_il, y_il, n_il
 
 
-def extract_features(Y, fixed_effect_time_order):
+def extract_features(Y, fixed_effect_time_order, t_max=None):
     """Extract the design features from longitudinal data
 
     Parameters
@@ -210,8 +217,12 @@ def extract_features(Y, fixed_effect_time_order):
         Y_i = Y.iloc[i]
         U_i, V_i, y_i, N_i = [], [], np.array([]), []
         for l in range(n_long_features):
-            U_il, V_il, y_il, N_il = from_ts_to_design_features(
-                Y_i[l], fixed_effect_time_order)
+            if t_max is not None:
+                U_il, V_il, y_il, N_il = from_ts_to_design_features(
+                    Y_i[l], fixed_effect_time_order, t_max)
+            else:
+                U_il, V_il, y_il, N_il = from_ts_to_design_features(
+                    Y_i[l], fixed_effect_time_order)
 
             U_i.append(U_il)
             V_i.append(V_il)

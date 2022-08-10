@@ -395,6 +395,53 @@ class prox_QNEM(Learner):
         else:
             raise ValueError('You must fit the model first')
 
+    def predict_marker_sample(self, X, Y, Y_tsfresh):
+        """Marker rule of the lights model for being on the high-risk group
+
+        Parameters
+        ----------
+        X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
+            The time-independent features matrix
+
+        Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
+            The longitudinal data. Each element of the dataframe is
+            a pandas.Series
+
+        Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, _)
+            The longitudinal data in the format to be used by tsfresh.
+
+        Returns
+        -------
+        marker : `np.ndarray`, shape=(n_samples,)
+            Returns the marker rule of the sample for being on the high-risk
+            group
+        """
+        if self._fitted:
+            theta, alpha = self.theta, self.fixed_effect_time_order
+            n_samples, n_long_features = Y.shape
+            markers = []
+            asso_feats = tsfresh_extraction(Y_tsfresh, self.T_u,
+                                            self.fc_parameters)
+            for i in range(n_samples):
+                time_measurement = Y.iloc[i][0].index.values
+                # predictions for alive subjects only
+                T_u = self.T_u
+                marker = np.zeros(len(time_measurement))
+                pi_xi = self._get_proba(X[i:(i + 1)])
+                for t in range(len(time_measurement)):
+                    ext_feat = extract_features(Y[i:(i + 1)], alpha,
+                                                time_measurement[t])
+                    f = self.f_data_given_latent(ext_feat,
+                                                 asso_feats[i:(i + 1)],
+                                                 time_measurement[t], T_u, 0)
+                    marker[t] = self._get_post_proba(pi_xi, f)
+
+                markers.append(marker)
+
+            return markers
+        else:
+            raise ValueError('You must fit the model first')
+
     def _update_theta(self, **kwargs):
         """Update class attributes corresponding to lights model parameters
         """
