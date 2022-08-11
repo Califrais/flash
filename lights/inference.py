@@ -13,7 +13,7 @@ from lights.model.m_step_functions import MstepFunctions
 from lights.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
-from lights.base.base import tsfresh_extraction
+from lights.base.base import feat_representation_extraction
 
 class prox_QNEM(Learner):
     """prox-QNEM Algorithm for the lights model inference
@@ -353,7 +353,7 @@ class prox_QNEM(Learner):
             a pandas.Series
 
         asso_feats : `np.ndarray`, shape=(n_samples, n_asso_params)
-            Association features extracted from tsfresh
+            Extracted association features
 
         prediction_times : `np.ndarray`, shape=(n_samples,), default=None
             Times for prediction, that is up to which one has longitudinal data.
@@ -395,7 +395,7 @@ class prox_QNEM(Learner):
         else:
             raise ValueError('You must fit the model first')
 
-    def predict_marker_sample(self, X, Y, Y_tsfresh):
+    def predict_marker_sample(self, X, Y, Y_rep):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -407,8 +407,9 @@ class prox_QNEM(Learner):
             The longitudinal data. Each element of the dataframe is
             a pandas.Series
 
-        Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, _)
-            The longitudinal data in the format to be used by tsfresh.
+        Y_rep : `pandas.DataFrame`, shape=(n_samples, _)
+            The longitudinal data in the format to be used later for extracting
+            representation features.
 
         Returns
         -------
@@ -420,7 +421,7 @@ class prox_QNEM(Learner):
             theta, alpha = self.theta, self.fixed_effect_time_order
             n_samples, n_long_features = Y.shape
             markers = []
-            asso_feats = tsfresh_extraction(Y_tsfresh, self.T_u,
+            asso_feats = feat_representation_extraction(Y_rep, n_long_features, self.T_u,
                                             self.fc_parameters)
             for i in range(n_samples):
                 time_measurement = Y.iloc[i][0].index.values
@@ -455,7 +456,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, Y_tsfresh):
+    def fit(self, X, Y, T, delta, Y_rep):
         """Fits the lights model
 
         Parameters
@@ -498,7 +499,7 @@ class prox_QNEM(Learner):
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
 
-        asso_feats = tsfresh_extraction(Y_tsfresh, T_u, self.fc_parameters)
+        asso_feats = feat_representation_extraction(Y_rep, L, T_u, self.fc_parameters)
         nb_asso_param = asso_feats.shape[-1] // L
 
         # Initialization
@@ -690,7 +691,7 @@ class prox_QNEM(Learner):
 
         self._end_solve()
 
-    def score(self, X, Y, T, delta, Y_tsfresh):
+    def score(self, X, Y, T, delta, Y_rep):
         """Computes the C-index score with the trained parameters on the given
         data
 
@@ -715,7 +716,8 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            asso_feats = tsfresh_extraction(Y_tsfresh, self.T_u, self.fc_parameters)
+            n_long_features = Y.shape[1]
+            asso_feats = feat_representation_extraction(Y_rep, n_long_features, self.T_u, self.fc_parameters)
             c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
             return max(c_index, 1 - c_index)
         else:
