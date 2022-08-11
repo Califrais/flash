@@ -3,7 +3,7 @@ from lights.base.history import History
 from time import time
 import numpy as np
 import pandas as pd
-from tsfresh import extract_features as tsfresh_extract_features
+from tsfresh import extract_features as extract_rep_features
 
 
 class Learner:
@@ -392,19 +392,20 @@ def clean_xi_ext(xi_ext, fit_intercept):
         xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
     return xi_ext
 
-def tsfresh_extraction(Y_tsfresh, T_u, fc_parameters):
+def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
     """
 
     Parameters
     ----------
-    Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, 4)
-        The longitudinal data in the format to be used by tsfresh.
+    Y_rep : `pandas.DataFrame`, shape=(n_samples, 4)
+        The longitudinal data in the format to be used for extracting
+        representation features.
 
     T_u : `np.ndarray`, shape=(J,)
         The unique time to event.
 
     fc_parameters : `dict`
-        Parameters to control which features are calculated by tsfresh.
+        Parameters to control which features are calculated.
 
     Returns
     -------
@@ -412,10 +413,13 @@ def tsfresh_extraction(Y_tsfresh, T_u, fc_parameters):
         Extracted features.
     """
     J = len(T_u)
+    asso_features = None
+    nb_noise_feat = 2
+    nb_total_noise_feat = nb_noise_feat * n_long_features
     for j in range(J):
         t = T_u[j]
-        tmp = Y_tsfresh[Y_tsfresh.time < t]
-        ext_feat = tsfresh_extract_features(tmp, column_id="id",
+        tmp = Y_rep[Y_rep.time < t]
+        ext_feat = extract_rep_features(tmp, column_id="id",
                                     column_sort="time",
                                     column_kind="kind",
                                     column_value="value",
@@ -424,14 +428,18 @@ def tsfresh_extraction(Y_tsfresh, T_u, fc_parameters):
                                     )
         columns = np.sort(ext_feat.columns)
         ext_feat["id"] = ext_feat.index.values
-        ext_feat = pd.merge(Y_tsfresh["id"].drop_duplicates(), ext_feat,
+        ext_feat = pd.merge(Y_rep["id"].drop_duplicates(), ext_feat,
                             how="left", on=["id"]).fillna(0)
-        if j == 0:
-            asso_features = np.zeros((J, ) + ext_feat[columns].shape)
-            asso_features[j] = ext_feat[columns]
-        else:
-            asso_features[j] = ext_feat[columns]
-
+        n_samples, nb_total_extracted_feat = ext_feat[columns].shape
+        nb_extracted_feat =  nb_total_extracted_feat // n_long_features
+        nb_feat = nb_extracted_feat + nb_noise_feat
+        if asso_features is None:
+            asso_features = np.zeros((J, n_samples, nb_total_extracted_feat + nb_total_noise_feat))
+        for l in range(n_long_features):
+            asso_features[j, : , l * nb_feat : l * nb_feat + nb_extracted_feat] \
+                = ext_feat[columns].values[: , l * nb_extracted_feat : (l + 1) * nb_extracted_feat]
+            asso_features[j, :, l * nb_feat + nb_extracted_feat :
+                                (l + 1) * nb_feat] = np.random.normal(0, .1, (n_samples, nb_noise_feat))
     asso_features = asso_features.swapaxes(0, 1)
 
     return asso_features
