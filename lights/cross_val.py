@@ -5,7 +5,7 @@ from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from time import time
 from scipy.stats import beta
 import pandas as pd
-from lights.competing_methods.all_model import load_data, extract_lights_feat, extract_R_feat
+from lights.data_loader.load_data import load_data, extract_lights_feat, extract_R_feat
 
 def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
                    , simu=True, n_folds=3,
