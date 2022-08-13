@@ -1,14 +1,18 @@
 import numpy as np
 from sklearn.model_selection import KFold
-from lights.inference import prox_QNMCEM
+from lights.inference import prox_QNEM
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+from time import time
+from scipy.stats import beta
+import pandas as pd
+from lights.data_loader.load_data import load_data, extract_lights_feat, extract_R_feat
 
-
-def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
+def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
+                   , simu=True, n_folds=3,
                    adaptative_grid_el=True, shuffle=True, tol=1e-5,
                    warm_start=True, eta_elastic_net=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
-                   max_iter=100, max_iter_lbfgs=50, max_iter_proxg=50,
+                   max_iter=20, max_iter_lbfgs=50, max_iter_proxg=50,
                    max_eval=50):
     """Apply n_folds randomized search cross-validation using the given
     data, to select the best penalization hyper-parameters
@@ -86,27 +90,32 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
         zeta_xi_max = 1. / (1. - eta_elastic_net) * (.5 / n_samples) \
                       * np.absolute(X).sum(axis=0).max()
 
+
     def learners(params):
         scores = []
         for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
-            learner = prox_QNMCEM(verbose=False, tol=tol,
-                                   warm_start=warm_start, simu=simu,
-                                   fixed_effect_time_order=1, max_iter=max_iter,
+            learner = prox_QNEM(tol=tol, warm_start=warm_start, simu=simu,
+                                   fixed_effect_time_order= fixed_effect_time_order,
+                                   fc_parameters= fc_parameters, max_iter=max_iter,
                                    max_iter_lbfgs=max_iter_lbfgs,
-                                   max_iter_proxg=max_iter_proxg, S_k=S_k)
+                                   max_iter_proxg=max_iter_proxg, print_every=1)
             X_train, X_test = X[idx_train], X[idx_test]
             T_train, T_test = T[idx_train], T[idx_test]
             Y_train, Y_test = Y.iloc[idx_train, :], Y.iloc[idx_test, :]
+            id_test = np.unique(Y_rep.id.values)[idx_test]
+            Y_rep_train = Y_rep[~Y_rep.id.isin(id_test)]
+            Y_rep_test = Y_rep[Y_rep.id.isin(id_test)]
             delta_train, delta_test = delta[idx_train], delta[idx_test]
             learner.l_pen_EN = params['l_pen_EN']
             learner.l_pen_SGL = params['l_pen_SGL']
             try:
-                learner.fit(X_train, Y_train, T_train, delta_train)
+                learner.fit(X_train, Y_train, T_train, delta_train, Y_rep_train)
             except ValueError:
                 scores = np.nan
                 break
             else:
-                scores.append(learner.score(X_test, Y_test, T_test, delta_test))
+                scores.append(compute_Cindex(learner, X_test, Y_test, T_test,
+                                             delta_test, Y_rep_test))
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
     fspace = {
@@ -119,3 +128,103 @@ def cross_validate(X, Y, T, delta, S_k, simu=True, n_folds=10,
                 trials=trials)
 
     return best, trials
+
+def truncate_features(Y, t_max, Y_rep=None):
+    n_samples, n_long_features = Y.shape
+    if Y_rep is not None:
+        id = np.unique(Y_rep['id'].values)
+    for i in range(n_samples):
+        Y_i = Y.iloc[i]
+        for l in range(n_long_features):
+            time = Y_i[l].index.values
+            y = Y_i[l].values.flatten()
+            if not all(time > t_max[i]):
+                y_ = y[time <= t_max[i]]
+                time_ = time[time <= t_max[i]]
+                Y.iat[i, l] = pd.Series(y_, index=time_)
+                if Y_rep is not None:
+                    Y_rep = Y_rep.loc[~ ((Y_rep['id'] == id[i]) &
+                                          (Y_rep['kind'] == ("long_feat_" + str(l))) &
+                                          (Y_rep['time'] > t_max[i]))]
+    return Y, Y_rep
+
+def compute_Cindex(learner, X, Y, T, delta, Y_rep=None):
+    n_samples = X.shape[0]
+    t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
+    if Y_rep is None:
+        Y_, _ = truncate_features(Y.copy(), t_max)
+        score = learner.score(X, Y_, T, delta)
+    else:
+        Y_, Y_rep_ = truncate_features(Y.copy(), t_max, Y_rep.copy())
+        score = learner.score(X, Y_, T, delta, Y_rep_)
+
+    return score
+
+def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
+    seed = 100
+    running_time = []
+    score = []
+    for idx in range(n_run):
+        start_time = time()
+        if simulation:
+            data, data_lights, Y_rep, time_dep_feat, time_indep_feat = \
+                load_data(simu=True, seed=seed)
+        else:
+            data, data_lights, Y_rep, time_dep_feat, time_indep_feat = \
+                load_data(simu=False, seed=seed)
+        id_list = data_lights["id"]
+        nb_test_sample = int(test_size * len(id_list))
+        id_test = np.random.choice(id_list, size=nb_test_sample, replace=False)
+        data_lights_train = data_lights[~data_lights.id.isin(id_test)]
+        data_lights_test = data_lights[data_lights.id.isin(id_test)]
+        X_lights_train, Y_lights_train, T_train, delta_train = \
+            extract_lights_feat(data_lights_train, time_indep_feat,
+                                time_dep_feat)
+        X_lights_test, Y_lights_test, T_test, delta_test = \
+            extract_lights_feat(data_lights_test, time_indep_feat,
+                                time_dep_feat)
+
+        Y_rep_train = Y_rep[~Y_rep.id.isin(id_test)]
+        Y_rep_test = Y_rep[Y_rep.id.isin(id_test)]
+
+        data_train = data[~data.id.isin(id_test)]
+        data_test = data[data.id.isin(id_test)]
+        data_R_train, T_R_train, delta_R_train = extract_R_feat(data_train)
+        data_R_test, T_R_test, delta_R_test = extract_R_feat(data_test)
+
+        # cross_validation of lights
+        if model == "lights":
+            fc_parameters = {
+                    "mean": None,
+                    "median": None,
+                    "quantile": [{"q": 0.25}, {"q": 0.75}],
+                    "standard_deviation": None,
+                    "skewness": None,
+            }
+            fixed_effect_time_order = 1
+            zeta_gamma_max = 1
+            n_folds = 5
+            max_eval = 50
+            best_param, trials = cross_validate(X_lights_train, Y_lights_train, T_train,
+                                                delta_train, Y_rep_train,
+                                                fc_parameters,
+                                                fixed_effect_time_order,
+                                                zeta_gamma_max=zeta_gamma_max,
+                                                n_folds=n_folds,
+                                                max_eval=max_eval)
+            l_pen_EN, l_pen_SGL = best_param.values()
+            learner = prox_QNEM(fixed_effect_time_order=fixed_effect_time_order,
+                                max_iter=5, initialize=True, print_every=1,
+                                l_pen_SGL=l_pen_SGL, eta_sp_gp_l1=.9, l_pen_EN=l_pen_EN,
+                                fc_parameters=fc_parameters)
+            learner.fit(X_lights_train, Y_lights_train, T_train, delta_train,
+                        Y_rep_train)
+
+            c_index = compute_Cindex(learner, X_lights_test, Y_lights_test,
+                                        T_test, delta_test, Y_rep_test)
+        exe_time = time() - start_time
+        running_time.append(exe_time)
+        score.append(c_index)
+        seed += 1
+
+    return score, running_time

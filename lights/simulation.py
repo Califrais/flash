@@ -257,7 +257,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  std_error: float = .5, decay: float = 3.,
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
-                 shape: float = .1, scale: float = .02,
+                 shape: float = .1, scale: float = .001,
                  censoring_factor: float = 10, grid_time: bool = True):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
@@ -350,8 +350,9 @@ class SimuJointLongitudinalSurvival(Simulation):
         t_max : `np.ndarray`, shape=(n_samples,)
             The time up to which subject has longitudinal data.
 
-        Y_tsfresh : `pandas.DataFrame`, shape=(n_samples, 4)
-            The longitudinal data in the format to be used by tsfresh.
+        Y_rep : `pandas.DataFrame`, shape=(n_samples, 4)
+            The longitudinal data in the format to be extracted later in the use
+            of representation feature.
 
         """
         seed = self.seed
@@ -507,7 +508,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the time up to which one has longitudinal data
         t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
         N_il = np.zeros((n_samples, n_long_features))
-        Y_tsfresh = pd.DataFrame(columns=["id", "time", "kind", "value"])
+        Y_rep = pd.DataFrame(columns=["id", "time", "kind", "value"])
         Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
                                   for l in range(n_long_features)])
         # TODO : delete N_il after tests
@@ -579,7 +580,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                        "time": times_i[l],
                        "kind": ["long_feat_" + str(l)] * n_il,
                        "value": y_il}
-                Y_tsfresh = Y_tsfresh.append(pd.DataFrame(tmp),
+                Y_rep = Y_rep.append(pd.DataFrame(tmp),
                                              ignore_index=True)
 
             Y.loc[i] = y_i
@@ -589,4 +590,4 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.latent_class = G
         self.N_il = N_il
 
-        return X, Y, np.ceil(T), delta, S_k, Y_tsfresh, t_max
+        return X, Y, np.ceil(T), delta, S_k, Y_rep, t_max

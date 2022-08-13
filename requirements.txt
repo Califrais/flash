@@ -173,6 +173,7 @@ importlib-metadata==4.11.3
     #   click
     #   jsonschema
     #   pep517
+    #   prettytable
     #   sphinx
 importlib-resources==5.7.1
     # via
@@ -415,6 +416,10 @@ pillow==9.1.0
     #   matplotlib
 pip-tools==6.6.0
     # via -r requirements.in
+plotly==5.10.0
+    # via -r requirements.in
+prettytable==3.3.0
+    # via -r requirements.in
 prometheus-client==0.14.1
     # via
     #   -r requirements.in
@@ -605,6 +610,10 @@ tblib==1.7.0
     # via
     #   -r requirements.in
     #   distributed
+tenacity==8.0.1
+    # via
+    #   -r requirements.in
+    #   plotly
 terminado==0.13.3
     # via
     #   -r requirements.in
@@ -661,6 +670,7 @@ tsfresh==0.19.0
     # via -r requirements.in
 typing-extensions==4.3.0
     # via
+    #   -r requirements.in
     #   argon2-cffi
     #   importlib-metadata
     #   jsonschema
@@ -681,6 +691,7 @@ urllib3==1.26.9
 wcwidth==0.2.5
     # via
     #   -r requirements.in
+    #   prettytable
     #   prompt-toolkit
 webencodings==0.5.1
     # via
