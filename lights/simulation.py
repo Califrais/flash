@@ -63,12 +63,11 @@ class Simulation:
     It does nothing besides printing stuff and verbosing
     """
 
-    def __init__(self, seed=None, verbose=True):
+    def __init__(self, seed=0, verbose=True):
         # Set default parameters
         self.seed = seed
         self.verbose = verbose
-        if self.seed is not None:
-            self._set_seed()
+        self._set_seed()
         # No data simulated yet
         self.time_indep_features = None
         self.long_features = None
