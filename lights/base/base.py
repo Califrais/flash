@@ -424,7 +424,8 @@ def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
                                     column_kind="kind",
                                     column_value="value",
                                     default_fc_parameters=fc_parameters,
-                                    impute_function=None
+                                    impute_function=None,
+                                    disable_progressbar=True
                                     )
         columns = np.sort(ext_feat.columns)
         ext_feat["id"] = ext_feat.index.values
