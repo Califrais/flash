@@ -8,7 +8,7 @@ import pandas as pd
 from lights.data_loader.load_data import load_data, extract_lights_feat, extract_R_feat
 
 def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
-                   , simu=True, n_folds=3,
+                   , simu=True, n_folds=3, verbose=False,
                    adaptative_grid_el=True, shuffle=True, tol=1e-5,
                    warm_start=True, eta_elastic_net=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
@@ -97,7 +97,7 @@ def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
             learner = prox_QNEM(tol=tol, warm_start=warm_start, simu=simu,
                                    fixed_effect_time_order= fixed_effect_time_order,
                                    fc_parameters= fc_parameters, max_iter=max_iter,
-                                   max_iter_lbfgs=max_iter_lbfgs,
+                                   max_iter_lbfgs=max_iter_lbfgs, verbose=verbose,
                                    max_iter_proxg=max_iter_proxg, print_every=1)
             X_train, X_test = X[idx_train], X[idx_test]
             T_train, T_test = T[idx_train], T[idx_test]
@@ -159,19 +159,13 @@ def compute_Cindex(learner, X, Y, T, delta, Y_rep=None):
         score = learner.score(X, Y_, T, delta, Y_rep_)
 
     return score
-
 def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
     seed = 100
     running_time = []
     score = []
     for idx in range(n_run):
         start_time = time()
-        if simulation:
-            data, data_lights, Y_rep, time_dep_feat, time_indep_feat = \
-                load_data(simu=True, seed=seed)
-        else:
-            data, data_lights, Y_rep, time_dep_feat, time_indep_feat = \
-                load_data(simu=False, seed=seed)
+        data, data_lights, Y_rep, time_dep_feat, time_indep_feat = load_data(simu=simulation, seed=seed)
         id_list = data_lights["id"]
         nb_test_sample = int(test_size * len(id_list))
         id_test = np.random.choice(id_list, size=nb_test_sample, replace=False)
