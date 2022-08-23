@@ -392,6 +392,7 @@ def clean_xi_ext(xi_ext, fit_intercept):
         xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
     return xi_ext
 
+
 def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
     """
 
@@ -414,6 +415,7 @@ def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
     """
     J = len(T_u)
     asso_features = None
+    #TODO : use sparsity instead of nb_noise_feat
     nb_noise_feat = 2
     nb_total_noise_feat = nb_noise_feat * n_long_features
     for j in range(J):
@@ -434,6 +436,7 @@ def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
         n_samples, nb_total_extracted_feat = ext_feat[columns].shape
         nb_extracted_feat =  nb_total_extracted_feat // n_long_features
         nb_feat = nb_extracted_feat + nb_noise_feat
+        # We do not know nb_total_extracted_feat in advance
         if asso_features is None:
             asso_features = np.zeros((J, n_samples, nb_total_extracted_feat + nb_total_noise_feat))
         for l in range(n_long_features):
