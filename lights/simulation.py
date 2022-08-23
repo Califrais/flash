@@ -184,7 +184,7 @@ class SimuJointLongitudinalSurvival(Simulation):
 	shape : `float`, default=.1
 		Shape parameter of the Gompertz distribution of the baseline
 
-	censoring_factor : `float`, default=2.0
+	censoring_factor : `float`, default=10
 		Level of censoring. Increasing censoring_factor leads to less censored
 		times and conversely.
 
