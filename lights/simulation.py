@@ -258,7 +258,7 @@ class SimuJointLongitudinalSurvival(Simulation):
                  baseline_hawkes_uniform_bounds: list = (.1, 1.),
                  adjacency_hawkes_uniform_bounds: list = (.1, .2),
                  shape: float = .1, scale: float = .001,
-                 censoring_factor: float = 10, grid_time: bool = True):
+                 censoring_factor: float = 2, grid_time: bool = True):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
