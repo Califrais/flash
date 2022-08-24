@@ -351,9 +351,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         S_k : `list`
             Set of nonactive group for 2 classes
 
-        t_max : `np.ndarray`, shape=(n_samples,)
-            The time up to which subject has longitudinal data.
-
         Y_rep : `pandas.DataFrame`, shape=(n_samples, 4)
             The longitudinal data in the format to be extracted later in the use
             of representation feature.
@@ -511,8 +508,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         delta = (T_star <= C).astype(np.ushort)
         self.censoring = delta
 
-        # Simulation of the time up to which one has longitudinal data
-        t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
         N_il = np.zeros((n_samples, n_long_features))
         Y_rep = pd.DataFrame(columns=["id", "time", "kind", "value"])
         Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
@@ -546,7 +541,7 @@ class SimuJointLongitudinalSurvival(Simulation):
             hawkes = SimuHawkesExpKernels(adjacency=adjacency,
                                           decays=decays,
                                           baseline=baseline, verbose=False,
-                                          end_time=t_max[i], seed=seed + i)
+                                          end_time=T[i], seed=seed + i)
             hawkes.simulate()
             self.hawkes += [hawkes]
             if self.grid_time:
@@ -555,8 +550,6 @@ class SimuJointLongitudinalSurvival(Simulation):
                     tmp = np.sort(
                         np.random.choice(tmp, size=10,
                                          replace=False))
-                if t_max[i] not in tmp:
-                    tmp = np.append(tmp, t_max[i])
 
                 times_i = [tmp] * n_long_features
             else:
@@ -564,9 +557,10 @@ class SimuJointLongitudinalSurvival(Simulation):
                 for l in range(n_long_features):
                     if len(times_i[l]) > 10:
                         times_i[l] = np.sort(
-                            np.random.choice(times_i[l], size=10, replace=False))
-                    if t_max[i] not in times_i[l]:
-                        times_i[l] = np.append(times_i[l], t_max[i])
+                            np.random.choice(times_i[l], size=10,
+                                             replace=False))
+                    if len(times_i[l]) == 0:
+                        times_i[l] = np.random.uniform(0, T[i], 1)
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
@@ -595,4 +589,4 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.latent_class = G
         self.N_il = N_il
 
-        return X, Y, T, delta, S_k, Y_rep, t_max
+        return X, Y, T, delta, S_k, Y_rep
