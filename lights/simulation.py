@@ -348,13 +348,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         delta : `np.ndarray`, shape=(n_samples,)
             The simulated censoring indicator
 
-        S_k : `list`
-            Set of nonactive group for 2 classes
-
-        Y_rep : `pandas.DataFrame`, shape=(n_samples, 4)
-            The longitudinal data in the format to be extracted later in the use
-            of representation feature.
-
         """
         seed = self.seed
         n_samples = self.n_samples
@@ -509,9 +502,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.censoring = delta
 
         N_il = np.zeros((n_samples, n_long_features))
-        Y_rep = pd.DataFrame(columns=["id", "time", "kind", "value"])
-        Y = pd.DataFrame(columns=['long_feature_%s' % (l + 1)
-                                  for l in range(n_long_features)])
         # TODO : delete N_il after tests
         if self.grid_time:
             # Simulation of the measurement times of the
@@ -536,7 +526,7 @@ class SimuJointLongitudinalSurvival(Simulation):
             a_, b_ = baseline_hawkes_uniform_bounds
             baseline = uniform(a_, b_).rvs(size=n_long_features,
                                            random_state=seed)
-
+        id = np.arange(n_samples)
         for i in range(n_samples):
             hawkes = SimuHawkesExpKernels(adjacency=adjacency,
                                           decays=decays,
@@ -550,6 +540,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                     tmp = np.sort(
                         np.random.choice(tmp, size=10,
                                          replace=False))
+                if len(tmp) == 0:
+                    tmp = np.random.uniform(0, T[i], 1)
 
                 times_i = [tmp] * n_long_features
             else:
@@ -574,19 +566,22 @@ class SimuJointLongitudinalSurvival(Simulation):
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
                 y_il = U_il.dot(beta_l) + U_il.dot(b_l) + eps_il
-                y_i += [pd.Series(y_il, index=times_i[l])]
-                tmp = {"id": [i] * n_il,
-                       "time": times_i[l],
-                       "kind": ["long_feat_" + str(l)] * n_il,
-                       "value": y_il}
-                Y_rep = Y_rep.append(pd.DataFrame(tmp),
-                                             ignore_index=True)
+                y_i.append(y_il)
+            time_dep_feat = ['time_dep_feat%s' % (l + 1)
+                             for l in range(n_long_features)]
+            # TODO: Update univariate time
+            Y_i = np.column_stack(
+                (np.array([id[i]] * n_il), times_i[0], np.array(y_i).T))
+            if i == 0:
+                Y_data = Y_i
+            else:
+                Y_data = np.row_stack((Y_data, Y_i))
 
-            Y.loc[i] = y_i
-
+        Y = pd.DataFrame(data=Y_data, columns=["id", "T_long"] + time_dep_feat)
         self.event_times = T_star
         self.long_features = Y
         self.latent_class = G
         self.N_il = N_il
-
-        return X, Y, T, delta, S_k, Y_rep
+        self.time_dep_feat = time_dep_feat
+        self.S_k = S_k
+        return X, Y, T, delta
