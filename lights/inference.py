@@ -14,6 +14,7 @@ from lights.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
 from lights.base.base import feat_representation_extraction
+import re
 
 class prox_QNEM(Learner):
     """prox-QNEM Algorithm for the lights model inference
@@ -340,7 +341,7 @@ class prox_QNEM(Learner):
         f *= f_y
         return f
 
-    def predict_marker(self, X, Y, asso_feats, prediction_times=None):
+    def predict_marker(self, X, Y, prediction_times=None):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -367,15 +368,15 @@ class prox_QNEM(Learner):
         """
         if self._fitted:
             theta, alpha = self.theta, self.fixed_effect_time_order
-            ext_feat = extract_features(Y, alpha)
-            n_samples, n_long_features = Y.shape
+            asso_feats = feat_representation_extraction(Y, self.n_long_features,
+                                                        self.T_u, self.fc_parameters)
+            ext_feat = extract_features(Y, self.time_dep_feats, alpha)
+            id_list = list(np.unique(Y.id.values))
+            n_samples = len(id_list)
             last_measurement = np.zeros(n_samples)
             for i in range(n_samples):
-                t_i_max = 0
-                Y_i = Y.iloc[i]
-                for l in range(n_long_features):
-                    times_il = Y_i[l].index.values
-                    t_i_max = max(t_i_max, np.array(times_il).max())
+                Y_i  = Y[(Y["id"] == id_list[i])]
+                t_i_max = np.array(Y_i["T_long"].values).max()
                 last_measurement[i] = t_i_max
             if prediction_times is None:
                 prediction_times = last_measurement
@@ -395,7 +396,7 @@ class prox_QNEM(Learner):
         else:
             raise ValueError('You must fit the model first')
 
-    def predict_marker_sample(self, X, Y, Y_rep):
+    def predict_marker_sample(self, X, Y):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -419,19 +420,21 @@ class prox_QNEM(Learner):
         """
         if self._fitted:
             theta, alpha = self.theta, self.fixed_effect_time_order
-            n_samples, n_long_features = Y.shape
+            id_list = list(np.unique(Y.id.values))
+            n_samples = len(id_list)
             markers = []
-            asso_feats = feat_representation_extraction(Y_rep, n_long_features, self.T_u,
-                                            self.fc_parameters)
+            asso_feats = feat_representation_extraction(Y, self.n_long_features,
+                                                        self.T_u, self.fc_parameters)
             for i in range(n_samples):
-                time_measurement = Y.iloc[i][0].index.values
                 # predictions for alive subjects only
                 T_u = self.T_u
-                marker = np.zeros(len(time_measurement))
                 pi_xi = self._get_proba(X[i:(i + 1)])
+                Y_i = Y[(Y["id"] == id_list[i])]
+                time_measurement = Y_i["T_long"].values
+                marker = np.zeros(len(time_measurement))
                 for t in range(len(time_measurement)):
-                    ext_feat = extract_features(Y[i:(i + 1)], alpha,
-                                                time_measurement[t])
+                    ext_feat = extract_features(Y_i, self.time_dep_feats,
+                                                alpha, time_measurement[t])
                     f = self.f_data_given_latent(ext_feat,
                                                  asso_feats[i:(i + 1)],
                                                  time_measurement[t], T_u, 0)
@@ -456,7 +459,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, Y_rep):
+    def fit(self, X, Y, T, delta):
         """Fits the lights model
 
         Parameters
@@ -483,7 +486,9 @@ class prox_QNEM(Learner):
         fit_intercept = self.fit_intercept
         alpha = self.fixed_effect_time_order
         n_samples, p = X.shape
-        L = Y.shape[1]
+        self.time_dep_feats = [feat for feat in Y.columns.values
+                          if feat not in ["id", "T_long"]]
+        L = len(self.time_dep_feats)
         self.n_samples = n_samples
         self.n_time_indep_features = p
         self.n_long_features = L
@@ -494,17 +499,16 @@ class prox_QNEM(Learner):
             p += 1
 
         X = normalize(X)  # Normalize time-independent features
-        ext_feat = extract_features(Y, alpha)  # Features extraction
+        ext_feat = extract_features(Y, self.time_dep_feats, alpha)  # Features extraction
         T_u = np.unique(T)
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
 
-        asso_feats = feat_representation_extraction(Y_rep, L, T_u, self.fc_parameters)
+        asso_feats = feat_representation_extraction(Y, L, T_u, self.fc_parameters)
         nb_asso_param = asso_feats.shape[-1] // L
 
         # Initialization
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
-
         if self.initialize:
             # Initialize longitudinal submodels
             mlmm = MLMM(max_iter=max_iter, verbose=verbose, tol=tol,
@@ -522,7 +526,6 @@ class prox_QNEM(Learner):
             D = np.diag(np.ones(r))
             phi = np.ones((L, 1))
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
-
         #TODO: just for testing, remove later
         phi = np.ones(L).reshape(-1, 1)
         D = .01 * np.diag(np.ones(r_l * L))
@@ -544,7 +547,6 @@ class prox_QNEM(Learner):
         E_func.b_stats(ext_feat)
         F_func = MstepFunctions(fit_intercept, X, delta, p, self.l_pen_EN,
                                 self.eta_elastic_net)
-
         f = self.f_data_given_latent(ext_feat, asso_feats, T, self.T_u, delta)
         Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
         pi_xi = self._get_proba(X)
@@ -557,7 +559,6 @@ class prox_QNEM(Learner):
             self.history.print_history()
 
         for n_iter in range(1, max_iter + 1):
-
             # E-Step
             pi_est = self._get_post_proba(pi_xi, Lambda_1)
             self.pi_est = pi_est
@@ -688,10 +689,9 @@ class prox_QNEM(Learner):
             else:
                 # Update for next iteration
                 Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
-
         self._end_solve()
 
-    def score(self, X, Y, T, delta, Y_rep):
+    def score(self, X, Y, T, delta):
         """Computes the C-index score with the trained parameters on the given
         data
 
@@ -716,9 +716,10 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            n_long_features = Y.shape[1]
-            asso_feats = feat_representation_extraction(Y_rep, n_long_features, self.T_u, self.fc_parameters)
-            c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
+            time_dep_feats = [feat for feat in Y.columns.values
+                              if feat not in ["id", "T_long"]]
+            n_long_features = len(time_dep_feats)
+            c_index = c_index_score(T, self.predict_marker(X, Y), delta)
             return max(c_index, 1 - c_index)
         else:
             raise ValueError('You must fit the model first')

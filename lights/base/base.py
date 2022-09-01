@@ -4,6 +4,7 @@ from time import time
 import numpy as np
 import pandas as pd
 from tsfresh import extract_features as extract_rep_features
+import re
 
 
 class Learner:
@@ -127,7 +128,7 @@ def normalize(X):
     return X_norm
 
 
-def from_ts_to_design_features(Y_il, fixed_effect_time_order, t_max=None):
+def extract_to_design_features(Y_il, times_il, fixed_effect_time_order, t_max=None):
     """Extracts the design features from a given longitudinal trajectory
 
     Parameters
@@ -148,26 +149,25 @@ def from_ts_to_design_features(Y_il, fixed_effect_time_order, t_max=None):
     n_il : `list`
         The corresponding number of measurements
     """
-    times_il_ = Y_il.index.values
     if t_max is not None:
-        times_il_bool = times_il_ <= t_max
-        times_il = times_il_[times_il_bool]
-        y_il = Y_il.values[times_il_bool].reshape(-1, 1)
+        times_il_bool = times_il <= t_max
+        times_il_ = times_il[times_il_bool]
+        y_il = Y_il[times_il_bool].reshape(-1, 1)
     else:
-        times_il = times_il_
-        y_il = Y_il.values.reshape(-1, 1)
+        times_il_ = times_il
+        y_il = Y_il.reshape(-1, 1)
 
-    n_il = len(times_il)
+    n_il = len(times_il_)
     U_il = np.ones(n_il)
     for t in range(1, fixed_effect_time_order + 1):
-        U_il = np.c_[U_il, times_il ** t]
+        U_il = np.c_[U_il, times_il_ ** t]
     # linear time-varying features
     V_il = np.ones(n_il)
-    V_il = np.c_[V_il, times_il]
+    V_il = np.c_[V_il, times_il_]
     return U_il, V_il, y_il, n_il
 
 
-def extract_features(Y, fixed_effect_time_order, t_max=None):
+def extract_features(Y, time_dep_feats, fixed_effect_time_order, t_max=None):
     """Extract the design features from longitudinal data
 
     Parameters
@@ -206,7 +206,9 @@ def extract_features(Y, fixed_effect_time_order, t_max=None):
     N_L : `list` of L `list`
         Number of longitudinal measurements arranged by l-th order
     """
-    n_samples, n_long_features = Y.shape
+    id_list = list(np.unique(Y.id.values))
+    n_samples = len(id_list)
+    n_long_features = len(time_dep_feats)
     U, V, y, N = [], [], [], []
     U_L = [[] for _ in range(n_long_features)]
     V_L = [[] for _ in range(n_long_features)]
@@ -214,15 +216,17 @@ def extract_features(Y, fixed_effect_time_order, t_max=None):
     N_L = [[] for _ in range(n_long_features)]
 
     for i in range(n_samples):
-        Y_i = Y.iloc[i]
+        Y_i  = Y[(Y["id"] == id_list[i])]
         U_i, V_i, y_i, N_i = [], [], np.array([]), []
         for l in range(n_long_features):
+            Y_il = Y_i[time_dep_feats[l]].values
+            times_il = Y_i["T_long"].values
             if t_max is not None:
-                U_il, V_il, y_il, N_il = from_ts_to_design_features(
-                    Y_i[l], fixed_effect_time_order, t_max)
+                U_il, V_il, y_il, N_il = extract_to_design_features(
+                    Y_il, times_il, fixed_effect_time_order, t_max)
             else:
-                U_il, V_il, y_il, N_il = from_ts_to_design_features(
-                    Y_i[l], fixed_effect_time_order)
+                U_il, V_il, y_il, N_il = extract_to_design_features(
+                    Y_il, times_il, fixed_effect_time_order)
 
             U_i.append(U_il)
             V_i.append(V_il)
@@ -245,7 +249,6 @@ def extract_features(Y, fixed_effect_time_order, t_max=None):
         y_L[l] = np.concatenate(tuple(y_L[l]))
 
     return (U, V, y, N), (U_L, V_L, y_L, N_L)
-
 
 def logistic_grad(z):
     """Overflow proof computation of 1 / (1 + exp(-z)))
@@ -393,7 +396,7 @@ def clean_xi_ext(xi_ext, fit_intercept):
     return xi_ext
 
 
-def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
+def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
     """
 
     Parameters
@@ -420,18 +423,16 @@ def feat_representation_extraction(Y_rep, n_long_features, T_u, fc_parameters):
     nb_total_noise_feat = nb_noise_feat * n_long_features
     for j in range(J):
         t = T_u[j]
-        tmp = Y_rep[Y_rep.time < t]
+        tmp = Y[Y.T_long < t]
         ext_feat = extract_rep_features(tmp, column_id="id",
-                                    column_sort="time",
-                                    column_kind="kind",
-                                    column_value="value",
+                                    column_sort="T_long",
                                     default_fc_parameters=fc_parameters,
                                     impute_function=None,
                                     disable_progressbar=True
                                     )
         columns = np.sort(ext_feat.columns)
         ext_feat["id"] = ext_feat.index.values
-        ext_feat = pd.merge(Y_rep["id"].drop_duplicates(), ext_feat,
+        ext_feat = pd.merge(Y["id"].drop_duplicates(), ext_feat,
                             how="left", on=["id"]).fillna(0)
         n_samples, nb_total_extracted_feat = ext_feat[columns].shape
         nb_extracted_feat =  nb_total_extracted_feat // n_long_features
