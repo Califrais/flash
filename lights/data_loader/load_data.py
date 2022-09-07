@@ -1,5 +1,5 @@
 import os
-os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Resources"
+#os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Resources"
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri, numpy2ri
 import numpy as np
