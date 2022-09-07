@@ -396,7 +396,8 @@ def clean_xi_ext(xi_ext, fit_intercept):
     return xi_ext
 
 
-def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
+def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters,
+                                   add_noise, sparsity=.3):
     """
 
     Parameters
@@ -418,9 +419,6 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
     """
     J = len(T_u)
     asso_features = None
-    #TODO : use sparsity instead of nb_noise_feat
-    nb_noise_feat = 2
-    nb_total_noise_feat = nb_noise_feat * n_long_features
     for j in range(J):
         t = T_u[j]
         tmp = Y[Y.T_long < t]
@@ -435,16 +433,23 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
         ext_feat = pd.merge(Y["id"].drop_duplicates(), ext_feat,
                             how="left", on=["id"]).fillna(0)
         n_samples, nb_total_extracted_feat = ext_feat[columns].shape
-        nb_extracted_feat =  nb_total_extracted_feat // n_long_features
-        nb_feat = nb_extracted_feat + nb_noise_feat
-        # We do not know nb_total_extracted_feat in advance
-        if asso_features is None:
-            asso_features = np.zeros((J, n_samples, nb_total_extracted_feat + nb_total_noise_feat))
-        for l in range(n_long_features):
-            asso_features[j, : , l * nb_feat : l * nb_feat + nb_extracted_feat] \
-                = ext_feat[columns].values[: , l * nb_extracted_feat : (l + 1) * nb_extracted_feat]
-            asso_features[j, :, l * nb_feat + nb_extracted_feat :
-                                (l + 1) * nb_feat] = np.random.normal(0, .1, (n_samples, nb_noise_feat))
+        nb_extracted_feat = nb_total_extracted_feat // n_long_features
+        if add_noise:
+            nb_noise_feat = int((sparsity) * nb_extracted_feat / (1 - sparsity))
+            nb_total_noise_feat = nb_noise_feat * n_long_features
+            nb_feat = nb_extracted_feat + nb_noise_feat
+            # We do not know nb_total_extracted_feat in advance
+            if asso_features is None:
+                asso_features = np.zeros((J, n_samples, nb_total_extracted_feat + nb_total_noise_feat))
+            for l in range(n_long_features):
+                asso_features[j, : , l * nb_feat : l * nb_feat + nb_extracted_feat] \
+                    = ext_feat[columns].values[: , l * nb_extracted_feat : (l + 1) * nb_extracted_feat]
+                asso_features[j, :, l * nb_feat + nb_extracted_feat :
+                                    (l + 1) * nb_feat] = np.random.normal(0, .1, (n_samples, nb_noise_feat))
+        else:
+            if asso_features is None:
+                asso_features = np.zeros((J, n_samples, nb_total_extracted_feat))
+            asso_features[j] = ext_feat
     asso_features = asso_features.swapaxes(0, 1)
 
-    return asso_features
+    return asso_features, nb_extracted_feat

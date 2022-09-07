@@ -368,8 +368,10 @@ class prox_QNEM(Learner):
         """
         if self._fitted:
             theta, alpha = self.theta, self.fixed_effect_time_order
-            asso_feats = feat_representation_extraction(Y, self.n_long_features,
-                                                        self.T_u, self.fc_parameters)
+            add_noise = True if self.simu else False
+            asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
+                                                        self.T_u, self.fc_parameters,
+                                                        add_noise)
             ext_feat = extract_features(Y, self.time_dep_feats, alpha)
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
@@ -423,8 +425,10 @@ class prox_QNEM(Learner):
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
             markers = []
-            asso_feats = feat_representation_extraction(Y, self.n_long_features,
-                                                        self.T_u, self.fc_parameters)
+            add_noise = True if self.simu else False
+            asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
+                                                        self.T_u, self.fc_parameters,
+                                                        add_noise)
             for i in range(n_samples):
                 # predictions for alive subjects only
                 T_u = self.T_u
@@ -459,7 +463,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta):
+    def fit(self, X, Y, T, delta, simu=True):
         """Fits the lights model
 
         Parameters
@@ -492,6 +496,7 @@ class prox_QNEM(Learner):
         self.n_samples = n_samples
         self.n_time_indep_features = p
         self.n_long_features = L
+        self.simu = simu
         q_l = alpha + 1
         r_l = 2  # Affine random effects
         K = 2
@@ -503,9 +508,11 @@ class prox_QNEM(Learner):
         T_u = np.unique(T)
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
-
-        asso_feats = feat_representation_extraction(Y, L, T_u, self.fc_parameters)
+        add_noise = True if self.simu else False
+        asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
+                                                    self.fc_parameters, add_noise)
         nb_asso_param = asso_feats.shape[-1] // L
+        self.nb_extracted_feat = nb_extracted_feat
 
         # Initialization
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
