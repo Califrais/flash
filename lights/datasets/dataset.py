@@ -52,7 +52,7 @@ class Dataset:
         label_column=None,
         time_indep_columns=None,
         time_dep_columns=None,
-        df_lights=None,
+        data=None,
         df_competing=None,
         Y_rep=None,
         test_size=0.3,
@@ -64,8 +64,7 @@ class Dataset:
         self.time_dep_columns = time_dep_columns
         self.test_size = test_size
         self.verbose = verbose
-        self.df_lights = df_lights
-        self.df_competing = df_competing
+        self.data = data
         self.Y_rep = Y_rep
 
     def __repr__(self):
