@@ -7,7 +7,7 @@ from scipy.stats import beta
 import pandas as pd
 from lights.data_loader.load_data import load_data, extract_lights_feat, extract_R_feat
 
-def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
+def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
                    , simu=True, n_folds=3, verbose=False,
                    adaptative_grid_el=True, shuffle=True, tol=1e-5,
                    warm_start=True, eta_elastic_net=.1,
@@ -101,21 +101,20 @@ def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
                                    max_iter_proxg=max_iter_proxg, print_every=1)
             X_train, X_test = X[idx_train], X[idx_test]
             T_train, T_test = T[idx_train], T[idx_test]
-            Y_train, Y_test = Y.iloc[idx_train, :], Y.iloc[idx_test, :]
-            id_test = np.unique(Y_rep.id.values)[idx_test]
-            Y_rep_train = Y_rep[~Y_rep.id.isin(id_test)]
-            Y_rep_test = Y_rep[Y_rep.id.isin(id_test)]
+            id_test = np.unique(Y.id.values)[idx_test]
+            Y_test = Y[Y.id.isin(id_test)]
+            Y_train = Y[~Y.id.isin(id_test)]
             delta_train, delta_test = delta[idx_train], delta[idx_test]
             learner.l_pen_EN = params['l_pen_EN']
             learner.l_pen_SGL = params['l_pen_SGL']
             try:
-                learner.fit(X_train, Y_train, T_train, delta_train, Y_rep_train)
+                learner.fit(X_train, Y_train, T_train, delta_train)
             except ValueError:
                 scores = np.nan
                 break
             else:
                 scores.append(compute_Cindex(learner, X_test, Y_test, T_test,
-                                             delta_test, Y_rep_test))
+                                             delta_test))
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
     fspace = {
@@ -129,34 +128,22 @@ def cross_validate(X, Y, T, delta, Y_rep, fc_parameters, fixed_effect_time_order
 
     return best, trials
 
-def truncate_features(Y, t_max, Y_rep=None):
-    n_samples, n_long_features = Y.shape
-    if Y_rep is not None:
-        id = np.unique(Y_rep['id'].values)
+def truncate_features(Y, t_max):
+    id_list = list(np.unique(Y['id'].values))
+    n_samples = len(id_list)
     for i in range(n_samples):
-        Y_i = Y.iloc[i]
-        for l in range(n_long_features):
-            time = Y_i[l].index.values
-            y = Y_i[l].values.flatten()
-            if not all(time > t_max[i]):
-                y_ = y[time <= t_max[i]]
-                time_ = time[time <= t_max[i]]
-                Y.iat[i, l] = pd.Series(y_, index=time_)
-                if Y_rep is not None:
-                    Y_rep = Y_rep.loc[~ ((Y_rep['id'] == id[i]) &
-                                          (Y_rep['kind'] == ("long_feat_" + str(l))) &
-                                          (Y_rep['time'] > t_max[i]))]
-    return Y, Y_rep
+        times_i = Y[(Y["id"] == id_list[i])].id.values
+        if all(times_i > t_max[i]):
+            t_max[i] = times_i[0]
+        Y = Y[(Y["id"] != id_list[i]) | ((Y["id"] == id_list[i])
+                                         & (Y["T_long"] <= t_max[i]))]
+    return Y
 
-def compute_Cindex(learner, X, Y, T, delta, Y_rep=None):
+def compute_Cindex(learner, X, Y, T, delta):
     n_samples = X.shape[0]
     t_max = np.multiply(T, 1 - beta.rvs(2, 5, size=n_samples))
-    if Y_rep is None:
-        Y_, _ = truncate_features(Y.copy(), t_max)
-        score = learner.score(X, Y_, T, delta)
-    else:
-        Y_, Y_rep_ = truncate_features(Y.copy(), t_max, Y_rep.copy())
-        score = learner.score(X, Y_, T, delta, Y_rep_)
+    Y_= truncate_features(Y.copy(), t_max)
+    score = learner.score(X, Y_, T, delta)
 
     return score
 def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
