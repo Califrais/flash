@@ -152,21 +152,16 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
     score = []
     for idx in range(n_run):
         start_time = time()
-        data, data_lights, Y_rep, time_dep_feat, time_indep_feat = load_data(simu=simulation, seed=seed)
-        id_list = data_lights["id"]
-        nb_test_sample = int(test_size * len(id_list))
-        id_test = np.random.choice(id_list, size=nb_test_sample, replace=False)
-        data_lights_train = data_lights[~data_lights.id.isin(id_test)]
-        data_lights_test = data_lights[data_lights.id.isin(id_test)]
+        data, time_indep_feat, time_dep_feat = load_data(simu=simulation, seed=seeds[idx])
+        id = np.unique(data.id.values)
+        nb_test_sample = int(test_size * len(id))
+        id_test = np.random.choice(id, size=nb_test_sample, replace=False)
+        data_train = data[~data.id.isin(id_test)]
+        data_test = data[data.id.isin(id_test)]
         X_lights_train, Y_lights_train, T_train, delta_train = \
-            extract_lights_feat(data_lights_train, time_indep_feat,
-                                time_dep_feat)
+            extract_lights_feat(data, time_indep_feat, time_dep_feat)
         X_lights_test, Y_lights_test, T_test, delta_test = \
-            extract_lights_feat(data_lights_test, time_indep_feat,
-                                time_dep_feat)
-
-        Y_rep_train = Y_rep[~Y_rep.id.isin(id_test)]
-        Y_rep_test = Y_rep[Y_rep.id.isin(id_test)]
+            extract_lights_feat(data, time_indep_feat, time_dep_feat)
 
         data_train = data[~data.id.isin(id_test)]
         data_test = data[data.id.isin(id_test)]
@@ -186,8 +181,8 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
             zeta_gamma_max = 1
             n_folds = 5
             max_eval = 50
-            best_param, trials = cross_validate(X_lights_train, Y_lights_train, T_train,
-                                                delta_train, Y_rep_train,
+            best_param, trials = cross_validate(X_lights_train, Y_lights_train,
+                                                T_train, delta_train,
                                                 fc_parameters,
                                                 fixed_effect_time_order,
                                                 zeta_gamma_max=zeta_gamma_max,
@@ -198,11 +193,10 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
                                 max_iter=5, initialize=True, print_every=1,
                                 l_pen_SGL=l_pen_SGL, eta_sp_gp_l1=.9, l_pen_EN=l_pen_EN,
                                 fc_parameters=fc_parameters)
-            learner.fit(X_lights_train, Y_lights_train, T_train, delta_train,
-                        Y_rep_train)
+            learner.fit(X_lights_train, Y_lights_train, T_train, delta_train)
 
             c_index = compute_Cindex(learner, X_lights_test, Y_lights_test,
-                                        T_test, delta_test, Y_rep_test)
+                                        T_test, delta_test)
         exe_time = time() - start_time
         running_time.append(exe_time)
         score.append(c_index)
