@@ -147,7 +147,7 @@ def compute_Cindex(learner, X, Y, T, delta):
 
     return score
 def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
-    seed = 100
+    seeds = [1, 123]
     running_time = []
     score = []
     for idx in range(n_run):
@@ -200,6 +200,6 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
         exe_time = time() - start_time
         running_time.append(exe_time)
         score.append(c_index)
-        seed += 1
+        # seed += 1
 
     return score, running_time
