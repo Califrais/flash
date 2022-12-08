@@ -200,7 +200,7 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
                                         T_test, delta_test)
         exe_time = time() - start_time
         running_time.append(exe_time)
-        score.append(c_index)
+        score.append(max(c_index, 1 - c_index))
         # seed += 1
 
     return score, running_time
