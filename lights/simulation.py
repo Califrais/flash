@@ -389,16 +389,15 @@ class SimuJointLongitudinalSurvival(Simulation):
         X[H_, :nb_active_time_indep_features] -= gap
 
         # Normalize time-independent features
-        X = normalize(X)
-        self.time_indep_features = X
         X_dot_xi = X.dot(xi)
 
         # Simulation of latent group
         pi_xi = logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
         G = (u < pi_xi).astype(int)
-        self.G = G
 
+        X = normalize(X)
+        self.time_indep_features = X
         # Simulation of the random effects components
         r_l = 2  # Affine random effects
         r = r_l * n_long_features
@@ -465,12 +464,12 @@ class SimuJointLongitudinalSurvival(Simulation):
         idx_12.sort()
 
         iota_01 = (beta_0[idx_2] + b[G == 0][:, idx_2]).dot(
-            gamma_0[idx_4]) + X[G == 0].dot(.1 * xi)
+            gamma_0[idx_4]) + X[G == 0].dot(xi)
         iota_01 += b[G == 0].dot(gamma_0[idx_12])
         iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(
             gamma_0[idx_4])
         iota_11 = (beta_1[idx_2] + b[G == 1][:, idx_2]).dot(
-            gamma_1[idx_4]) + X[G == 1].dot(.1 * xi)
+            gamma_1[idx_4]) + X[G == 1].dot(xi)
         iota_11 += b[G == 1].dot(gamma_1[idx_12])
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(
             gamma_1[idx_4])
@@ -481,7 +480,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         n_samples_class_0 = n_samples - n_samples_class_1
         u_0 = np.random.rand(n_samples_class_0)
         u_1 = np.random.rand(n_samples_class_1)
-
         tmp = iota_02 + shape
         T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
                                 (scale * shape * np.exp(iota_01))) / tmp
