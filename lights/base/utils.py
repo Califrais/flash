@@ -246,12 +246,13 @@ def visualize_vect_learning(learner, name, symbol = None, true_coeffs = None,
         plt.xlabel('iterations', fontsize=fs + 2)
         plt.xticks(fontsize=fs), plt.yticks(fontsize=fs)
         cm = 'Dark2'
-        plot_history(learner, name=name, ax=ax, colormap=cm, alpha=.8)
+        plot_history(learner, name=name, ax=ax, colormap=cm, alpha=.8, legend=False)
 
-        legend1 = ax.legend(legend_est, loc='center right',
-                            bbox_to_anchor=(-0.1, 0.5), fontsize=fs)
-        plt.gca().add_artist(legend1)
-        fig.tight_layout()
+        if legend_true:
+            legend1 = ax.legend(legend_est, loc='center right',
+                                bbox_to_anchor=(-0.1, 0.5), fontsize=fs)
+            plt.gca().add_artist(legend1)
+            fig.tight_layout()
         plt.show()
     else:
         fig = plt.figure(figsize=(8, 4))

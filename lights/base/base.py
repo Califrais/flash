@@ -421,7 +421,7 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters,
     asso_features = None
     for j in range(J):
         t = T_u[j]
-        tmp = Y[Y.T_long < t]
+        tmp = Y[Y.T_long <= t]
         ext_feat = extract_rep_features(tmp, column_id="id",
                                     column_sort="T_long",
                                     default_fc_parameters=fc_parameters,
@@ -444,12 +444,11 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters,
             for l in range(n_long_features):
                 asso_features[j, : , l * nb_feat : l * nb_feat + nb_extracted_feat] \
                     = ext_feat[columns].values[: , l * nb_extracted_feat : (l + 1) * nb_extracted_feat]
-                asso_features[j, :, l * nb_feat + nb_extracted_feat :
+                asso_features[j, : , l * nb_feat + nb_extracted_feat :
                                     (l + 1) * nb_feat] = np.random.normal(0, .1, (n_samples, nb_noise_feat))
         else:
             if asso_features is None:
                 asso_features = np.zeros((J, n_samples, nb_total_extracted_feat))
-            asso_features[j] = ext_feat
+            asso_features[j] = ext_feat[columns]
     asso_features = asso_features.swapaxes(0, 1)
-
     return asso_features, nb_extracted_feat
