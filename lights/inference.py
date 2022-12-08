@@ -38,7 +38,7 @@ class prox_QNEM(Learner):
         For 0 < eta_elastic_net < 1, the regularization is a linear combination
         of L1 and L2
 
-    eta_sp_gp_l1: `float`, default=0.1
+    eta_sp_gp_l1: `float`, default=0.9
         The Sparse Group L1 mixing parameter, with 0 <= eta_sp_gp_l1 <= 1
         For eta_sp_gp_l1 = 1 this is Group L1
 
@@ -99,12 +99,13 @@ class prox_QNEM(Learner):
     """
 
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
-                 eta_elastic_net=.1, eta_sp_gp_l1=.1,
+                 eta_elastic_net=.1, eta_sp_gp_l1=.9,
                  max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
                  verbose=True, print_every=10, tol=1e-5,
                  warm_start=True, fixed_effect_time_order=5, initialize=True,
                  copt_accelerate=False, copt_solver_step='backtracking',
-                 simu=True, S_k=None, cov_corr_rdn_long=.05, fc_parameters=None):
+                 simu=True, S_k=None, cov_corr_rdn_long=.05, fc_parameters=None,
+                 sparsity=None):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -122,6 +123,7 @@ class prox_QNEM(Learner):
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
         self.simu = simu
+        self.sparsity = sparsity
         self.S_k = S_k
         self.cov_corr_rdn_long = cov_corr_rdn_long
 
@@ -371,7 +373,7 @@ class prox_QNEM(Learner):
             add_noise = True if self.simu else False
             asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
                                                         self.T_u, self.fc_parameters,
-                                                        add_noise)
+                                                        add_noise, self.sparsity)
             ext_feat = extract_features(Y, self.time_dep_feats, alpha)
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
@@ -428,7 +430,7 @@ class prox_QNEM(Learner):
             add_noise = True if self.simu else False
             asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
                                                         self.T_u, self.fc_parameters,
-                                                        add_noise)
+                                                        add_noise, self.sparsity)
             for i in range(n_samples):
                 # predictions for alive subjects only
                 T_u = self.T_u
@@ -463,7 +465,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, simu=True):
+    def fit(self, X, Y, T, delta):
         """Fits the lights model
 
         Parameters
@@ -496,7 +498,6 @@ class prox_QNEM(Learner):
         self.n_samples = n_samples
         self.n_time_indep_features = p
         self.n_long_features = L
-        self.simu = simu
         q_l = alpha + 1
         r_l = 2  # Affine random effects
         K = 2
@@ -510,7 +511,8 @@ class prox_QNEM(Learner):
         J, ind_1, ind_2 = get_times_infos(T, T_u)
         add_noise = True if self.simu else False
         asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
-                                                    self.fc_parameters, add_noise)
+                                                    self.fc_parameters, add_noise, self.sparsity)
+        self.asso_feats = asso_feats
         nb_asso_param = asso_feats.shape[-1] // L
         self.nb_extracted_feat = nb_extracted_feat
 
@@ -723,9 +725,6 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            time_dep_feats = [feat for feat in Y.columns.values
-                              if feat not in ["id", "T_long"]]
-            n_long_features = len(time_dep_feats)
             c_index = c_index_score(T, self.predict_marker(X, Y), delta)
             return max(c_index, 1 - c_index)
         else:
