@@ -13,7 +13,7 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
                    warm_start=True, eta_elastic_net=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
                    max_iter=20, max_iter_lbfgs=50, max_iter_proxg=50,
-                   max_eval=50):
+                   max_eval=50, sparsity=None):
     """Apply n_folds randomized search cross-validation using the given
     data, to select the best penalization hyper-parameters
 
@@ -98,7 +98,8 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
                                    fixed_effect_time_order= fixed_effect_time_order,
                                    fc_parameters= fc_parameters, max_iter=max_iter,
                                    max_iter_lbfgs=max_iter_lbfgs, verbose=verbose,
-                                   max_iter_proxg=max_iter_proxg, print_every=1)
+                                   max_iter_proxg=max_iter_proxg, print_every=1,
+                                sparsity=sparsity)
             X_train, X_test = X[idx_train], X[idx_test]
             T_train, T_test = T[idx_train], T[idx_test]
             id_test = np.unique(Y.id.values)[idx_test]
@@ -118,8 +119,8 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
     fspace = {
-        'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-4, zeta_xi_max),
-        'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-4, zeta_gamma_max)
+        'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-8, zeta_xi_max),
+        'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-8, zeta_gamma_max)
     }
 
     trials = Trials()
@@ -132,7 +133,7 @@ def truncate_features(Y, t_max):
     id_list = list(np.unique(Y['id'].values))
     n_samples = len(id_list)
     for i in range(n_samples):
-        times_i = Y[(Y["id"] == id_list[i])].id.values
+        times_i = Y[(Y["id"] == id_list[i])].T_long.values
         if all(times_i > t_max[i]):
             t_max[i] = times_i[0]
         Y = Y[(Y["id"] != id_list[i]) | ((Y["id"] == id_list[i])
