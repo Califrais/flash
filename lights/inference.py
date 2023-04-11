@@ -343,7 +343,7 @@ class prox_QNEM(Learner):
         f *= f_y
         return f
 
-    def predict_marker(self, X, Y, prediction_times=None):
+    def predict_marker(self, X, Y, asso_feats=None, prediction_times=None):
         """Marker rule of the lights model for being on the high-risk group
 
         Parameters
@@ -371,9 +371,12 @@ class prox_QNEM(Learner):
         if self._fitted:
             theta, alpha = self.theta, self.fixed_effect_time_order
             add_noise = True if self.simu else False
-            asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
-                                                        self.T_u, self.fc_parameters,
-                                                        add_noise, self.sparsity)
+            asso_feats = asso_feats
+            if asso_feats is None:
+                asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
+                                                            self.T_u, self.fc_parameters,
+                                                            add_noise, self.sparsity)
+
             ext_feat = extract_features(Y, self.time_dep_feats, alpha)
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
@@ -465,7 +468,7 @@ class prox_QNEM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta):
+    def fit(self, X, Y, T, delta, asso_feats=None):
         """Fits the lights model
 
         Parameters
@@ -510,8 +513,12 @@ class prox_QNEM(Learner):
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
         add_noise = True if self.simu else False
-        asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
-                                                    self.fc_parameters, add_noise, self.sparsity)
+        asso_feats = asso_feats
+        if asso_feats is None:
+            asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
+                                                        self.fc_parameters, add_noise, self.sparsity)
+        else:
+            nb_extracted_feat = None
         self.asso_feats = asso_feats
         nb_asso_param = asso_feats.shape[-1] // L
         self.nb_extracted_feat = nb_extracted_feat
@@ -700,7 +707,7 @@ class prox_QNEM(Learner):
                 Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
         self._end_solve()
 
-    def score(self, X, Y, T, delta):
+    def score(self, X, Y, T, delta, asso_feats=None):
         """Computes the C-index score with the trained parameters on the given
         data
 
@@ -725,7 +732,7 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            c_index = c_index_score(T, self.predict_marker(X, Y), delta)
+            c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
             return max(c_index, 1 - c_index)
         else:
             raise ValueError('You must fit the model first')
