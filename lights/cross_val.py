@@ -13,7 +13,7 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
                    warm_start=True, eta_elastic_net=.1,
                    zeta_gamma_max = None, zeta_xi_max = None,
                    max_iter=20, max_iter_lbfgs=50, max_iter_proxg=50,
-                   max_eval=50, sparsity=None):
+                   max_eval=50, sparsity=None, grid_search=False):
     """Apply n_folds randomized search cross-validation using the given
     data, to select the best penalization hyper-parameters
 
@@ -118,14 +118,32 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
                                              delta_test))
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
-    fspace = {
-        'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-8, zeta_xi_max),
-        'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-8, zeta_gamma_max)
-    }
+    if grid_search:
+        params = {}
+        trials = pd.DataFrame(columns=["l_pen_EN", "l_pen_SGL", "loss"])
+        nb_trial_sqrt = int(np.sqrt(max_eval))
+        for log_l_pen_EN in np.linspace(np.log(zeta_xi_max * 1e-8), np.log(zeta_xi_max), nb_trial_sqrt):
+            for log_l_pen_SGL in np.linspace(np.log(zeta_gamma_max * 1e-8),
+                                            np.log(zeta_gamma_max), nb_trial_sqrt):
+                params['l_pen_EN'] = np.exp(log_l_pen_EN)
+                params['l_pen_SGL'] = np.exp(log_l_pen_SGL)
+                loss = learners(params)["loss"]
+                new_row = {"l_pen_EN" : params['l_pen_EN'],
+                           "l_pen_SGL" : params['l_pen_SGL'],
+                           "loss" : loss}
+                trials = trials.append(new_row, ignore_index=True)
 
-    trials = Trials()
-    best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=max_eval,
-                trials=trials)
+        best = trials[trials.loss == trials.loss.min()].squeeze()
+
+    else:
+        fspace = {
+            'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-8, zeta_xi_max),
+            'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-8, zeta_gamma_max)
+        }
+
+        trials = Trials()
+        best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=max_eval,
+                    trials=trials)
 
     return best, trials
 
