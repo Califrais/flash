@@ -280,7 +280,7 @@ def visualize_vect_learning(learner, name, symbol = None, true_coeffs = None,
     fig.tight_layout()
     plt.show()
 
-def visualize_vect_per_group(vector, n_groups, ax):
+def visualize_vect_per_group(vector, n_groups, ax, plot_area=False):
     """
 
     Parameters
@@ -296,11 +296,27 @@ def visualize_vect_per_group(vector, n_groups, ax):
     """
     n_coeffs_cum = 0
     n_coeffs = len(vector) // n_groups
+    axvline = []
+    vector_per_group = []
     for l in range(n_groups - 1):
         label = ''
         if l == 0:
-            label = r'l-features'
+            label = r'$\ell$-features'
         ax.axvline(n_coeffs_cum + n_coeffs - .4, c='m', ls='--',
                    alpha=.8, lw=1, label=label)
+        axvline.append((n_coeffs_cum - .4, n_coeffs_cum + n_coeffs - .4))
+        vector_per_group.append((0, 0) if not np.any(
+            vector[l * n_coeffs: (l + 1) * n_coeffs]) else (1, 1))
         n_coeffs_cum += n_coeffs
         ax.legend()
+
+    if plot_area:
+        l += 1
+        axvline.append((n_coeffs_cum - .4, n_coeffs_cum + n_coeffs - .4))
+        vector_per_group.append(
+            (0, 0) if not np.any(vector[l * n_coeffs: (l + 1) * n_coeffs]) else (
+            1, 1))
+        ax.fill_between(np.array(axvline).flatten(), 0, .5,
+                        where=np.array(vector_per_group).flatten() > 0,
+                        color='green', alpha=0.5,
+                        transform=ax.get_xaxis_transform())
