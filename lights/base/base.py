@@ -4,7 +4,6 @@ from time import time
 import numpy as np
 import pandas as pd
 from tsfresh import extract_features as extract_rep_features
-import re
 
 
 class Learner:
@@ -369,7 +368,6 @@ def get_vect_from_ext(v_ext):
     v = (v_ext[:dim] - v_ext[dim:]).flatten()
     return v
 
-
 def clean_xi_ext(xi_ext, fit_intercept):
     """Removes potential intercept coefficients in the time-independent
     coefficient vector decomposed on positive and negative parts
@@ -395,9 +393,7 @@ def clean_xi_ext(xi_ext, fit_intercept):
         xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
     return xi_ext
 
-
-def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters,
-                                   add_noise, sparsity=.3):
+def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
     """
 
     Parameters
@@ -419,36 +415,37 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters,
     """
     J = len(T_u)
     asso_features = None
+    tmp = pd.DataFrame()
+    max_id = max(np.unique(Y["id"].values))
     for j in range(J):
         t = T_u[j]
-        tmp = Y[Y.T_long <= t]
-        ext_feat = extract_rep_features(tmp, column_id="id",
-                                    column_sort="T_long",
-                                    default_fc_parameters=fc_parameters,
-                                    impute_function=None,
-                                    disable_progressbar=True
-                                    )
-        columns = np.sort(ext_feat.columns)
-        ext_feat["id"] = ext_feat.index.values
-        ext_feat = pd.merge(Y["id"].drop_duplicates(), ext_feat,
-                            how="left", on=["id"]).fillna(0)
-        n_samples, nb_total_extracted_feat = ext_feat[columns].shape
-        nb_extracted_feat = nb_total_extracted_feat // n_long_features
-        if add_noise:
-            nb_noise_feat = int((sparsity) * nb_extracted_feat / (1 - sparsity))
-            nb_total_noise_feat = nb_noise_feat * n_long_features
-            nb_feat = nb_extracted_feat + nb_noise_feat
-            # We do not know nb_total_extracted_feat in advance
-            if asso_features is None:
-                asso_features = np.zeros((J, n_samples, nb_total_extracted_feat + nb_total_noise_feat))
-            for l in range(n_long_features):
-                asso_features[j, : , l * nb_feat : l * nb_feat + nb_extracted_feat] \
-                    = ext_feat[columns].values[: , l * nb_extracted_feat : (l + 1) * nb_extracted_feat]
-                asso_features[j, : , l * nb_feat + nb_extracted_feat :
-                                    (l + 1) * nb_feat] = np.random.normal(0, .1, (n_samples, nb_noise_feat))
+        tmp_ = Y[(Y.T_long <= t)]
+        tmp_.id = tmp_.id + j*max_id
+        tmp = tmp.append(tmp_)
+    ext_feat = extract_rep_features(timeseries_container=tmp, column_id="id",
+                                column_sort="T_long",
+                                default_fc_parameters=fc_parameters,
+                                impute_function=None,
+                                disable_progressbar=True,
+                                )
+    columns = np.sort(ext_feat.columns)
+    ext_feat["id"] = ext_feat.index.values
+    for j in range(J):
+        t = T_u[j]
+        tmp_ = Y[(Y.T_long <= t)]
+        ext_feat_ = ext_feat[ext_feat.id.isin(np.unique(tmp_.id.values) + j*max_id)]
+        ext_feat_.id = ext_feat_.id - j*max_id
+        ext_feat_ = pd.merge(Y["id"].drop_duplicates(), ext_feat_,
+                            how="left", on=["id"])
+        n_samples, nb_total_extracted_feat = ext_feat_[columns].shape
+        if j == 0:
+            ext_feat_ = ext_feat_.fillna(0)
         else:
-            if asso_features is None:
-                asso_features = np.zeros((J, n_samples, nb_total_extracted_feat))
-            asso_features[j] = ext_feat[columns]
+            ext_feat_[ext_feat_.isna().any(axis=1)] = ext_feat_prev[ext_feat_.isna().any(axis=1)]
+        ext_feat_prev = ext_feat_.copy()
+        nb_extracted_feat = nb_total_extracted_feat // n_long_features
+        if asso_features is None:
+            asso_features = np.zeros((J, n_samples, nb_total_extracted_feat))
+        asso_features[j] = ext_feat_[columns]
     asso_features = asso_features.swapaxes(0, 1)
     return asso_features, nb_extracted_feat
