@@ -101,7 +101,7 @@ class prox_QNEM(Learner):
     def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
                  eta_elastic_net=.1, eta_sp_gp_l1=.9,
                  max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
-                 verbose=True, print_every=10, tol=1e-5,
+                 verbose=True, print_every=10, tol=1e-4,
                  warm_start=True, fixed_effect_time_order=5, initialize=True,
                  copt_accelerate=False, copt_solver_step='backtracking',
                  simu=True, S_k=None, cov_corr_rdn_long=.05, fc_parameters=None,
@@ -370,12 +370,10 @@ class prox_QNEM(Learner):
         """
         if self._fitted:
             theta, alpha = self.theta, self.fixed_effect_time_order
-            add_noise = True if self.simu else False
             asso_feats = asso_feats
             if asso_feats is None:
                 asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
-                                                            self.T_u, self.fc_parameters,
-                                                            add_noise, self.sparsity)
+                                                            self.T_u, self.fc_parameters)
 
             ext_feat = extract_features(Y, self.time_dep_feats, alpha)
             id_list = list(np.unique(Y.id.values))
@@ -430,10 +428,8 @@ class prox_QNEM(Learner):
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
             markers = []
-            add_noise = True if self.simu else False
             asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
-                                                        self.T_u, self.fc_parameters,
-                                                        add_noise, self.sparsity)
+                                                        self.T_u, self.fc_parameters)
             for i in range(n_samples):
                 # predictions for alive subjects only
                 T_u = self.T_u
@@ -509,14 +505,13 @@ class prox_QNEM(Learner):
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, self.time_dep_feats, alpha)  # Features extraction
-        T_u = np.unique(T)
+        T_u = np.unique(T[delta==1])
         self.T_u = T_u
         J, ind_1, ind_2 = get_times_infos(T, T_u)
-        add_noise = True if self.simu else False
         asso_feats = asso_feats
         if asso_feats is None:
             asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
-                                                        self.fc_parameters, add_noise, self.sparsity)
+                                                        self.fc_parameters)
         else:
             nb_extracted_feat = None
         self.asso_feats = asso_feats
@@ -534,19 +529,19 @@ class prox_QNEM(Learner):
             D = mlmm.long_cov
             phi = mlmm.phi
             baseline_hazard = initialize_baseline_hazard(X, T, delta)
+            baseline_hazard = baseline_hazard[
+                [item in T_u for item in np.unique(T)]]
         else:
             # Fixed initialization
             q = q_l * L
             r = r_l * L
             beta = np.zeros((q, 1))
-            D = np.diag(np.ones(r))
-            phi = np.ones((L, 1))
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
         #TODO: just for testing, remove later
-        phi = np.ones(L).reshape(-1, 1)
-        D = .01 * np.diag(np.ones(r_l * L))
         beta_0 = beta.reshape(-1, 1)
         beta_1 = beta_0.copy()
+        phi = np.ones((L, 1))
+        D = 1e-2 * np.identity(r_l * L)
         gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
         gamma_1 = gamma_0.copy()
         self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
@@ -626,7 +621,7 @@ class prox_QNEM(Learner):
             groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
             eta_sp_gp_l1 = self.eta_sp_gp_l1
             l_pen_SGL = self.l_pen_SGL
-            prox = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
+            prox_0 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
             args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
                         "phi": phi, "beta": beta_K,
                         "baseline_hazard": baseline_hazard,
@@ -636,7 +631,7 @@ class prox_QNEM(Learner):
 
             args_0 = {"group": 0}
             res0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[0], prox=prox,
+                fun=F_func.Q_func, x0=gamma_init[0], prox=prox_0,
                 max_iter=max_iter_proxg,
                 args=[{**args_all, **args_0}], jac=F_func.grad_Q,
                 step=self.copt_step,
@@ -645,8 +640,9 @@ class prox_QNEM(Learner):
 
             # gamma_1 update
             args_1 = {"group": 1}
+            prox_1 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
             res1 = (copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[1], prox=prox,
+                fun=F_func.Q_func, x0=gamma_init[1], prox=prox_1,
                 max_iter=max_iter_proxg,
                 args=[{**args_all, **args_1}], jac=F_func.grad_Q,
                 step=self.copt_step,
