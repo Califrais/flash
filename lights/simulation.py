@@ -1,9 +1,6 @@
 from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
-from tick.hawkes import SimuHawkesExpKernels
-from scipy.stats import uniform, beta
-from scipy.sparse import random
 from lights.base.base import normalize, logistic_grad
 import numpy as np
 import pandas as pd
@@ -121,19 +118,19 @@ class SimuJointLongitudinalSurvival(Simulation):
     n_time_indep_features : `int`, default=10
         Number of time-independent features
 
-    sparsity : `float`, default=.7
+    sparsity : `float`, default=.5
         Proportion of both time-independent and association features active
         coefficients vector. Must be in [0, 1].
 
-    coeff_val_time_indep : `float`, default=1.
+    coeff_val_time_indep : `float`, default=.2
         Value of the active coefficients in the time-independent coefficient
         vectors
 
-    coeff_val_asso_low_risk : `float`, default=.8
+    coeff_val_asso_low_risk : `float`, default=.1
         Value of the coefficients parameter used in the association coefficient
         vectors of low risk group
 
-    coeff_val_asso_high_risk : `float`, default=1.
+    coeff_val_asso_high_risk : `float`, default=.4
         Value of the coefficients parameter used in the association coefficient
         vectors of high risk group
 
@@ -144,7 +141,7 @@ class SimuJointLongitudinalSurvival(Simulation):
     high_risk_rate : `float`, default=.4
         Proportion of desired high risk samples rate
 
-    gap : `float`, default=.5
+    gap : `float`, default=1.
         Gap value to create high/low risk groups in the time-independent
         features
 
@@ -155,11 +152,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         Correlation to use in the Toeplitz covariance matrix for the random
         effects simulation
 
-    fixed_effect_mean_low_risk : `tuple`, default=(-.1, .1)
+    fixed_effect_mean_low_risk : `tuple`, default=(-.6, .1)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the low risk group
 
-    fixed_effect_mean_high_risk : `tuple`, default=(.3, .25)
+    fixed_effect_mean_high_risk : `tuple`, default=(.05, .2)
         Mean vector of the gaussian used to generate the fixed effect parameters
         for the high risk group
 
@@ -182,13 +179,13 @@ class SimuJointLongitudinalSurvival(Simulation):
         Bounds of the uniform distribution used to generate sparse adjacency
         matrix for measurement times intensities
 
-    scale : `float`, default=.001
+    scale : `float`, default=.05
         Scaling parameter of the Gompertz distribution of the baseline
 
     shape : `float`, default=.1
         Shape parameter of the Gompertz distribution of the baseline
 
-    censoring_factor : `float`, default=2.0
+    censoring_factor : `float`, default=2.
         Level of censoring. Increasing censoring_factor leads to less censored
         times and conversely.
 
@@ -249,19 +246,17 @@ class SimuJointLongitudinalSurvival(Simulation):
 
     def __init__(self, verbose: bool = True, seed: int = None,
                  n_samples: int = 1000, n_time_indep_features: int = 10,
-                 sparsity: float = .7, coeff_val_time_indep: float = 1.,
-                 coeff_val_asso_low_risk: float = .8,
-                 coeff_val_asso_high_risk: float = 1.,
+                 sparsity: float = .5, coeff_val_time_indep: float = .2,
+                 coeff_val_asso_low_risk: float = .1,
+                 coeff_val_asso_high_risk: float = .4,
                  cov_corr_time_indep: float = .5,
-                 high_risk_rate: float = .4, gap: float = .5,
+                 high_risk_rate: float = .4, gap: float = 1.,
                  n_long_features: int = 10, cov_corr_long: float = .01,
-                 fixed_effect_mean_low_risk: tuple = (-.1, .1),
-                 fixed_effect_mean_high_risk: tuple = (.3, .25),
+                 fixed_effect_mean_low_risk: tuple = (-.6, .1),
+                 fixed_effect_mean_high_risk: tuple = (.05, .2),
                  corr_fixed_effect: float = .01,
-                 std_error: float = .5, decay: float = 3.,
-                 baseline_hawkes_uniform_bounds: list = (.1, 1.),
-                 adjacency_hawkes_uniform_bounds: list = (.1, .2),
-                 shape: float = .1, scale: float = .001,
+                 std_error: float = .5,
+                 shape: float = .1, scale: float = .05,
                  censoring_factor: float = 2., grid_time: bool = True):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
@@ -280,9 +275,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.fixed_effect_mean_high_risk = fixed_effect_mean_high_risk
         self.corr_fixed_effect = corr_fixed_effect
         self.std_error = std_error
-        self.decay = decay
-        self.baseline_hawkes_uniform_bounds = baseline_hawkes_uniform_bounds
-        self.adjacency_hawkes_uniform_bounds = adjacency_hawkes_uniform_bounds
         self.shape = shape
         self.scale = scale
         self.censoring_factor = censoring_factor
@@ -296,7 +288,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.fixed_effect_coeffs = None
         self.asso_coeffs = None
         self.iotas = None
-        self.G = None
         self.hawkes = []
 
     @property
@@ -365,9 +356,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         fixed_effect_mean_high_risk = self.fixed_effect_mean_high_risk
         corr_fixed_effect = self.corr_fixed_effect
         std_error = self.std_error
-        decay = self.decay
-        baseline_hawkes_uniform_bounds = self.baseline_hawkes_uniform_bounds
-        adjacency_hawkes_uniform_bounds = self.adjacency_hawkes_uniform_bounds
         shape = self.shape
         scale = self.scale
         censoring_factor = self.censoring_factor
@@ -498,59 +486,12 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Censoring indicator: 1 if it is a time of failure, 0 if censoring
         delta = (T_star <= C).astype(np.ushort)
         self.censoring = delta
-
-        N_il = np.zeros((n_samples, n_long_features))
-        # TODO : delete N_il after tests
-        if self.grid_time:
-            # Simulation of the measurement times of the
-            # longitudinal processes using univarite Hawkes
-            decays = decay
-            a_, b_ = adjacency_hawkes_uniform_bounds
-            adjacency = uniform(a_, b_).rvs((1, 1))
-            a_, b_ = baseline_hawkes_uniform_bounds
-            baseline = uniform(a_, b_).rvs(1, random_state=seed)
-
-        else:
-            # Simulation of the measurement times of the longitudinal
-            # processes using multivariate Hawkes
-            decays = decay * np.ones((n_long_features, n_long_features))
-            a_, b_ = adjacency_hawkes_uniform_bounds
-            rvs_adjacency = uniform(a_, b_).rvs
-            adjacency = random(n_long_features, n_long_features,
-                               density=0.3,
-                               data_rvs=rvs_adjacency,
-                               random_state=seed).todense()
-            np.fill_diagonal(adjacency, rvs_adjacency(size=n_long_features))
-            a_, b_ = baseline_hawkes_uniform_bounds
-            baseline = uniform(a_, b_).rvs(size=n_long_features,
-                                           random_state=seed)
         id = np.arange(n_samples)
+        np.random.seed(seed)
         for i in range(n_samples):
-            hawkes = SimuHawkesExpKernels(adjacency=adjacency,
-                                          decays=decays,
-                                          baseline=baseline, verbose=False,
-                                          end_time=T[i], seed=seed + i)
-            hawkes.simulate()
-            self.hawkes += [hawkes]
-            if self.grid_time:
-                tmp = hawkes.timestamps[0]
-                if len(tmp) > 10:
-                    tmp = np.sort(
-                        np.random.choice(tmp, size=10,
-                                         replace=False))
-                if len(tmp) == 0:
-                    tmp = np.random.uniform(0, T[i], 1)
-
-                times_i = [tmp] * n_long_features
-            else:
-                times_i = hawkes.timestamps
-                for l in range(n_long_features):
-                    if len(times_i[l]) > 10:
-                        times_i[l] = np.sort(
-                            np.random.choice(times_i[l], size=10,
-                                             replace=False))
-                    if len(times_i[l]) == 0:
-                        times_i[l] = np.random.uniform(0, T[i], 1)
+            n_i = np.random.randint(1, 20)
+            tmp = np.unique(np.random.uniform(0, T[i], n_i))
+            times_i = [tmp] * n_long_features
             y_i = []
             for l in range(n_long_features):
                 if G[i] == 0:
@@ -560,7 +501,6 @@ class SimuJointLongitudinalSurvival(Simulation):
 
                 b_l = b[i, 2 * l:2 * l + 2]
                 n_il = len(times_i[l])
-                N_il[i, l] = n_il
                 U_il = np.c_[np.ones(n_il), times_i[l]]
                 eps_il = np.random.normal(0, std_error, n_il)
                 y_il = U_il.dot(beta_l) + U_il.dot(b_l) + eps_il
@@ -579,7 +519,6 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.event_times = T_star
         self.long_features = Y
         self.latent_class = G
-        self.N_il = N_il
         self.time_dep_feat = time_dep_feat
         self.S_k = S_k
         return X, Y, T, delta
