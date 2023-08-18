@@ -74,9 +74,9 @@ class MLMM(Learner):
         log_lik = 0
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], y_list[i], sum(N[i])
-            inv_Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
-            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
-            tmp_1 = multi_dot([V_i, D, V_i.T]) + inv_Sigma_i
+            Phi_i = [[phi[l, 0]] * N[i][l] for l in range(n_long_features)]
+            Sigma_i = np.diag(np.concatenate(Phi_i))
+            tmp_1 = multi_dot([V_i, D, V_i.T]) + Sigma_i
             tmp_2 = y_i - U_i.dot(beta)
 
             op1 = n_i * np.log(2 * np.pi)
@@ -128,8 +128,10 @@ class MLMM(Learner):
 
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
-        q_l = fixed_effect_time_order + 1
-        r_l = 2  # Affine random effects
+        self.q_l = fixed_effect_time_order + 1
+        self.r_l = 2  # Affine random effects
+        r_l = self.r_l
+        q_l = self.q_l
 
         if self.initialize:
             # initialize parameters by fitting univariate linear mixed models
@@ -168,18 +170,18 @@ class MLMM(Learner):
                 U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
 
                 # compute Sigma_i
-                Phi_i = [[1 / phi[l, 0]] * N_i[l]
+                inv_Phi_i = [[1 / phi[l, 0]] * N_i[l]
                          for l in range(n_long_features)]
-                Sigma_i = np.diag(np.concatenate(Phi_i))
+                inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i))
 
                 # compute Omega_i
                 D_inv = np.linalg.inv(D)
                 Omega_i = np.linalg.inv(
-                    V_i.transpose().dot(Sigma_i).dot(V_i) + D_inv)
+                    V_i.transpose().dot(inv_Sigma_i).dot(V_i) + D_inv)
                 Omega.append(Omega_i)
 
                 # compute mu_i
-                mu_i = Omega_i.dot(V_i.transpose()).dot(Sigma_i).dot(
+                mu_i = Omega_i.dot(V_i.transpose()).dot(inv_Sigma_i).dot(
                     y_i - U_i.dot(beta))
                 mu[:, i] = mu_i.flatten()
 
