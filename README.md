@@ -1,16 +1,16 @@
-# lights
-_ligths_ is a generalized joint model for high-dimensional multivariate longitudinal data and censored durations
+# flash
+_flash_ is a generalized joint model for high-dimensional multivariate longitudinal data and censored durations
 
 ## Quick description
-_ligths_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of both longitudinal and and time-independent features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high-dimensional shared associations.
+_flash_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of both longitudinal and and time-independent features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high-dimensional shared associations.
 
 To allow flexibility in modeling the dependency between the longitudinal features and the event time, we use appropriate penalties : elastic net for feature selection in the latent class membership, and sparse group lasso in the survival model, as well as for the fixed effect (allowing flexible representations of time).
 
-Inference is achieved using an efficient and novel Quasi-Newton Monte Carlo Expectation Maximization algorithm.
+Inference is achieved using an extension of Expectation Maximization algorithm.
 
 ## Use cases
 
-_lights_ can be used for many statistical learning applications where one wants to predict the risk for an event of interest to occur quickly, taking into account simultaneously a huge number of longitudinal signals in a high-dimensional context. It provides powerful interpretability by automatically pinpointing significant time-dependent and time-independent features. Hence, it can be used for real-time decision support, for instance:
+_flash_ can be used for many statistical learning applications where one wants to predict the risk for an event of interest to occur quickly, taking into account simultaneously a huge number of longitudinal signals in a high-dimensional context. It provides powerful interpretability by automatically pinpointing significant time-dependent and time-independent features. Hence, it can be used for real-time decision support, for instance:
  
 - In a medical context, where the event of interest could be survival time, re-hospitalization, relapse or disease progression, and the longitudinal data represents biomarkers or vital parameters measurements.
 
@@ -19,7 +19,7 @@ _lights_ can be used for many statistical learning applications where one wants 
 ## Installation
 Clone the repository, then inside the folder, use a `virtualenv` to install the requirements
 ```shell script
-git clone git@github.com:Califrais/lights.git
+git clone git@github.com:Califrais/flash.git
 cd lights
 
 # If your default interpreter is Python3:
@@ -40,7 +40,7 @@ The second command installs the project as a package, making the main module imp
 
 The library can be tested simply by running
 
-    python -m unittest discover -v ./lights/tests "test_*.py"
+    python -m unittest discover -v ./flash/tests "test_*.py"
 
 in terminal. This shall check that everything is working and in order.
 
@@ -56,5 +56,5 @@ Replace `.bashrc` with the variant for your shell (e.g. `.tcshrc`, `.zshrc`, `.c
 
 ## Other files
 
-The Jupyter notebook "Lights tutorial" gives useful example of how to use the model based on simulated data.
+The Jupyter notebook "FLASH tutorial" gives useful example of how to use the model based on simulated data.
 It will be very simple then to adapt it to your own data.
