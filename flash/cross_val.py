@@ -1,19 +1,15 @@
 import numpy as np
 from sklearn.model_selection import KFold
-from lights.inference import prox_QNEM
+from flash.inference import ext_EM
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from time import time
 from scipy.stats import beta
 import pandas as pd
-from lights.data_loader.load_data import load_data, extract_lights_feat, extract_R_feat
+from competing_methods.all_model import load_data, extract_flash_feat, truncate_data
+from flash.base.base import normalize
 
-def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
-                   , simu=True, n_folds=3, verbose=False,
-                   adaptative_grid_el=True, shuffle=True, tol=1e-5,
-                   warm_start=True, eta_elastic_net=.1,
-                   zeta_gamma_max = None, zeta_xi_max = None,
-                   max_iter=20, max_iter_lbfgs=50, max_iter_proxg=50,
-                   max_eval=50, sparsity=None, grid_search=False):
+def cross_validate(data, time_indep_feat, time_dep_feat, fc_parameters, l_pen_EN_list, l_pen_SGL_list,
+                   n_folds=10, shuffle=True):
     """Apply n_folds randomized search cross-validation using the given
     data, to select the best penalization hyper-parameters
 
@@ -22,128 +18,77 @@ def cross_validate(X, Y, T, delta, fc_parameters, fixed_effect_time_order
     X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
         The time-independent features matrix
 
-    Y : `pandas.DataFrame`, shape=(n_samples, n_long_features)
-        The simulated longitudinal data. Each element of the dataframe is
-        a pandas.Series
+    Y : `pandas.DataFrame`
+        The longitudinal data.
 
     T : `np.ndarray`, shape=(n_samples,)
         Censored times of the event of interest
 
-    S_k : `list`
-        Set of nonactive group for 2 classes (will be useful in case of
-        simulated data).
-
-    simu : `bool`, defaut=True
-        If `True` we do the inference with simulated data.
-
     delta : `np.ndarray`, shape=(n_samples,)
         Censoring indicator
+
+    l_pen_EN_list : `list`
+        List of level of penalization for the ElasticNet
+
+    l_pen_SGL_list : `list`
+        List of level of penalization for the Sparse Group Lasso
 
     n_folds : `int`, default=10
         Number of folds. Must be at least 2.
 
-    adaptative_grid_el : `bool`, default=True
-        If `True`, adapt the ElasticNet strength parameter grid using the
-        KKT conditions
-
     shuffle : `bool`, default=True
         Whether to shuffle the data before splitting into batches
 
-    tol : `float`, default=1e-5
-        The tolerance of the solver (iterations stop when the stopping
-        criterion is below it). By default the solver does ``max_iter``
-        iterations
-
-    warm_start : `bool`, default=True
-        If true, learning will start from the last reached solution
-
-    eta_elastic_net : `float`, default=0.1
-        The ElasticNet mixing parameter, with 0 <= eta <= 1.
-        For eta = 0 this is ridge (L2) regularization
-        For eta = 1 this is lasso (L1) regularization
-        For 0 < eta < 1, the regularization is a linear combination
-        of L1 and L2
-
-    zeta_gamma_max: `float`
-        The interval upper bound for gamma
-
-    zeta_xi_max: `float`
-        The interval upper bound for xi
-
-    max_iter: `int`, default=100
-        Maximum number of iterations of the prox-QNMCEM algorithm
-
-    max_iter_lbfgs: `int`, default=50
-        Maximum number of iterations of the L-BFGS-B solver
-
-    max_iter_proxg: `int`, default=50
-        Maximum number of iterations of the proximal gradient solver
-
-    max_eval: `int`, default=50
-        Maximum number of trials of the Hyperopt
     """
-    n_samples = T.shape[0]
     cv = KFold(n_splits=n_folds, shuffle=shuffle)
-
-    if adaptative_grid_el:
-        # from KKT conditions
-        zeta_xi_max = 1. / (1. - eta_elastic_net) * (.5 / n_samples) \
-                      * np.absolute(X).sum(axis=0).max()
-
-
+    X, _, _, _ = extract_flash_feat(data, time_indep_feat, time_dep_feat)
     def learners(params):
         scores = []
         for n_fold, (idx_train, idx_test) in enumerate(cv.split(X)):
-            learner = prox_QNEM(tol=tol, warm_start=warm_start, simu=simu,
-                                   fixed_effect_time_order= fixed_effect_time_order,
-                                   fc_parameters= fc_parameters, max_iter=max_iter,
-                                   max_iter_lbfgs=max_iter_lbfgs, verbose=verbose,
-                                   max_iter_proxg=max_iter_proxg, print_every=1,
-                                sparsity=sparsity)
-            X_train, X_test = X[idx_train], X[idx_test]
-            T_train, T_test = T[idx_train], T[idx_test]
-            id_test = np.unique(Y.id.values)[idx_test]
-            Y_test = Y[Y.id.isin(id_test)]
-            Y_train = Y[~Y.id.isin(id_test)]
-            delta_train, delta_test = delta[idx_train], delta[idx_test]
+            learner = ext_EM(fc_parameters= fc_parameters, verbose=False,
+                             print_every=1, max_iter=40)
+            id_test = np.unique(data["id"])[idx_test]
+            data_train = data[~data.id.isin(id_test)]
+            data_test = data[data.id.isin(id_test)]
+            data_test_truncated = truncate_data(data_test)
+            X_train, Y_train, T_train, delta_train = extract_flash_feat(
+                                                                data_train,
+                                                                time_indep_feat,
+                                                                time_dep_feat)
+            X_test, Y_test, T_test, delta_test = extract_flash_feat(
+                                                                data_test_truncated,
+                                                                time_indep_feat,
+                                                                time_dep_feat)
+            X_train = normalize(X_train)
+            Y_train[time_dep_feat] = normalize(Y_train[time_dep_feat].values)
+            X_test = normalize(X_test)
+            Y_test[time_dep_feat] = normalize(Y_test[time_dep_feat].values)
+
             learner.l_pen_EN = params['l_pen_EN']
             learner.l_pen_SGL = params['l_pen_SGL']
             try:
                 learner.fit(X_train, Y_train, T_train, delta_train)
-            except ValueError:
+                score = compute_Cindex(learner, X_test, Y_test, T_test, delta_test)
+            except (ValueError, np.linalg.LinAlgError) as e:
                 scores = np.nan
                 break
             else:
-                scores.append(compute_Cindex(learner, X_test, Y_test, T_test,
-                                             delta_test))
+                scores.append(score)
         return {'loss': -np.mean(scores), 'status': STATUS_OK}
 
-    if grid_search:
-        params = {}
-        trials = pd.DataFrame(columns=["l_pen_EN", "l_pen_SGL", "loss"])
-        nb_trial_sqrt = int(np.sqrt(max_eval))
-        for log_l_pen_EN in np.linspace(np.log(zeta_xi_max * 1e-8), np.log(zeta_xi_max), nb_trial_sqrt):
-            for log_l_pen_SGL in np.linspace(np.log(zeta_gamma_max * 1e-8),
-                                            np.log(zeta_gamma_max), nb_trial_sqrt):
-                params['l_pen_EN'] = np.exp(log_l_pen_EN)
-                params['l_pen_SGL'] = np.exp(log_l_pen_SGL)
-                loss = learners(params)["loss"]
-                new_row = {"l_pen_EN" : params['l_pen_EN'],
-                           "l_pen_SGL" : params['l_pen_SGL'],
-                           "loss" : loss}
-                trials = trials.append(new_row, ignore_index=True)
+    params = {}
+    trials = pd.DataFrame(columns=["l_pen_EN", "l_pen_SGL", "loss"])
+    for log_l_pen_EN in l_pen_EN_list:
+        for log_l_pen_SGL in l_pen_SGL_list:
+            params['l_pen_EN'] = log_l_pen_EN
+            params['l_pen_SGL'] = log_l_pen_SGL
+            loss = learners(params)["loss"]
+            new_row = {"l_pen_EN" : params['l_pen_EN'],
+                       "l_pen_SGL" : params['l_pen_SGL'],
+                       "loss" : loss}
+            trials = trials.append(new_row, ignore_index=True)
 
-        best = trials[trials.loss == trials.loss.min()].squeeze()
-
-    else:
-        fspace = {
-            'l_pen_EN': hp.uniform('l_pen_EN', zeta_xi_max * 1e-8, zeta_xi_max),
-            'l_pen_SGL': hp.uniform('l_pen_SGL', zeta_gamma_max * 1e-8, zeta_gamma_max)
-        }
-
-        trials = Trials()
-        best = fmin(fn=learners, space=fspace, algo=tpe.suggest, max_evals=max_eval,
-                    trials=trials)
+    best = trials[trials.loss == trials.loss.min()].squeeze()
 
     return best, trials
 
@@ -208,7 +153,7 @@ def risk_prediction(model="lights", n_run=2, simulation=False, test_size=.3):
                                                 n_folds=n_folds,
                                                 max_eval=max_eval)
             l_pen_EN, l_pen_SGL = best_param.values()
-            learner = prox_QNEM(fixed_effect_time_order=fixed_effect_time_order,
+            learner = ext_EM(fixed_effect_time_order=fixed_effect_time_order,
                                 max_iter=5, initialize=True, print_every=1,
                                 l_pen_SGL=l_pen_SGL, eta_sp_gp_l1=.9, l_pen_EN=l_pen_EN,
                                 fc_parameters=fc_parameters)

@@ -1,5 +1,5 @@
-from lights.base.base import Learner, block_diag
-from lights.init.ulmm import ULMM
+from flash.base.base import Learner, block_diag
+from flash.init.ulmm import ULMM
 import numpy as np
 from numpy.linalg import multi_dot
 
@@ -128,10 +128,12 @@ class MLMM(Learner):
 
         (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
         n_samples, n_long_features = len(U_list), len(U_L)
-        self.q_l = fixed_effect_time_order + 1
-        self.r_l = 2  # Affine random effects
-        r_l = self.r_l
-        q_l = self.q_l
+#        self.q_l = fixed_effect_time_order + 1
+#        self.r_l = 2  # Affine random effects
+#        r_l = self.r_l
+#        q_l = self.q_l
+        q_l = fixed_effect_time_order + 1
+        r_l = 2
 
         if self.initialize:
             # initialize parameters by fitting univariate linear mixed models
@@ -233,3 +235,43 @@ class MLMM(Learner):
                 break
 
         self._end_solve()
+
+    def predict(self, extracted_features):
+        """Predict
+
+        Parameters
+        ----------
+        extracted_features : `tuple, tuple`,
+            The extracted features from longitudinal data.
+            Each tuple is a combination of fixed-effect design features,
+            random-effect design features, outcomes, number of the longitudinal
+            measurements for all subject or arranged by l-th order.
+
+        Returns
+        -------
+        output : `float`
+            The predicted value
+        """
+        (U_list, V_list, y_list, N), (U_L, V_L, y_L, N_L) = extracted_features
+        n_samples, n_long_features = len(U_list), len(U_L)
+        D, beta, phi = self.long_cov, self.fixed_effect_coeffs, self.phi
+        D_inv = np.linalg.inv(D)
+
+        y_pred = []
+        for i in range(n_samples):
+            U_i, V_i, y_i, N_i = U_list[i], V_list[i], y_list[i], N[i]
+            sel_idx = ~np.isnan(y_i).flatten()
+            inv_Phi_i = [[1 / phi[l, 0]] * N_i[l]
+                         for l in range(n_long_features)]
+            inv_Sigma_i = np.diag(np.concatenate(inv_Phi_i)[sel_idx])
+            Omega_i = np.linalg.inv(
+                V_i[sel_idx].transpose().dot(inv_Sigma_i).dot(
+                    V_i[sel_idx]) + D_inv)
+
+            # compute mu_i
+            mu_i = Omega_i.dot(V_i[sel_idx].transpose()).dot(inv_Sigma_i).dot(
+                y_i[sel_idx] - U_i[sel_idx].dot(beta))
+            y_i_pred = U_i.dot(beta.flatten()) + V_i.dot(mu_i.flatten())
+            y_pred.append((y_i_pred.reshape(n_long_features, -1).T))
+
+        return np.vstack(y_pred)

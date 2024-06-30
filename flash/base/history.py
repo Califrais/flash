@@ -51,15 +51,21 @@ class History:
         for key, val in kwargs.items():
             if key == 'theta':
                 for key_, val_ in val.items():
-                    ravel = False
-                    if type(val_) is np.ndarray:
-                        if val_.ndim == 2:
-                            if val_.shape[1] == 1:
-                                ravel = True
-                    if ravel:
-                        history[key_].append(val_.ravel())
-                    else:
-                        history[key_].append(val_)
+                    if key_ not in ["beta", "gamma", "xi"]:
+                        ravel = False
+                        if type(val_) is np.ndarray:
+                            if val_.ndim == 2:
+                                if val_.shape[1] == 1:
+                                    ravel = True
+                        if ravel:
+                            history[key_].append(val_.ravel())
+                        else:
+                            if key_ in ["beta", "gamma", "xi"]:
+                                K = len(val_)
+                                for k in range(K):
+                                    history[key_ + "_" + str(k)].append(val_[k])
+                            else:
+                                history[key_].append(val_)
             else:
                 history[key].append(val)
 

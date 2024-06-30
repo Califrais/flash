@@ -1,4 +1,4 @@
-from lights.base.base import Learner
+from flash.base.base import Learner
 import numpy as np
 import statsmodels.formula.api as smf
 import pandas as pd

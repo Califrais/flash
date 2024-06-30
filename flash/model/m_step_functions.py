@@ -1,6 +1,6 @@
 import numpy as np
-from lights.base.base import logistic_loss, get_xi_from_xi_ext
-from lights.model.regularizations import ElasticNet
+from flash.base.base import logistic_loss, get_xi_from_xi_ext
+from flash.model.regularizations import ElasticNet
 
 
 class MstepFunctions:
@@ -8,9 +8,6 @@ class MstepFunctions:
 
     Parameters
     ----------
-    fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independent
-        features
 
     X : `np.ndarray`, shape=(n_samples, n_time_indep_features)
         The time-independent features matrix
@@ -32,15 +29,14 @@ class MstepFunctions:
         of L1 and L2
     """
 
-    def __init__(self, fit_intercept, X, delta, n_time_indep_features,
+    def __init__(self, X, delta, n_time_indep_features,
                  l_pen_EN, eta_elastic_net):
-        self.fit_intercept = fit_intercept
         self.X, self.delta = X, delta
         self.n_time_indep_features = n_time_indep_features
         self.n_samples = X.shape[0]
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
 
-    def P_pen_func(self, pi_est, xi_ext):
+    def P_pen_func(self, pi_est, xi_ext, k, xi_ext_all):
         """Computes the sub objective function P with penalty, to be minimized
         at each prox_QNMCEM iteration using fmin_l_bfgs_b.
 
@@ -59,13 +55,15 @@ class MstepFunctions:
         output : `float`
             The value of the P sub objective to be minimized at each prox_QNMCEM step
         """
-        xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
-        pen = self.ENet.pen(xi)
-        P = self.P_func(pi_est, xi_ext)
+        xi_ext_all_ = xi_ext_all.copy()
+        xi_ext_all_[k] = xi_ext
+        xi = get_xi_from_xi_ext(xi_ext_all_)
+        pen = self.ENet.pen(xi[:, k])
+        P = self.P_func(pi_est, xi)
         sub_obj = P + pen
         return sub_obj
 
-    def P_func(self, pi_est, xi_ext):
+    def P_func(self, pi_est, xi):
         """Computes the function denoted P in the lights paper.
 
         Parameters
@@ -83,13 +81,20 @@ class MstepFunctions:
         P : `float`
             The value of the P sub objective
         """
-        xi_0, xi = get_xi_from_xi_ext(xi_ext, self.fit_intercept)
-        u = xi_0 + self.X.dot(xi)
-        P = ((1 - pi_est) * logistic_loss(-u) +
-             pi_est * logistic_loss(u)).mean()
+        K = pi_est.shape[1]
+        u = self.X.dot(xi)
+        #P = ((1 - pi_est) * logistic_loss(-u) +
+        #     pi_est * logistic_loss(u)).mean()
+        P_sum = 0
+        pi_xi = (np.exp(u).T / np.exp(u).sum(axis=1)).T
+        for k in range(K):
+            P_sum += pi_est[:, k] * pi_xi[:, k]
+
+        P = np.mean(P_sum)
+
         return P
 
-    def grad_P(self, pi_est, xi_ext):
+    def grad_P(self, pi_est, pi_xi):
         """Computes the gradient of the function P
 
         Parameters
@@ -107,19 +112,14 @@ class MstepFunctions:
         output : `np.ndarray`
             The value of the P sub objective gradient
         """
-        fit_intercept = self.fit_intercept
-        X, n_samples = self.X, self.n_samples
-        xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
-        u = xi_0 + X.dot(xi)
-        if fit_intercept:
-            X = np.concatenate((np.ones(n_samples).reshape(1, n_samples).T, X),
-                               axis=1)
-        grad = X * (pi_est - np.exp(-logistic_loss(u))).reshape(-1, 1)
+        X = self.X
+        grad = (X.T * (pi_est - pi_xi)).T
         grad = - grad.mean(axis=0)
         grad_sub_obj = np.concatenate([grad, -grad])
+
         return grad_sub_obj
 
-    def grad_P_pen(self, pi_est, xi_ext):
+    def grad_P_pen(self, pi_est, xi_ext, k, xi_ext_all):
         """Computes the gradient of the sub objective P with penalty
 
         Parameters
@@ -137,14 +137,14 @@ class MstepFunctions:
         output : `np.ndarray`
             The value of the P sub objective gradient
         """
-        fit_intercept = self.fit_intercept
-        n_time_indep_features = self.n_time_indep_features
-        xi_0, xi = get_xi_from_xi_ext(xi_ext, fit_intercept)
-        grad_pen = self.ENet.grad(xi)
-        if fit_intercept:
-            grad_pen = np.concatenate([[0], grad_pen[:n_time_indep_features],
-                                       [0], grad_pen[n_time_indep_features:]])
-        grad_P = self.grad_P(pi_est, xi_ext)
+        xi_ext_all_ = xi_ext_all.copy()
+        xi_ext_all_[k] = xi_ext
+        xi = get_xi_from_xi_ext(xi_ext_all_)
+        u = self.X.dot(xi)
+        pi_xi = (np.exp(u).T / np.exp(u).sum(axis=1)).T
+
+        grad_pen = self.ENet.grad(xi[:, k])
+        grad_P = self.grad_P(pi_est[:, k], pi_xi[:, k])
         return grad_P + grad_pen
 
     def Q_func(self, gamma_k, *args):

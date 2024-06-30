@@ -1,7 +1,7 @@
 from datetime import datetime
 from time import time
 from scipy.linalg.special_matrices import toeplitz
-from lights.base.base import normalize, logistic_grad
+from flash.base.base import normalize, logistic_grad, probit
 import numpy as np
 import pandas as pd
 
@@ -217,10 +217,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         different longitudinal outcome. Here r = 2*n_long_features since
         one choose affine random effects, so all r_l=2
 
-    fixed_effect_coeffs : `list`, [beta_0, beta_1]
+    fixed_effect_coeffs : `list`, [beta_1, beta_2]
         Simulated fixed effect coefficient vectors per group
 
-    asso_coeffs : `list`, [gamma_0, gamma_1]
+    asso_coeffs : `list`, [gamma_1, gamma_2]
         Simulated association parameters per group
 
     iotas : `dict`, {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
@@ -381,8 +381,9 @@ class SimuJointLongitudinalSurvival(Simulation):
 
         # Simulation of latent group
         pi_xi = logistic_grad(X_dot_xi)
+        #pi_xi = probit(X_dot_xi)
         u = np.random.rand(n_samples)
-        G = (u < pi_xi).astype(int)
+        G = (u < pi_xi).astype(int) + 1
 
         X = normalize(X)
         self.time_indep_features = X
@@ -395,11 +396,11 @@ class SimuJointLongitudinalSurvival(Simulation):
         # Simulation of the fixed effect parameters
         q_l = 2
         q = q_l * n_long_features  # linear time-varying features, so all q_l=2
-        mean_0 = fixed_effect_mean_low_risk * n_long_features
-        beta_0 = np.random.multivariate_normal(mean_0, np.diag(
-            corr_fixed_effect * np.ones(q)))
-        mean_1 = fixed_effect_mean_high_risk * n_long_features
+        mean_1 = fixed_effect_mean_low_risk * n_long_features
         beta_1 = np.random.multivariate_normal(mean_1, np.diag(
+            corr_fixed_effect * np.ones(q)))
+        mean_2 = fixed_effect_mean_high_risk * n_long_features
+        beta_2 = np.random.multivariate_normal(mean_2, np.diag(
             corr_fixed_effect * np.ones(q)))
 
         # Simulation of the fixed effect and association parameters
@@ -433,16 +434,16 @@ class SimuJointLongitudinalSurvival(Simulation):
                         active_rdn_effect_idx[k] += [0] * r_l
                 gamma.append(gamma_k)
             return gamma, S_k, np.array(active_beta_idx), np.array(active_rdn_effect_idx)
-        [gamma_0, gamma_1], S_k, active_beta_idx, active_rdn_effect_idx = \
+        [gamma_1, gamma_2], S_k, active_beta_idx, active_rdn_effect_idx = \
             simu_sparse_params()
-        beta_0 = beta_0 * active_beta_idx[0]
-        beta_1 = beta_1 * active_beta_idx[1]
-        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1),
-                                    beta_1.reshape(-1, 1)]
-        b[G == 0] = b[G == 0] * active_rdn_effect_idx[0]
-        b[G == 1] = b[G == 1] * active_rdn_effect_idx[1]
-        self.asso_coeffs = [gamma_0, gamma_1]
-        self.fixed_effect_coeffs = [beta_0.reshape(-1, 1), beta_1.reshape(-1, 1)]
+        beta_1 = beta_1 * active_beta_idx[0]
+        beta_2 = beta_2 * active_beta_idx[1]
+        self.fixed_effect_coeffs = [beta_1.reshape(-1, 1),
+                                    beta_2.reshape(-1, 1)]
+        b[G == 1] = b[G == 1] * active_rdn_effect_idx[0]
+        b[G == 2] = b[G == 2] * active_rdn_effect_idx[1]
+        self.asso_coeffs = [gamma_1, gamma_2]
+        self.fixed_effect_coeffs = [beta_1.reshape(-1, 1), beta_2.reshape(-1, 1)]
 
         # Simulation of true times
         idx_2 = np.arange(0, r_l * n_long_features, r_l)
@@ -451,29 +452,29 @@ class SimuJointLongitudinalSurvival(Simulation):
         idx_12 = np.concatenate(((idx_4 + 1), (idx_4 + 2)))
         idx_12.sort()
 
-        iota_01 = (beta_0[idx_2] + b[G == 0][:, idx_2]).dot(
-            gamma_0[idx_4]) + X[G == 0].dot(xi)
-        iota_01 += b[G == 0].dot(gamma_0[idx_12])
-        iota_02 = (beta_0[idx_3] + b[G == 0][:, idx_3]).dot(
-            gamma_0[idx_4])
         iota_11 = (beta_1[idx_2] + b[G == 1][:, idx_2]).dot(
             gamma_1[idx_4]) + X[G == 1].dot(xi)
         iota_11 += b[G == 1].dot(gamma_1[idx_12])
         iota_12 = (beta_1[idx_3] + b[G == 1][:, idx_3]).dot(
             gamma_1[idx_4])
-        self.iotas = {1: [iota_01, iota_11], 2: [iota_02, iota_12]}
+        iota_21 = (beta_2[idx_2] + b[G == 2][:, idx_2]).dot(
+            gamma_2[idx_4]) + X[G == 2].dot(xi)
+        iota_21 += b[G == 2].dot(gamma_2[idx_12])
+        iota_22 = (beta_2[idx_3] + b[G == 2][:, idx_3]).dot(
+            gamma_2[idx_4])
+        self.iotas = {1: [iota_11, iota_21], 2: [iota_12, iota_22]}
 
         T_star = np.zeros(n_samples)
-        n_samples_class_1 = np.sum(G)
-        n_samples_class_0 = n_samples - n_samples_class_1
-        u_0 = np.random.rand(n_samples_class_0)
+        n_samples_class_2 = np.sum(G == 2)
+        n_samples_class_1 = n_samples - n_samples_class_2
         u_1 = np.random.rand(n_samples_class_1)
-        tmp = iota_02 + shape
-        T_star[G == 0] = np.log(1 - tmp * np.log(u_0) /
-                                (scale * shape * np.exp(iota_01))) / tmp
+        u_2 = np.random.rand(n_samples_class_2)
         tmp = iota_12 + shape
         T_star[G == 1] = np.log(1 - tmp * np.log(u_1) /
                                 (scale * shape * np.exp(iota_11))) / tmp
+        tmp = iota_22 + shape
+        T_star[G == 2] = np.log(1 - tmp * np.log(u_2) /
+                                (scale * shape * np.exp(iota_21))) / tmp
 
         m = T_star.mean()
         # Simulation of the censoring
@@ -494,10 +495,10 @@ class SimuJointLongitudinalSurvival(Simulation):
             times_i = [tmp] * n_long_features
             y_i = []
             for l in range(n_long_features):
-                if G[i] == 0:
-                    beta_l = beta_0[2 * l:2 * l + 2]
-                else:
+                if G[i] == 1:
                     beta_l = beta_1[2 * l:2 * l + 2]
+                else:
+                    beta_l = beta_2[2 * l:2 * l + 2]
 
                 b_l = b[i, 2 * l:2 * l + 2]
                 n_il = len(times_i[l])
@@ -507,7 +508,6 @@ class SimuJointLongitudinalSurvival(Simulation):
                 y_i.append(y_il)
             time_dep_feat = ['time_dep_feat%s' % (l + 1)
                              for l in range(n_long_features)]
-            # TODO: Update univariate time
             Y_i = np.column_stack(
                 (np.array([id[i]] * n_il), times_i[0], np.array(y_i).T))
             if i == 0:

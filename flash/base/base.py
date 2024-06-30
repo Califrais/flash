@@ -1,10 +1,11 @@
 from datetime import datetime
-from lights.base.history import History
+from flash.base.history import History
 from time import time
 import numpy as np
 import pandas as pd
 from tsfresh import extract_features as extract_rep_features
-
+import iisignature
+from scipy.stats import norm
 
 class Learner:
     """The base class for a Solver.
@@ -259,6 +260,11 @@ def logistic_grad(z):
     res[idx_neg] = 1 - 1. / (1. + np.exp(z[idx_neg]))
     return res
 
+def probit(z):
+    """Overflow proof computation of 1 / (1 + exp(-z)))
+    """
+    res = norm.cdf(z)
+    return res
 
 def logistic_loss(z):
     """Overflow proof computation of log(1 + exp(-z))
@@ -318,7 +324,7 @@ def get_ext_from_vect(v):
     return v_ext
 
 
-def get_xi_from_xi_ext(xi_ext, fit_intercept):
+def get_xi_from_xi_ext(xi_ext):
     """Get the time-independent coefficient vector from its extension on
     positive and negative parts
 
@@ -328,10 +334,6 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
         The time-independent coefficient vector decomposed on positive and
         negative parts
 
-    fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independent
-        features
-
     Returns
     -------
     xi_0 : `float`
@@ -340,14 +342,13 @@ def get_xi_from_xi_ext(xi_ext, fit_intercept):
     xi : `np.ndarray`, shape=(n_time_indep_features,)
         The time-independent coefficient vector
     """
-    dim = len(xi_ext) // 2
-    xi = xi_ext[:dim] - xi_ext[dim:]
-    if fit_intercept:
-        xi_0 = xi[0]
-        xi = xi[1:]
-    else:
-        xi_0 = 0
-    return xi_0, xi
+    K = len(xi_ext)
+    dim = xi_ext[0].shape[0] // 2
+    xi = np.zeros((dim, K))
+    for k in range(K):
+        xi[:, k] = (xi_ext[k][:dim] - xi_ext[k][dim:]).flatten()
+
+    return xi
 
 
 def get_vect_from_ext(v_ext):
@@ -368,37 +369,12 @@ def get_vect_from_ext(v_ext):
     v = (v_ext[:dim] - v_ext[dim:]).flatten()
     return v
 
-def clean_xi_ext(xi_ext, fit_intercept):
-    """Removes potential intercept coefficients in the time-independent
-    coefficient vector decomposed on positive and negative parts
-
-    Parameters
-    ----------
-    xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-        The time-independent coefficient vector decomposed on positive and
-        negative parts
-
-    fit_intercept : `bool`
-        If `True`, include an intercept in the model for the time independent
-        features
-
-    Returns
-    -------
-    xi_ext : `np.ndarray`, shape=(2*n_time_indep_features,)
-        The time-independent coefficient vector decomposed on positive and
-        negative parts without potential intercept coefficients
-    """
-    if fit_intercept:
-        n_time_indep_features = len(xi_ext) // 2
-        xi_ext = np.delete(xi_ext, [0, n_time_indep_features + 1])
-    return xi_ext
-
 def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
     """
 
     Parameters
     ----------
-    Y_rep : `pandas.DataFrame`, shape=(n_samples, 4)
+    Y : `pandas.DataFrame`, shape=(n_samples, 4)
         The longitudinal data in the format to be used for extracting
         representation features.
 
@@ -421,13 +397,12 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
         t = T_u[j]
         tmp_ = Y[(Y.T_long <= t)]
         tmp_.id = tmp_.id + j*max_id
-        tmp = tmp.append(tmp_)
+        tmp = pd.concat([tmp, tmp_], ignore_index=True)
     ext_feat = extract_rep_features(timeseries_container=tmp, column_id="id",
                                 column_sort="T_long",
                                 default_fc_parameters=fc_parameters,
                                 impute_function=None,
-                                disable_progressbar=True,
-                                )
+                                disable_progressbar=True)
     columns = np.sort(ext_feat.columns)
     ext_feat["id"] = ext_feat.index.values
     for j in range(J):
@@ -448,4 +423,57 @@ def feat_representation_extraction(Y, n_long_features, T_u, fc_parameters):
             asso_features = np.zeros((J, n_samples, nb_total_extracted_feat))
         asso_features[j] = ext_feat_[columns]
     asso_features = asso_features.swapaxes(0, 1)
+    return asso_features, nb_extracted_feat
+
+
+def feat_representation_extraction_sig(Y, T_u, order=2):
+    """
+
+    Parameters
+    ----------
+    Y : `pandas.DataFrame`, shape=(n_samples, 4)
+        The longitudinal data in the format to be used for extracting
+        representation features.
+
+    T_u : `np.ndarray`, shape=(J,)
+        The unique time to event.
+
+    fc_parameters : `dict`
+        Parameters to control which features are calculated.
+
+    Returns
+    -------
+    asso_features : `np.ndarray`, shape=(J,)
+        Extracted features.
+    """
+    J = len(T_u)
+    n_samples = len(np.unique(Y["id"].values))
+    idx = np.unique(Y["id"].values)
+#    longi_feat = Y.columns[2:]
+#    paths = np.zeros((n_samples, J, len(longi_feat), 30, 2))
+#    for i in range(n_samples):
+#        for j in range(J):
+#            t = T_u[j]
+#            tmp_ = Y[(Y.T_long <= t) & (Y.id == idx[i])]
+#            n_ij = tmp_.shape[0]
+#            for k in range(len(longi_feat)):
+#                paths[i, j, k, : n_ij] = tmp_[["T_long", longi_feat[k]]].values
+#
+#                paths[i, j, k, n_ij :] = paths[i, j, k, n_ij]
+
+#    asso_features = iisignature.sig(paths, 2).reshape((n_samples, J, -1))
+    longi_feat = Y.columns[1:]
+    paths = np.zeros((n_samples, J, 30, len(longi_feat)))
+    for i in range(n_samples):
+        for j in range(J):
+            t = T_u[j]
+            tmp_ = Y[(Y.T_long <= t) & (Y.id == idx[i])]
+            n_ij = tmp_.shape[0]
+            paths[i, j, : n_ij] = tmp_[longi_feat].values
+
+            paths[i, j, n_ij :] = paths[i, j, n_ij]
+
+    asso_features = iisignature.sig(paths, order)
+    nb_extracted_feat = asso_features.shape[-1]
+
     return asso_features, nb_extracted_feat

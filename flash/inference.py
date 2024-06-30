@@ -4,26 +4,22 @@ import copt
 import warnings
 from scipy.optimize import fmin_l_bfgs_b
 from lifelines.utils import concordance_index as c_index_score
-from lights.base.base import Learner, extract_features, normalize, block_diag, \
+from flash.base.base import Learner, extract_features, normalize, block_diag, \
     get_xi_from_xi_ext, logistic_grad, get_times_infos
-from lights.init.mlmm import MLMM
-from lights.init.cox import initialize_baseline_hazard
-from lights.model.e_step_functions import EstepFunctions
-from lights.model.m_step_functions import MstepFunctions
-from lights.model.regularizations import ElasticNet, SparseGroupL1
+from flash.init.mlmm import MLMM
+from flash.init.cox import initialize_baseline_hazard
+from flash.model.e_step_functions import EstepFunctions
+from flash.model.m_step_functions import MstepFunctions
+from flash.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
-from lights.base.base import feat_representation_extraction
-import re
+from flash.base.base import feat_representation_extraction
 
-class prox_QNEM(Learner):
-    """prox-QNEM Algorithm for the lights model inference
+class ext_EM(Learner):
+    """Extension of EM Algorithm for the flash model inference
 
     Parameters
     ----------
-    fit_intercept : `bool`, default=True
-        If `True`, include an intercept in the model for the time independent
-        features
 
     l_pen_EN : `float`, default=0.
         Level of penalization for the ElasticNet
@@ -67,7 +63,7 @@ class prox_QNEM(Learner):
     warm_start : `bool`, default=True
         If true, learning will start from the last reached solution
 
-    fixed_effect_time_order : `int`, default=5
+    fixed_effect_time_order : `int`, default=1
         Order of the higher time monomial considered for the representations of
         the time-varying features corresponding to the fixed effect. The
         dimension of the corresponding design matrix is then equal to
@@ -84,35 +80,21 @@ class prox_QNEM(Learner):
     copt_solver_step : function or `str`='backtracking', default='backtracking'
         Step size for optimization algorithm used in Copt colver
 
-    simu : `bool`, defaut=True
-        If `True` we do the inference with simulated data.
-
-    S_k : `list`
-        Set of nonactive group for 2 classes (will be useful in case of
-        simulated data).
-
-    cov_corr_rdn_long : `float`
-        Correlation coefficient of the toeplitz correlation matrix of
-        random longitudinal features (will be useful in case of
-        simulated data).
-
     """
 
-    def __init__(self, fit_intercept=False, l_pen_EN=0., l_pen_SGL=0.,
+    def __init__(self, l_pen_EN=0., l_pen_SGL=0.,
                  eta_elastic_net=.1, eta_sp_gp_l1=.9,
-                 max_iter=100, max_iter_lbfgs=50, max_iter_proxg=10,
+                 max_iter=40, max_iter_lbfgs=50, max_iter_proxg=10,
                  verbose=True, print_every=10, tol=1e-4,
-                 warm_start=True, fixed_effect_time_order=5, initialize=True,
+                 warm_start=True, fixed_effect_time_order=1, initialize=True,
                  copt_accelerate=False, copt_solver_step='backtracking',
-                 simu=True, S_k=None, cov_corr_rdn_long=.05, fc_parameters=None,
-                 sparsity=None):
+                 fc_parameters=None):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
         self.max_iter_proxg = max_iter_proxg
         self.tol = tol
         self.warm_start = warm_start
-        self.fit_intercept = fit_intercept
         self.fixed_effect_time_order = fixed_effect_time_order
         self.initialize = initialize
         self.copt_accelerate = copt_accelerate
@@ -122,10 +104,6 @@ class prox_QNEM(Learner):
         self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
-        self.simu = simu
-        self.sparsity = sparsity
-        self.S_k = S_k
-        self.cov_corr_rdn_long = cov_corr_rdn_long
 
         # Attributes that will be instantiated afterwards
         self.n_samples = None
@@ -133,14 +111,12 @@ class prox_QNEM(Learner):
         self.n_long_features = None
         self.T_u = None
         self.theta = {
-            "beta_0": np.empty(1),
-            "beta_1": np.empty(1),
+            "beta": np.empty(1),
             "long_cov": np.empty(1),
             "phi": np.empty(1),
             "xi": np.empty(1),
             "baseline_hazard": pd.Series(),
-            "gamma_0": np.empty(1),
-            "gamma_1": np.empty(1)
+            "gamma": np.empty(1)
         }
         self.copt_step = copt_solver_step
         self.fc_parameters = fc_parameters
@@ -163,7 +139,7 @@ class prox_QNEM(Learner):
 
     @staticmethod
     def _log_lik(pi_xi, f):
-        """Computes the the likelihood of the lights model
+        """Computes the the likelihood of the flash model
 
         Parameters
         ----------
@@ -179,8 +155,7 @@ class prox_QNEM(Learner):
         prb : `float`
             The log-likelihood computed on the given data
         """
-        pi_xi_ = np.vstack((1 - pi_xi, pi_xi)).T
-        prb = np.log((pi_xi_ * f).sum(axis=-1)).mean()
+        prb = np.log((pi_xi * f).sum(axis=-1)).mean()
         return prb
 
     def _func_obj(self, pi_xi, f):
@@ -208,15 +183,15 @@ class prox_QNEM(Learner):
         log_lik = self._log_lik(pi_xi, f)
         # xi elastic net penalty
         xi = theta["xi"]
-        xi_pen = self.ENet.pen(xi)
-
-        # gamma sparse group l1 penalty
-        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
+        gamma = theta["gamma"]
+        groups = np.arange(0, len(gamma[0])).reshape(L, -1).tolist()
         SGL1 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups)
-        gamma_0_pen = SGL1.pen(gamma_0)
-        gamma_1_pen = SGL1.pen(gamma_1)
-        pen = xi_pen + gamma_0_pen + gamma_1_pen
+        K = xi.shape[1]
+        pen = 0
+        for k in range(K):
+            pen += self.ENet.pen(xi[:, k])
+            pen += SGL1.pen(gamma[k])
+
         return -log_lik + pen
 
     def _get_proba(self, X):
@@ -234,9 +209,10 @@ class prox_QNEM(Learner):
             Returns the probability of the sample for being on the high-risk
             group given time-independent features
         """
-        xi_0, xi = self.theta["xi_0"], self.theta["xi"]
-        u = xi_0 + X.dot(xi)
-        return logistic_grad(u)
+        u = X.dot(self.theta["xi"])
+
+        #return logistic_grad(u)
+        return (np.exp(u).T / np.exp(u).sum(axis=1)).T
 
     @staticmethod
     def _get_post_proba(pi_xi, Lambda_1):
@@ -245,21 +221,21 @@ class prox_QNEM(Learner):
 
         Parameters
         ----------
-        pi_xi : `np.ndarray`, shape=(n_samples,)
+        pi_xi : `np.ndarray`, shape=(n_samples, K)
             Comes from get_proba function
 
         Lambda_1 : `np.ndarray`, shape=(n_samples, K)
-            Computed integral (see (15) in the lights paper) with
+            Computed integral (see (15) in the flash paper) with
             \tilde(g)=1
 
         Returns
         -------
-        pi_est : `np.ndarray`, shape=(n_samples,)
+        pi_est : `np.ndarray`, shape=(n_samples, K)
             Returns the posterior probability of the sample for being on the
             high-risk group given all observed data
         """
-        tmp = Lambda_1 * np.vstack((1 - pi_xi, pi_xi)).T
-        pi_est = tmp[:, 1] / tmp.sum(axis=1)
+        tmp = Lambda_1 * pi_xi
+        pi_est = (tmp.T / tmp.sum(axis=1)).T
         return pi_est
 
     def f_y_given_latent(self, extracted_features, beta):
@@ -286,7 +262,7 @@ class prox_QNEM(Learner):
         n_samples, n_long_features = len(y_list), self.n_long_features
         phi = self.theta["phi"]
         D = self.theta["long_cov"]
-        K = 2  # 2 latent groups
+        K = len(beta)  # nb latent groups
         f_y = np.ones(shape=(n_samples, K))
         for i in range(n_samples):
             U_i, V_i, y_i, n_i = U_list[i], V_list[i], \
@@ -330,21 +306,21 @@ class prox_QNEM(Learner):
         """
         theta, alpha = self.theta, self.fixed_effect_time_order
         baseline_hazard, phi = theta["baseline_hazard"], theta["phi"]
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        gamma_0, gamma_1 = theta["gamma_0"], theta["gamma_1"]
-        gamma_stack = np.hstack((gamma_0, gamma_1))
+        beta_all = theta["beta"]
+        gamma_all = theta["gamma"]
+        gamma_stack = np.hstack(gamma_all)
         tmp = np.exp(asso_feats.dot(gamma_stack))
         baseline_val = baseline_hazard.values.flatten()
         _, ind_1, ind_2 = get_times_infos(T, T_u)
         intensity = (tmp.T * ind_1.T).swapaxes(1, -1).dot(baseline_val)
         survival = np.exp(-(tmp.T * ind_2.T).swapaxes(1, -1).dot(baseline_val))
         f = ((intensity ** delta) * survival).T
-        f_y = self.f_y_given_latent(extracted_features, [beta_0, beta_1])
+        f_y = self.f_y_given_latent(extracted_features, beta_all)
         f *= f_y
         return f
 
     def predict_marker(self, X, Y, asso_feats=None, prediction_times=None):
-        """Marker rule of the lights model for being on the high-risk group
+        """Marker rule of the flash model for being on the high-risk group
 
         Parameters
         ----------
@@ -402,7 +378,7 @@ class prox_QNEM(Learner):
             raise ValueError('You must fit the model first')
 
     def predict_marker_sample(self, X, Y):
-        """Marker rule of the lights model for being on the high-risk group
+        """Marker rule of the flash model for being on the high-risk group
 
         Parameters
         ----------
@@ -452,20 +428,32 @@ class prox_QNEM(Learner):
             raise ValueError('You must fit the model first')
 
     def _update_theta(self, **kwargs):
-        """Update class attributes corresponding to lights model parameters
+        """Update class attributes corresponding to flash model parameters
         """
         for key, value in kwargs.items():
-            if key in ["long_cov", "phi", "baseline_hazard",
-                       "beta_0", "beta_1", "gamma_0", "gamma_1"]:
+            if key in ["long_cov", "phi", "baseline_hazard"]:
                 self.theta[key] = value
+            elif key == "beta":
+                self.theta[key] = value
+                K = len(value)
+                for k in range(K):
+                    self.theta["beta_" + str(k)] = value[k]
+            elif key == "gamma":
+                self.theta[key] = value
+                K = len(value)
+                for k in range(K):
+                    self.theta["gamma_" + str(k)] = value[k]
             elif key == "xi":
-                xi_0, xi = get_xi_from_xi_ext(value, self.fit_intercept)
-                self.theta["xi_0"], self.theta["xi"] = xi_0, xi
+                xi = get_xi_from_xi_ext(value)
+                self.theta["xi"] = xi
+                K = xi.shape[1]
+                for k in range(K):
+                    self.theta["xi_" + str(k)] = xi[:, k]
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, asso_feats=None):
-        """Fits the lights model
+    def fit(self, X, Y, T, delta, asso_feats=None, K=None):
+        """Fits the flash model
 
         Parameters
         ----------
@@ -488,7 +476,6 @@ class prox_QNEM(Learner):
         print_every = self.print_every
         tol = self.tol
         warm_start = self.warm_start
-        fit_intercept = self.fit_intercept
         alpha = self.fixed_effect_time_order
         n_samples, p = X.shape
         self.time_dep_feats = [feat for feat in Y.columns.values
@@ -499,9 +486,6 @@ class prox_QNEM(Learner):
         self.n_long_features = L
         q_l = alpha + 1
         r_l = 2  # Affine random effects
-        K = 2
-        if fit_intercept:
-            p += 1
 
         X = normalize(X)  # Normalize time-independent features
         ext_feat = extract_features(Y, self.time_dep_feats, alpha)  # Features extraction
@@ -537,16 +521,18 @@ class prox_QNEM(Learner):
             r = r_l * L
             beta = np.zeros((q, 1))
             baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
-        #TODO: just for testing, remove later
-        beta_0 = beta.reshape(-1, 1)
-        beta_1 = beta_0.copy()
+        beta_all = []
+        gamma_all = []
+        xi_ext_all = [np.zeros((2 * p, 1))]
+        for k in range(K):
+            beta_all.append(beta.reshape(-1, 1))
+            gamma_all.append(1e-4 * np.ones((L * nb_asso_param, 1)))
+        for k in range(1, K):
+            xi_ext_all.append(xi_ext.reshape(-1, 1))
         phi = np.ones((L, 1))
         D = 1e-2 * np.identity(r_l * L)
-        gamma_0 = 1e-4 * np.ones((L * nb_asso_param, 1))
-        gamma_1 = gamma_0.copy()
-        self._update_theta(beta_0=beta_0, beta_1=beta_1, xi=xi_ext,
-                           gamma_0=gamma_0, gamma_1=gamma_1, long_cov=D,
-                           phi=phi, baseline_hazard=baseline_hazard)
+        self._update_theta(beta=beta_all, xi=xi_ext_all, gamma=gamma_all,
+                           long_cov=D, phi=phi, baseline_hazard=baseline_hazard)
 
         # Stopping criteria and bounds vector for the optim algorithm
         max_iter_lbfgs, pgtol = self.max_iter_lbfgs, self.tol
@@ -556,8 +542,7 @@ class prox_QNEM(Learner):
         # Instanciates E-step and M-step functions
         E_func = EstepFunctions(T_u, L, alpha, self.theta)
         E_func.b_stats(ext_feat)
-        F_func = MstepFunctions(fit_intercept, X, delta, p, self.l_pen_EN,
-                                self.eta_elastic_net)
+        F_func = MstepFunctions(X, delta, p, self.l_pen_EN, self.eta_elastic_net)
         f = self.f_data_given_latent(ext_feat, asso_feats, T, self.T_u, delta)
         Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
         pi_xi = self._get_proba(X)
@@ -570,137 +555,135 @@ class prox_QNEM(Learner):
             self.history.print_history()
 
         for n_iter in range(1, max_iter + 1):
-            # E-Step
-            pi_est = self._get_post_proba(pi_xi, Lambda_1)
-            self.pi_est = pi_est
-            E_g1 = E_func.Eg(E_func.Eb, Lambda_1, pi_xi, f)
-            E_g2 = E_func.Eg(E_func.EbbT, Lambda_1, pi_xi, f)
+            try:
+                # E-Step
+                pi_est = self._get_post_proba(pi_xi, Lambda_1)
+                self.pi_est = pi_est
+                E_g1 = E_func.Eg(E_func.Eb, Lambda_1, pi_xi, f)
+                E_g2 = E_func.Eg(E_func.EbbT, Lambda_1, pi_xi, f)
 
-            # M-Step
-            D = E_g2.sum(axis=0) / n_samples  # D update
+                # M-Step
+                D = E_g2.sum(axis=0) / n_samples  # D update
 
-            if warm_start:
-                xi_init = xi_ext
-                if self.simu:
-                    gamma_init = [gamma_0.flatten(), gamma_1.flatten()]
+                if warm_start:
+                    xi_init = xi_ext_all
+                    gamma_init = gamma_all
                 else:
-                    gamma_init = [1e-4 * np.ones((L * (nb_asso_param))),
-                                  1e-4 * np.ones((L * (nb_asso_param)))]
-            else:
-                xi_init = np.zeros(2 * p)
-                gamma_init = [np.zeros(L * nb_asso_param),
-                              np.zeros(L * nb_asso_param)]
+                    xi_init = [np.zeros(2*p)] * K
+                    gamma_init = [np.zeros(L * nb_asso_param, 1)] * K
 
-            # xi update
-            xi_ext = fmin_l_bfgs_b(
-                func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_),
-                x0=xi_init,
-                fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_),
-                disp=False, bounds=bounds_xi, maxiter=max_iter_lbfgs,
-                pgtol=pgtol)[0]
+                # xi update
+                xi_ext_update = [np.zeros((2 * p, 1))]
+                for k in range(1, K):
+                    xi_ext_update.append(fmin_l_bfgs_b(
+                        func=lambda xi_ext_: F_func.P_pen_func(pi_est, xi_ext_, k, xi_ext_all),
+                        x0=xi_init[k],
+                        fprime=lambda xi_ext_: F_func.grad_P_pen(pi_est, xi_ext_, k, xi_ext_all),
+                        disp=False, bounds=bounds_xi, maxiter=max_iter_lbfgs,
+                        pgtol=pgtol)[0].reshape(-1, 1))
 
-            # beta update
-            pi_est_K = np.vstack((1 - pi_est, pi_est))
-            (U_list, V_list, y_list, _) = ext_feat[0]
-            num = np.zeros((K, L * q_l))
-            den = np.zeros((K, L * q_l, L * q_l))
-            for i in range(n_samples):
-                U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
-                tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g1[i])))
-                tmp_den = U_i.T.dot(U_i)
+                xi_ext_all = xi_ext_update
+
+                # beta update
+                pi_est_K = pi_est.T
+                (U_list, V_list, y_list, _) = ext_feat[0]
+                num = np.zeros((K, L * q_l))
+                den = np.zeros((K, L * q_l, L * q_l))
+                for i in range(n_samples):
+                    U_i, V_i, y_i = U_list[i], V_list[i], y_list[i]
+                    tmp_num = U_i.T.dot((y_i.flatten() - V_i.dot(E_g1[i])))
+                    tmp_den = U_i.T.dot(U_i)
+                    for k in range(K):
+                        num[k] += pi_est_K[k, i] * tmp_num
+                        den[k] += pi_est_K[k, i] * tmp_den
+                beta_update = []
                 for k in range(K):
-                    num[k] += pi_est_K[k, i] * tmp_num
-                    den[k] += pi_est_K[k, i] * tmp_den
-            beta_0 = np.linalg.inv(den[0]).dot(num[0]).reshape(-1, 1)
-            beta_1 = np.linalg.inv(den[1]).dot(num[1]).reshape(-1, 1)
-            self._update_theta(beta_0=beta_0, beta_1=beta_1)
+                    beta_update.append(np.linalg.inv(den[k]).dot(num[k]).reshape(-1, 1))
+                self._update_theta(beta = beta_update)
 
-            # gamma_0 update
-            beta_K = [beta_0, beta_1]
-            gamma = [gamma_0, gamma_1]
-            groups = np.arange(0, len(gamma_0)).reshape(L, -1).tolist()
-            eta_sp_gp_l1 = self.eta_sp_gp_l1
-            l_pen_SGL = self.l_pen_SGL
-            prox_0 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
-                        "phi": phi, "beta": beta_K,
-                        "baseline_hazard": baseline_hazard,
-                        "extracted_features": ext_feat,
-                        "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma,
-                        "asso_feats": asso_feats}
+                # gamma_1 update
+                beta_K = beta_update
+                gamma = gamma_all
+                groups = np.arange(0, len(gamma[0])).reshape(L, -1).tolist()
+                eta_sp_gp_l1 = self.eta_sp_gp_l1
+                l_pen_SGL = self.l_pen_SGL
+                prox_0 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
+                args_all = {"pi_est": pi_est_K, "E_g1": E_g1,
+                            "phi": phi, "beta": beta_K,
+                            "baseline_hazard": baseline_hazard,
+                            "extracted_features": ext_feat,
+                            "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma,
+                            "asso_feats": asso_feats}
 
-            args_0 = {"group": 0}
-            res0 = copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[0], prox=prox_0,
-                max_iter=max_iter_proxg,
-                args=[{**args_all, **args_0}], jac=F_func.grad_Q,
-                step=self.copt_step,
-                accelerated=self.copt_accelerate)
-            gamma_0 = res0.x.reshape(-1, 1)
+                gamma_update = []
+                for k in range(K):
+                    args_sup = {"group": k}
+                    res = copt.minimize_proximal_gradient(
+                        fun=F_func.Q_func, x0=gamma_init[k].flatten(), prox=prox_0,
+                        max_iter=max_iter_proxg,
+                        args=[{**args_all, **args_sup}], jac=F_func.grad_Q,
+                        step=self.copt_step,
+                        accelerated=self.copt_accelerate)
+                    gamma_update.append(res.x.reshape(-1, 1))
 
-            # gamma_1 update
-            args_1 = {"group": 1}
-            prox_1 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups).prox
-            res1 = (copt.minimize_proximal_gradient(
-                fun=F_func.Q_func, x0=gamma_init[1], prox=prox_1,
-                max_iter=max_iter_proxg,
-                args=[{**args_all, **args_1}], jac=F_func.grad_Q,
-                step=self.copt_step,
-                accelerated=self.copt_accelerate))
-            gamma_1 = res1.x.reshape(-1, 1)
+                # beta, gamma needs to be updated before the baseline
+                self._update_theta(gamma = gamma_update)
+                E_func.theta = self.theta
 
-            # beta, gamma needs to be updated before the baseline
-            self._update_theta(gamma_0=gamma_0, gamma_1=gamma_1)
-            E_func.theta = self.theta
+                # baseline hazard update
+                tmp = np.exp(asso_feats.dot(np.hstack(gamma_update)))
+                baseline_hazard = pd.Series(
+                    data=  (((ind_1.T * delta).sum(axis=1)) /
+                          ((tmp.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
+                          .sum(axis=2).sum(axis=1)), index=T_u)
 
-            # baseline hazard update
-            tmp = np.exp(asso_feats.dot(np.hstack((gamma_0, gamma_1))))
-            baseline_hazard = pd.Series(
-                data=  (((ind_1.T * delta).sum(axis=1)) /
-                      ((tmp.T * ind_2.T).swapaxes(0, 1) * pi_est_K)
-                      .sum(axis=2).sum(axis=1)), index=T_u)
+                # phi update
+                beta_stack = np.hstack(beta_update)
+                (U_L, V_L, y_L, N_L) = ext_feat[1]
+                phi = np.zeros((L, 1))
+                for l in range(L):
+                    pi_est_stack = []
+                    for k in range(K):
+                        pi_est_ = np.concatenate([[pi_est[i, k]] * N_L[l][i]
+                                                  for i in range(n_samples)])
+                        pi_est_stack.append(pi_est_)
+                    pi_est_stack = np.vstack(pi_est_stack).T
+                    N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
+                    beta_l = beta_stack[q_l * l: q_l * (l + 1)]
+                    E_g1_l = E_g1.reshape((n_samples, L, r_l))[:, l].reshape(-1, 1)
+                    E_g2_l = block_diag(E_g2[:, r_l * l: r_l * (l + 1),
+                                        r_l * l: r_l * (l + 1)])
+                    tmp = y_l - U_l.dot(beta_l)
+                    phi_l = (pi_est_stack * (
+                            tmp * (tmp - 2 * (V_l.dot(E_g1_l))))).sum() \
+                            + np.trace(V_l.T.dot(V_l).dot(E_g2_l))
+                    phi[l] = phi_l / N_l
 
-            # phi update
-            beta_stack = np.hstack((beta_0, beta_1))
-            (U_L, V_L, y_L, N_L) = ext_feat[1]
-            phi = np.zeros((L, 1))
-            for l in range(L):
-                pi_est_ = np.concatenate([[pi_est[i]] * N_L[l][i]
-                                          for i in range(n_samples)])
-                pi_est_stack = np.vstack((1 - pi_est_, pi_est_)).T  # K = 2
-                N_l, y_l, U_l, V_l = sum(N_L[l]), y_L[l], U_L[l], V_L[l]
-                beta_l = beta_stack[q_l * l: q_l * (l + 1)]
-                E_g1_l = E_g1.reshape((n_samples, L, r_l))[:, l].reshape(-1, 1)
-                E_g2_l = block_diag(E_g2[:, r_l * l: r_l * (l + 1),
-                                    r_l * l: r_l * (l + 1)])
-                tmp = y_l - U_l.dot(beta_l)
-                phi_l = (pi_est_stack * (
-                        tmp * (tmp - 2 * (V_l.dot(E_g1_l))))).sum() \
-                        + np.trace(V_l.T.dot(V_l).dot(E_g2_l))
-                phi[l] = phi_l / N_l
+                self._update_theta(phi=phi, baseline_hazard=baseline_hazard,
+                                   long_cov=D, xi=xi_ext_all)
+                pi_xi = self._get_proba(X)
+                E_func.theta = self.theta
+                E_func.b_stats(ext_feat)
+                f = self.f_data_given_latent(ext_feat, asso_feats, T, T_u, delta)
 
-            self._update_theta(phi=phi, baseline_hazard=baseline_hazard,
-                               long_cov=D, xi=xi_ext)
-            pi_xi = self._get_proba(X)
-            E_func.theta = self.theta
-            E_func.b_stats(ext_feat)
-            f = self.f_data_given_latent(ext_feat, asso_feats, T, T_u, delta)
+                if n_iter % print_every == 0:
+                    prev_obj = obj
+                    obj = self._func_obj(pi_xi, f)
+                    rel_obj = abs(obj - prev_obj) / abs(prev_obj)
+                    self.history.update(n_iter=n_iter, theta=self.theta,
+                                        obj=obj, rel_obj=rel_obj)
+                    if verbose:
+                        self.history.print_history()
 
-            if n_iter % print_every == 0:
-                prev_obj = obj
-                obj = self._func_obj(pi_xi, f)
-                rel_obj = abs(obj - prev_obj) / abs(prev_obj)
-                self.history.update(n_iter=n_iter, theta=self.theta,
-                                    obj=obj, rel_obj=rel_obj)
-                if verbose:
-                    self.history.print_history()
-
-            if (n_iter + 1 > max_iter) or (rel_obj < tol):
+                if (n_iter + 1 > max_iter) or (rel_obj < tol):
+                    self._fitted = True
+                    break
+                else:
+                    # Update for next iteration
+                    Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
+            except np.linalg.LinAlgError as e:
                 self._fitted = True
                 break
-            else:
-                # Update for next iteration
-                Lambda_1 = E_func.Lambda_g(np.ones((n_samples, K)), f)
         self._end_solve()
 
     def score(self, X, Y, T, delta, asso_feats=None):
@@ -728,7 +711,7 @@ class prox_QNEM(Learner):
             The C-index score computed on the given data
         """
         if self._fitted:
-            c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats), delta)
+            c_index = c_index_score(T, self.predict_marker(X, Y, asso_feats)[:, 1], delta)
             return max(c_index, 1 - c_index)
         else:
             raise ValueError('You must fit the model first')

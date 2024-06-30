@@ -3,7 +3,7 @@ import os
 from rpy2 import robjects
 from rpy2.robjects import pandas2ri, numpy2ri
 import numpy as np
-from lights.simulation import SimuJointLongitudinalSurvival
+from flash.simulation import SimuJointLongitudinalSurvival
 import pandas as pd
 from scipy.stats import beta
 def load_data(simu, seed):

@@ -31,7 +31,7 @@ class EstepFunctions:
         self.theta = theta
         self.n_long_features = n_long_features
         self.J = len(T_u)
-        self.nb_total_asso_features = len(theta["gamma_0"])
+        self.nb_total_asso_features = len(theta["gamma"][0])
         self.fixed_effect_time_order = fixed_effect_time_order
         self.q_l, self.r_l = fixed_effect_time_order + 1, 2
 
@@ -54,11 +54,11 @@ class EstepFunctions:
         n_samples, n_long_features = len(U_list), self.n_long_features
         theta = self.theta
         D, phi = theta["long_cov"], theta["phi"]
-        beta_0, beta_1 = theta["beta_0"], theta["beta_1"]
-        beta_stack = np.hstack((beta_0, beta_1))
+        beta_all = theta["beta"]
+        beta_stack = np.hstack((beta_all))
         inv_D = np.linalg.inv(D)
         r = n_long_features * self.r_l
-        K = 2
+        K = len(beta_all)
         self.Eb = np.zeros((n_samples, K, r))
         self.EbbT = np.zeros((n_samples, K, r, r))
         for i in range(n_samples):
@@ -126,6 +126,15 @@ class EstepFunctions:
             The expectations for g
         """
         Lambda_g = self.Lambda_g(g, f)
-        Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
-                Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
+
+        #Eg = (Lambda_g[:, 0].T * (1 - pi_xi) + Lambda_g[:, 1].T * pi_xi) / (
+        #        Lambda_1[:, 0] * (1 - pi_xi) + Lambda_1[:, 1] * pi_xi)
+        K = pi_xi.shape[1]
+        num = 0
+        dem = 0
+        for k in range(K):
+            num += Lambda_g[:, k].T *  pi_xi[:, k]
+            dem += Lambda_1[:, k] * pi_xi[:, k]
+        Eg = num / dem
+
         return Eg.T
