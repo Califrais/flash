@@ -26,8 +26,16 @@ fit <- function(data, time_dep_feat, time_indep_feat) {
 
     ## estimation of Multivariate Joint Model
     jmbayes_mv <- mvJointModelBayes(MixedModelFit, CoxFit, timeVar = "T_long")
-
+    
     return(jmbayes_mv)
+#    Forms <- list()
+#    for(i in 1:length(time_dep_feat)){
+#        Forms[[time_dep_feat[[i]]]] = "values"
+#    #    Forms[[2 * i]] = list(fixed = as.formula("~ 1"), random = as.formula("~ 1"), indFixed = 2, indRandom = 2, name = "slope")
+#    #    names(Forms)[c(2 * i - 1, 2 * i)] <- c(time_dep_feat[[i]], time_dep_feat[[i]])    
+#    }
+#    jmbayes_mv_update <- update(jmbayes_mv, Formulas = Forms)
+#    return(jmbayes_mv_update)
 }
 
 
