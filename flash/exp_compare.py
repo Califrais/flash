@@ -21,7 +21,7 @@ def run():
     test_size = .3
     result_home_path = "results/"
     res = pd.DataFrame(columns=["Algo", "Dataset", "C_index", "Time"])
-    datasets = ["Aids", "PBCseq", "FLASH_simu", "joineRML_simu"]
+    datasets = ["FLASH_simu", "joineRML_simu", "PBCseq", "Aids"]
     for j in range(len(datasets)):
         dataset = datasets[j]
         data, time_dep_feat, time_indep_feat = load_data(data_name=dataset)
@@ -29,14 +29,13 @@ def run():
         id_list = np.unique(data["id"])
         nb_test_sample = int(test_size * len(id_list))
 
-        with open(result_home_path + dataset + '/final_selected_fc_parameters',
-                  'rb') as f:
+        with open(result_home_path + dataset + '/final_selected_fc_parameters', 'rb') as f:
             final_selected_fc_parameters = pkl.load(f)
 
         with open(result_home_path + dataset + '/Flash_penalties', 'rb') as f:
             flash_pens = np.load(f)
 
-        for i in range(1):
+        for i in range(50):
             np.random.seed(i)
             id_test = np.random.choice(id_list, size=nb_test_sample, replace=False)
             data_test = data[data.id.isin(id_test)]
@@ -145,11 +144,10 @@ def run():
         [ "A", "A", "A", "A"],
         [ "B", "C", "D", "E"]
     ]
-    strx = ["A", "B", "C", "D", "E"]
-    fig, ax = plt.subplot_mosaic(layout, figsize=(16,16))
+    _, ax = plt.subplot_mosaic(layout, figsize=(16,16))
     sns.set(style="white", font="STIXGeneral", context='talk',palette='colorblind')
 
-    axs = sns.boxplot(x="Dataset", y="C_index", hue="Algo", data=res, ax=ax["A"])
+    sns.boxplot(x="Dataset", y="C_index", hue="Algo", data=res, ax=ax["A"])
     ax["A"].set_ylabel(r"C_index", fontsize=fontsize, fontdict=dict(weight='bold'))
     ax["A"].set(xticklabels=[])
     ax["A"].set(xlabel=None)
