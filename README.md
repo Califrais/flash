@@ -58,3 +58,17 @@ Replace `.bashrc` with the variant for your shell (e.g. `.tcshrc`, `.zshrc`, `.c
 
 The Jupyter notebook "FLASH tutorial" gives useful example of how to use the model based on simulated data.
 It will be very simple then to adapt it to your own data.
+
+## Reproducing figures and table in the paper
+
+Figures 7 in the main paper can be reproduced with
+    
+    python flash/exp_compare.py
+
+Figures 3 in the Supplementary Materials can be reproduced with
+    
+    python flash/exp_K_sel.py
+
+Table 3 in the Supplementary Materials can be reproduced with
+    
+    python flash/exp_coef.py
