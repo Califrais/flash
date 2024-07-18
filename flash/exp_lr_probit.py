@@ -4,7 +4,7 @@ import warnings
 
 warnings.filterwarnings('ignore')
 import pandas as pd
-from flash.inference_ext import ext_EM
+from flash.inference import ext_EM
 from flash.base.base import feat_representation_extraction
 import numpy as np
 from competing_methods.all_model import load_data, extract_flash_feat, truncate_data
