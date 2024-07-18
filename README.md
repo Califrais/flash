@@ -27,7 +27,7 @@ virtualenv .venv_flash
 # If your default interpreter is Python2, you can explicitly target Python3 with:
 virtualenv -p python3.7 .venv_flash
 
-source .env_flash/bin/activate
+source .venv_flash/bin/activate
 ```
 Then, to download all required modules and initialize the project run the following commands:
 ```shell script
