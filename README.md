@@ -61,6 +61,8 @@ It will be very simple then to adapt it to your own data.
 
 ## Reproducing figures and table in the paper
 
+Figures 5 and 6 in the main paper can be reproduced by running the notebook "FLASH tutorial".
+
 Figures 7 in the main paper can be reproduced with
     
     python flash/exp_compare.py
@@ -68,6 +70,10 @@ Figures 7 in the main paper can be reproduced with
 Figures 3 in the Supplementary Materials can be reproduced with
     
     python flash/exp_K_sel.py
+
+Figures 4 in the Supplementary Materials can be reproduced with
+    
+    python flash/exp_lr_probit.py
 
 Table 3 in the Supplementary Materials can be reproduced with
     

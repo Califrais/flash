@@ -32,19 +32,33 @@ def load_data(data_name):
         df_ = pd.DataFrame(data=np.column_stack((id_list, T, delta, X)),
                                columns=["id", "T_survival", "delta"] + time_indep_feat)
         data = pd.merge(Y, df_, on="id")
+    elif data_name == "FLASH_simu_probit":
+        n_long_features = 5
+        n_time_indep_features = 10
+        n_samples = 500
+        simu = SimuJointLongitudinalSurvival(seed=123, n_long_features=n_long_features,
+                                             n_samples=n_samples,
+                                             n_time_indep_features=n_time_indep_features,
+                                             probit=True)
+        X, Y, T, delta = simu.simulate()
+        time_dep_feat = ['time_dep_feat%s' % (l + 1)
+                         for l in range(n_long_features)]
+        time_indep_feat = ['X_%s' % (l + 1)
+                           for l in range(n_time_indep_features)]
+        id_list = np.unique(Y.id)
+        df_ = pd.DataFrame(data=np.column_stack((id_list, T, delta, X)),
+                               columns=["id", "T_survival", "delta"] + time_indep_feat)
+        data = pd.merge(Y, df_, on="id")
     elif data_name == "PBCseq":
         # load PBC Seq
         robjects.r.source(os.getcwd() + "/competing_methods/load_PBC_Seq.R")
         time_indep_feat = ['drug', 'age', 'sex']
-        #time_dep_feat = ['serBilir', 'albumin', 'SGOT']
         time_dep_feat = ['serBilir', 'albumin', 'SGOT', 'platelets',
                          'prothrombin', 'alkaline', 'serChol']
         data_R = robjects.r["load"]()
         data =  robjects.conversion.rpy2py(data_R)
         # remove outliers
         data = data[(data[time_dep_feat] > -1e-4).all(axis=1)]
-        #for feat in time_dep_feat:
-        #    data[feat] = np.log(data[feat].values)
 
         #creating instance of one-hot-encoder
         encoder = OneHotEncoder(handle_unknown='ignore')

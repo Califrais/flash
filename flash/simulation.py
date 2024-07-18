@@ -257,7 +257,8 @@ class SimuJointLongitudinalSurvival(Simulation):
                  corr_fixed_effect: float = .01,
                  std_error: float = .5,
                  shape: float = .1, scale: float = .05,
-                 censoring_factor: float = 2., grid_time: bool = True):
+                 censoring_factor: float = 2., grid_time: bool = True,
+                 probit=False):
         Simulation.__init__(self, seed=seed, verbose=verbose)
 
         self.n_samples = n_samples
@@ -289,6 +290,7 @@ class SimuJointLongitudinalSurvival(Simulation):
         self.asso_coeffs = None
         self.iotas = None
         self.hawkes = []
+        self.probit = probit
 
     @property
     def sparsity(self):
@@ -380,8 +382,10 @@ class SimuJointLongitudinalSurvival(Simulation):
         X_dot_xi = X.dot(xi)
 
         # Simulation of latent group
-        pi_xi = logistic_grad(X_dot_xi)
-        #pi_xi = probit(X_dot_xi)
+        if self.probit:
+            pi_xi = probit(X_dot_xi)
+        else:
+            pi_xi = logistic_grad(X_dot_xi)
         u = np.random.rand(n_samples)
         G = (u < pi_xi).astype(int) + 1
 
