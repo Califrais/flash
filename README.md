@@ -35,7 +35,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 The second command installs the project as a package, making the main module importable from anywhere.
-Then, to add the virtual eviroment to jupyter notebook:
+Then, to add the virtual eviroment to jupyter kernel:
 ```shell script
 python -m ipykernel install --user --name=".venv_flash"
 ```
