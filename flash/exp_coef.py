@@ -15,7 +15,6 @@ from sklearn.model_selection import ShuffleSplit
 from flash.base.base import normalize
 from flash.base.base import feat_representation_extraction
 from flash.inference import ext_EM
-from flash.inference_ci import ext_EM as ext_EM_ci
 
 np.random.seed(0)
 
@@ -194,9 +193,10 @@ def run():
 	# training
 	l_pen_EN, l_pen_SGL = 5e-2, 2e-1
 	fixed_effect_time_order = 1
-	learner = ext_EM(fixed_effect_time_order=fixed_effect_time_order, max_iter=80,
-	                    print_every=1, l_pen_SGL=l_pen_SGL, l_pen_EN=l_pen_EN,
-	                    initialize=True, fc_parameters=final_selected_fc_parameters)
+	learner = ext_EM(fixed_effect_time_order=fixed_effect_time_order,
+	                 max_iter=80, print_every=1, l_pen_SGL=l_pen_SGL,
+	                 l_pen_EN=l_pen_EN, initialize=True,
+	                 fc_parameters=final_selected_fc_parameters)
 	learner.fit(X_train, Y_train, T_train, delta_train, asso_feat_train, K=2)
 
 	# run boostrap to get standard deviation
@@ -228,12 +228,13 @@ def run():
 		                                                    T_u, final_selected_fc_parameters)
 
 		l_pen_EN, l_pen_SGL = 5e-2, 2e-1
-		learner = ext_EM_ci(max_iter=40, print_every=1, l_pen_SGL=l_pen_SGL,
+		learner = ext_EM(max_iter=40, print_every=1, eta_elastic_net=1.,
+		                 eta_sp_gp_l1=1., l_pen_SGL=l_pen_SGL,
 		                 l_pen_EN=l_pen_EN, initialize=True,
 		                 fc_parameters=final_selected_fc_parameters)
 		learner.fit(X_train, Y_train, T_train, delta_train, asso_feat_train, K=2,
 		            xi_support=xi_est_support,
-		            supports=[gamma_0_est_support.flatten(),
+		            gamma_supports=[gamma_0_est_support.flatten(),
 		                      gamma_1_est_support.flatten()])
 
 		xi_CIs.append(learner.theta["xi_1"] * xi_est_support.flatten())

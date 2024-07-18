@@ -452,7 +452,8 @@ class ext_EM(Learner):
             else:
                 raise ValueError('Parameter {} is not defined'.format(key))
 
-    def fit(self, X, Y, T, delta, asso_feats=None, K=None):
+    def fit(self, X, Y, T, delta, asso_feats=None, K=None,
+            xi_support=None, gamma_supports=None):
         """Fits the flash model
 
         Parameters
@@ -527,8 +528,14 @@ class ext_EM(Learner):
         for k in range(K):
             beta_all.append(beta.reshape(-1, 1))
             gamma_all.append(1e-4 * np.ones((L * nb_asso_param, 1)))
+        if gamma_supports is None:
+            gamma_supports = [np.ones(L * nb_asso_param)] * K
+
         for k in range(1, K):
             xi_ext_all.append(xi_ext.reshape(-1, 1))
+        if xi_support is None:
+            xi_support = np.ones(p)
+        X = X * xi_support
         phi = np.ones((L, 1))
         D = 1e-2 * np.identity(r_l * L)
         self._update_theta(beta=beta_all, xi=xi_ext_all, gamma=gamma_all,
@@ -612,12 +619,12 @@ class ext_EM(Learner):
                             "phi": phi, "beta": beta_K,
                             "baseline_hazard": baseline_hazard,
                             "extracted_features": ext_feat,
-                            "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma,
-                            "asso_feats": asso_feats}
+                            "ind_1": ind_1, "ind_2": ind_2, "gamma": gamma}
 
                 gamma_update = []
                 for k in range(K):
-                    args_sup = {"group": k}
+                    args_sup = {"group": k,
+                                "asso_feats": asso_feats * gamma_supports[k]}
                     res = copt.minimize_proximal_gradient(
                         fun=F_func.Q_func, x0=gamma_init[k].flatten(), prox=prox_0,
                         max_iter=max_iter_proxg,
