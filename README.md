@@ -19,15 +19,15 @@ _flash_ can be used for many statistical learning applications where one wants t
 ## Installation
 Clone the repository, then inside the folder, use a `virtualenv` to install the requirements
 ```shell script
-git clone git@github.com:Califrais/flash.git
-cd lights
+git clone https://github.com/Califrais/flash.git
+cd flash
 
 # If your default interpreter is Python3:
-virtualenv .env
+virtualenv .venv_flash
 # If your default interpreter is Python2, you can explicitly target Python3 with:
-virtualenv -p python3 .env
+virtualenv -p python3.7 .venv_flash
 
-source .env/bin/activate
+source .env_flash/bin/activate
 ```
 Then, to download all required modules and initialize the project run the following commands:
 ```shell script
@@ -36,25 +36,7 @@ pip install -e .
 ```
 The second command installs the project as a package, making the main module importable from anywhere.
 
-### Unittest
-
-The library can be tested simply by running
-
-    python -m unittest discover -v ./flash/tests "test_*.py"
-
-in terminal. This shall check that everything is working and in order.
-
-To use the package outside the build directory, the build path should be added to the `PYTHONPATH` environment variable, as such (replace `$PWD` with the full path to the build directory if necessary):
-
-    export PYTHONPATH=$PYTHONPATH:$PWD
-
-For a permanent installation, this should be put in your shell setup script. To do so, you can run this from the _lights_ directory:
-
-    echo 'export PYTHONPATH=$PYTHONPATH:'$PWD >> ~/.bashrc
-
-Replace `.bashrc` with the variant for your shell (e.g. `.tcshrc`, `.zshrc`, `.cshrc` etc.).
-
-## Other files
+## Notebook tutorial
 
 The Jupyter notebook "FLASH tutorial" gives useful example of how to use the model based on simulated data.
 It will be very simple then to adapt it to your own data.
