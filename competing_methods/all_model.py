@@ -4,18 +4,11 @@ import rpy2.robjects as robjects
 from rpy2.robjects import pandas2ri, numpy2ri
 pandas2ri.activate()
 import numpy as np
-from flash.inference import ext_EM
 from flash.base.base import normalize
-from prettytable import PrettyTable
-from lifelines.utils import concordance_index as c_index_score
-from time import time
 from flash.simulation import SimuJointLongitudinalSurvival
 import pandas as pd
 from scipy.stats import beta
 from sklearn.preprocessing import OneHotEncoder
-from sksurv.nonparametric import CensoringDistributionEstimator
-from sksurv.metrics import brier_score
-from lifelines import KaplanMeierFitter
 def load_data(data_name):
     if data_name == "FLASH_simu":
         n_long_features = 5
