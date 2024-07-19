@@ -70,7 +70,7 @@ def run():
 	ax.set_ylabel("BIC")
 
 	plt.tight_layout()
-	plt.savefig('BIC_K_chosen.pdf')
+	plt.savefig('./BIC_K_chosen.pdf')
 	plt.show()
 
 if __name__ == "__main__":

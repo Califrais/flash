@@ -19,7 +19,7 @@ import rpy2.robjects as robjects
 
 def run():
     test_size = .3
-    result_home_path = "results/"
+    params_path = "flash/params/"
     res = pd.DataFrame(columns=["Algo", "Dataset", "C_index", "Time"])
     datasets = ["FLASH_simu", "joineRML_simu", "PBCseq", "Aids"]
     for j in range(len(datasets)):
@@ -29,10 +29,10 @@ def run():
         id_list = np.unique(data["id"])
         nb_test_sample = int(test_size * len(id_list))
 
-        with open(result_home_path + dataset + '/final_selected_fc_parameters', 'rb') as f:
+        with open(params_path + dataset + '/final_selected_fc_parameters', 'rb') as f:
             final_selected_fc_parameters = pkl.load(f)
 
-        with open(result_home_path + dataset + '/Flash_penalties', 'rb') as f:
+        with open(params_path + dataset + '/Flash_penalties', 'rb') as f:
             flash_pens = np.load(f)
 
         for i in range(50):
@@ -183,7 +183,7 @@ def run():
     ax["E"].set_ylabel('')
     ax["E"].set(xticklabels=[])
 
-    plt.savefig(result_home_path + 'flash_competing.pdf', bbox_inches='tight')
+    plt.savefig('./flash_competing.pdf', bbox_inches='tight')
     plt.show()
 
 

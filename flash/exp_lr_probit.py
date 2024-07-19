@@ -16,7 +16,7 @@ import rpy2.robjects as robjects
 
 def run():
     test_size = .3
-    result_home_path = "results/"
+    params_path = "flash/params/"
     res = pd.DataFrame(columns=["Dataset", "C_index"])
     datasets = ["FLASH_simu", "FLASH_simu_probit"]
     for j in range(len(datasets)):
@@ -26,10 +26,10 @@ def run():
         id_list = np.unique(data["id"])
         nb_test_sample = int(test_size * len(id_list))
 
-        with open(result_home_path + 'FLASH_simu/final_selected_fc_parameters', 'rb') as f:
+        with open(params_path + 'FLASH_simu/final_selected_fc_parameters', 'rb') as f:
             final_selected_fc_parameters = pkl.load(f)
 
-        with open(result_home_path + 'FLASH_simu/Flash_penalties', 'rb') as f:
+        with open(params_path + 'FLASH_simu/Flash_penalties', 'rb') as f:
             flash_pens = np.load(f)
 
         for i in range(50):
