@@ -25,6 +25,7 @@ def load_data(data_name):
         df_ = pd.DataFrame(data=np.column_stack((id_list, T, delta, X)),
                                columns=["id", "T_survival", "delta"] + time_indep_feat)
         data = pd.merge(Y, df_, on="id")
+
     elif data_name == "FLASH_simu_probit":
         n_long_features = 5
         n_time_indep_features = 10
@@ -42,6 +43,7 @@ def load_data(data_name):
         df_ = pd.DataFrame(data=np.column_stack((id_list, T, delta, X)),
                                columns=["id", "T_survival", "delta"] + time_indep_feat)
         data = pd.merge(Y, df_, on="id")
+
     elif data_name == "PBCseq":
         # load PBC Seq
         robjects.r.source(os.getcwd() + "/competing_methods/load_PBC_Seq.R")
@@ -60,8 +62,7 @@ def load_data(data_name):
         data['drug'] = encoder.fit_transform(data[['drug']]).toarray()
         data['sex'] = encoder.fit_transform(data[['sex']]).toarray()
         data['id'] = data['id'].astype(int)
-                
-        
+
     elif data_name == "Aids":
         # load aids
         robjects.r.source(os.getcwd() + "/competing_methods/load_aids.R")
@@ -79,6 +80,7 @@ def load_data(data_name):
         data['prevOI'] = encoder.fit_transform(data[['prevOI']]).toarray()
         data['AZT'] = encoder.fit_transform(data[['AZT']]).toarray()
         data['id'] = data['id'].astype(int)
+
     elif data_name == "joineRML_simu":
         encoder = OneHotEncoder(handle_unknown='ignore')
         robjects.r.source(os.getcwd() + "/competing_methods/load_simulated_joineRML.R")
@@ -87,7 +89,8 @@ def load_data(data_name):
         data_R = robjects.r["load"]()
         data =  robjects.conversion.rpy2py(data_R)
         data['id'] = data['id'].astype(int)
-    else: 
+
+    else:
         raise ValueError('Data name is not defined')
     
     return (data, time_dep_feat, time_indep_feat)
@@ -99,8 +102,6 @@ def truncate_data(data):
     for i in range(n_samples):
         T_long_id = data[(data["id"] == id_list[i])]["T_long"].values.reshape(-1, 1)
         data.loc[data["id"] == id_list[i], ['T_long']] = T_long_id - min(T_long_id)
-        #if len(data[(data["id"] == id_list[i])]["T_long"].values) < 2:
-        #    data = data[(data["id"] != id_list[i])]
     
     data_truncated = data.copy(deep=True)
     id_list = np.unique(data["id"])
