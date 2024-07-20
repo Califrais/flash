@@ -1,8 +1,4 @@
 import os
-os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.0/Resources"
-import warnings
-
-warnings.filterwarnings('ignore')
 import pandas as pd
 from flash.inference import ext_EM
 from flash.base.base import feat_representation_extraction
@@ -11,8 +7,8 @@ from competing_methods.all_model import load_data, extract_flash_feat, truncate_
 import pickle as pkl
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-import rpy2.robjects as robjects
+import warnings
+warnings.filterwarnings('ignore')
 
 def run():
     test_size = .3
@@ -86,8 +82,10 @@ def run():
     axs.set_ylabel("C_index", size=15)
     axs.set_ylim([0., 1.])
     handles, _ = axs.get_legend_handles_labels()
-    axs.legend(handles, ["LR", "Probit"], fontsize=15)
-    plt.savefig('./flash_sensity_probit.pdf', bbox_inches='tight')
+    axs.legend(handles, ["LR", "Probit"], fontsize=15, loc='lower left')
+    if not os.path.exists("results"):
+        os.mkdir("results")
+    plt.savefig('results/flash_sensity_probit.pdf', bbox_inches='tight')
     plt.show()
 
 

@@ -1,8 +1,8 @@
 # flash
-_flash_ is a generalized joint model for high-dimensional multivariate longitudinal data and censored durations
+_flash_ is a joint model for longitudinal and survival data in high dimension
 
 ## Quick description
-_flash_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of both longitudinal and and time-independent features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high-dimensional shared associations.
+_flash_ is a Python 3 package to deal with the problem of joint modeling of longitudinal data and censored durations, where a large number of both longitudinal and time-independent features are available. Features extracted from the longitudinal processes are included as potential risk factor in the survival model, which is a group-specific Cox model with high-dimensional shared associations.
 
 To allow flexibility in modeling the dependency between the longitudinal features and the event time, we use appropriate penalties : elastic net for feature selection in the latent class membership, and sparse group lasso in the survival model, as well as for the fixed effect (allowing flexible representations of time).
 
@@ -47,6 +47,8 @@ The Jupyter notebook "FLASH tutorial" gives useful example of how to use the mod
 It will be very simple then to adapt it to your own data.
 
 ## Reproducing figures and table in the paper
+
+The obtained following results are under "Results" folder.
 
 Figures 5 and 6 in the main paper can be reproduced by running the notebook "FLASH tutorial".
 

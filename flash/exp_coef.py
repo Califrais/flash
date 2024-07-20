@@ -1,26 +1,28 @@
 # Library setup
-import warnings
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
-warnings.filterwarnings('ignore')
-warnings.simplefilter('ignore', ConvergenceWarning)
-
-from competing_methods.all_model import load_data, extract_flash_feat
+import os
 import pandas as pd
 import numpy as np
 from tsfresh import extract_features as extract_rep_features
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from tsfresh.feature_extraction import ComprehensiveFCParameters
 from sklearn.model_selection import ShuffleSplit
+from prettytable import PrettyTable
 
 from flash.base.base import normalize
-from flash.base.base import feat_representation_extraction
 from flash.inference import ext_EM
+from flash.base.base import feat_representation_extraction
+from competing_methods.all_model import load_data, extract_flash_feat
 
+import warnings
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+warnings.filterwarnings('ignore')
+warnings.simplefilter('ignore', ConvergenceWarning)
 np.random.seed(0)
 
 def run():
 	# loading data
 	test_size = .3
+	params_path = "flash/params/"
 	dataset = "PBCseq"
 	data, time_dep_feat, time_indep_feat = load_data(data_name=dataset)
 	data = data[~data.isin([np.nan, np.inf, -np.inf]).any(1)]
@@ -191,7 +193,9 @@ def run():
 	T_u = np.unique(T_train[delta_train == 1])
 	asso_feat_train, _ = feat_representation_extraction(Y_train, n_long_features, T_u, final_selected_fc_parameters)
 	# training
-	l_pen_EN, l_pen_SGL = 5e-2, 2e-1
+	with open(params_path + dataset + '/Flash_penalties', 'rb') as f:
+		flash_pens = np.load(f)
+	l_pen_EN, l_pen_SGL = flash_pens[0], flash_pens[1]
 	fixed_effect_time_order = 1
 	learner = ext_EM(fixed_effect_time_order=fixed_effect_time_order,
 	                 max_iter=80, print_every=1, l_pen_SGL=l_pen_SGL,
@@ -252,12 +256,50 @@ def run():
 	mean_xi = np.array(xi_CIs).mean(axis=0)
 	std_xi = np.array(xi_CIs).std(axis=0)
 
-	print("Mean of gamma k=1", mean_gamma_0)
-	print("Standard deviation of gamma k=1", std_gamma_0)
-	print("Mean of gamma k=2", mean_gamma_1)
-	print("Standard deviation of gamma k=2", std_gamma_1)
-	print("Mean of xi", mean_xi)
-	print("Standard deviation of xi", std_xi)
+	coefs = PrettyTable(["Features", "Coefficient"])
+	coefs.align["Features"] = "c"  # Center align feature names
+	coefs.padding_width = 1  # One space between column edges and contents (default)
+	for j in range(len(time_indep_feat)):
+		if j != len(time_indep_feat) - 1:
+			if mean_xi[j] != 0:
+				coefs.add_row([time_indep_feat[j], str(round(mean_xi[j], 4)) + " ± " + str(round(std_xi[j], 4))])
+			else:
+				coefs.add_row([time_indep_feat[j], "0.0"])
+		else:
+			if mean_xi[j] != 0:
+				coefs.add_row([time_indep_feat[j], str(round(mean_xi[j], 4))  + " ± " + str(round(std_xi[j], 4))], divider=True)
+			else:
+				coefs.add_row([time_indep_feat[j], "0.0"])
+
+	for j in range(len(time_dep_feat)):
+		if j != len(time_dep_feat) - 1:
+			if mean_gamma_0[j] != 0:
+				coefs.add_row([time_dep_feat[j], str(round(mean_gamma_0[j], 4)) + " ± " + str(round(std_gamma_0[j], 4))])
+			else:
+				coefs.add_row([time_dep_feat[j], "0.0"])
+		else:
+			if mean_gamma_0[j] != 0:
+				coefs.add_row([time_dep_feat[j], str(round(mean_gamma_0[j], 4)) + " ± " + str(round(std_gamma_0[j], 4))], divider=True)
+			else:
+				coefs.add_row([time_dep_feat[j], "0.0"], divider=True)
+
+	for j in range(len(time_dep_feat)):
+		if j != len(time_dep_feat) - 1:
+			if mean_gamma_1[j] != 0:
+				coefs.add_row([time_dep_feat[j], str(round(mean_gamma_1[j], 4)) + " ± " + str(round(std_gamma_1[j], 4))])
+			else:
+				coefs.add_row([time_dep_feat[j], "0.0"])
+		else:
+			if mean_gamma_1[j] != 0:
+				coefs.add_row([time_dep_feat[j], str(round(mean_gamma_1[j], 4)) + " ± " + str(round(std_gamma_1[j], 4))], divider=True)
+			else:
+				coefs.add_row([time_dep_feat[j], "0.0"], divider=True)
+
+	coefs_ = coefs.get_string()
+	if not os.path.exists("results"):
+		os.mkdir("results")
+	with open('results/PBC_coefs.txt', 'w') as f:
+		f.write(coefs_)
 
 if __name__ == "__main__":
     run()

@@ -1,4 +1,5 @@
 # Library setup
+import os
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -24,12 +25,12 @@ def run():
 	nb_test_sample = int(test_size * len(id_list))
 	id_test = np.random.choice(id_list, size=nb_test_sample, replace=False)
 	data_train = data[~data.id.isin(id_test)]
-	data_test = data[data.id.isin(id_test)]
-	data_test_truncated = truncate_data(data_test)
 	n_long_features = len(time_dep_feat)
 
 	# data preprocessing
-	X_train, Y_train, T_train, delta_train = extract_flash_feat(data_train, time_indep_feat, time_dep_feat)
+	X_train, Y_train, T_train, delta_train = extract_flash_feat(data_train,
+	                                                            time_indep_feat,
+	                                                            time_dep_feat)
 	final_selected_fc_parameters = {
 	    'sum_values': None,
 	    'abs_energy': None,
@@ -37,7 +38,8 @@ def run():
 	    'time_reversal_asymmetry_statistic': [{'lag': 1}]
 	}
 	T_u = np.unique(T_train[delta_train == 1])
-	asso_feat_train, _ = feat_representation_extraction(Y_train, n_long_features, T_u, final_selected_fc_parameters)
+	asso_feat_train, _ = feat_representation_extraction(Y_train, n_long_features,
+	                                                    T_u, final_selected_fc_parameters)
 
 	# Training with best cross-validation params
 	l_pen_EN, l_pen_SGL = 1e-2, 2e-1
@@ -70,7 +72,9 @@ def run():
 	ax.set_ylabel("BIC")
 
 	plt.tight_layout()
-	plt.savefig('./BIC_K_chosen.pdf')
+	if not os.path.exists("results"):
+		os.mkdir("results")
+	plt.savefig('results/BIC_K_chosen.pdf')
 	plt.show()
 
 if __name__ == "__main__":

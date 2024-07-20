@@ -1,19 +1,19 @@
 import os
 os.environ['R_HOME'] = "/Library/Frameworks/R.framework/Versions/4.0/Resources"
-import warnings
-
-warnings.filterwarnings('ignore')
 import pandas as pd
-from flash.inference import ext_EM
-from flash.base.base import feat_representation_extraction
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
 from lifelines.utils import concordance_index as c_index_score
 from time import time
-from competing_methods.all_model import load_data, extract_flash_feat, \
-	extract_R_feat, truncate_data
 import pickle as pkl
+
+import warnings
+warnings.filterwarnings('ignore')
+from flash.inference import ext_EM
+from flash.base.base import feat_representation_extraction
+from competing_methods.all_model import load_data, extract_flash_feat, \
+    extract_R_feat, truncate_data
 
 import rpy2.robjects as robjects
 
@@ -183,7 +183,9 @@ def run():
     ax["E"].set_ylabel('')
     ax["E"].set(xticklabels=[])
 
-    plt.savefig('./flash_competing.pdf', bbox_inches='tight')
+    if not os.path.exists("results"):
+        os.mkdir("results")
+    plt.savefig('results/flash_competing.pdf', bbox_inches='tight')
     plt.show()
 
 
