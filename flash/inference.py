@@ -419,7 +419,7 @@ class ext_EM(Learner):
                     f = self.f_data_given_latent(ext_feat,
                                                  asso_feats[i:(i + 1)],
                                                  time_measurement[t], T_u, 0)
-                    marker[t] = self._get_post_proba(pi_xi, f)
+                    marker[t] = self._get_post_proba(pi_xi, f)[:, 1]
 
                 markers.append(marker)
 
@@ -504,24 +504,28 @@ class ext_EM(Learner):
         self.nb_extracted_feat = nb_extracted_feat
 
         # Initialization
+        if (L == 1):
+            max_iter = 15
+            self.initialize = False
         xi_ext = .5 * np.concatenate((np.ones(p), np.zeros(p)))
+        # Initialize longitudinal submodels
+        mlmm = MLMM(max_iter=max_iter, verbose=verbose, tol=tol,
+                    print_every=print_every, fixed_effect_time_order=alpha)
+        mlmm.fit(ext_feat)
         if self.initialize:
-            # Initialize longitudinal submodels
-            mlmm = MLMM(max_iter=max_iter, verbose=verbose, tol=tol,
-                        print_every=print_every, fixed_effect_time_order=alpha)
-            mlmm.fit(ext_feat)
+            beta = mlmm.fixed_effect_coeffs
+            phi = np.ones((L, 1))
+            D = 1e-2 * np.identity(r_l * L)
+            baseline_hazard = initialize_baseline_hazard(X, T, delta)
+            baseline_hazard = baseline_hazard[
+                [item in T_u for item in np.unique(T)]]
+        else:
             beta = mlmm.fixed_effect_coeffs
             D = mlmm.long_cov
             phi = mlmm.phi
             baseline_hazard = initialize_baseline_hazard(X, T, delta)
             baseline_hazard = baseline_hazard[
                 [item in T_u for item in np.unique(T)]]
-        else:
-            # Fixed initialization
-            q = q_l * L
-            r = r_l * L
-            beta = np.zeros((q, 1))
-            baseline_hazard = pd.Series(data=.5 * np.ones(J), index=T_u)
         beta_all = []
         gamma_all = []
         xi_ext_all = [np.zeros((2 * p, 1))]
@@ -536,8 +540,6 @@ class ext_EM(Learner):
         if xi_support is None:
             xi_support = np.ones(p)
         X = X * xi_support
-        phi = np.ones((L, 1))
-        D = 1e-2 * np.identity(r_l * L)
         self._update_theta(beta=beta_all, xi=xi_ext_all, gamma=gamma_all,
                            long_cov=D, phi=phi, baseline_hazard=baseline_hazard)
 

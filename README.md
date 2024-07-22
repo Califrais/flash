@@ -56,6 +56,10 @@ Figures 7 in the main paper can be reproduced with
     
     python flash/exp_compare.py
 
+Figures 1 in the Supplementary Materials can be reproduced with
+    
+    python flash/exp_NASA.py
+
 Figures 3 in the Supplementary Materials can be reproduced with
     
     python flash/exp_K_sel.py
