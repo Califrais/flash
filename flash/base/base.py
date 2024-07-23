@@ -449,19 +449,6 @@ def feat_representation_extraction_sig(Y, T_u, order=2):
     J = len(T_u)
     n_samples = len(np.unique(Y["id"].values))
     idx = np.unique(Y["id"].values)
-#    longi_feat = Y.columns[2:]
-#    paths = np.zeros((n_samples, J, len(longi_feat), 30, 2))
-#    for i in range(n_samples):
-#        for j in range(J):
-#            t = T_u[j]
-#            tmp_ = Y[(Y.T_long <= t) & (Y.id == idx[i])]
-#            n_ij = tmp_.shape[0]
-#            for k in range(len(longi_feat)):
-#                paths[i, j, k, : n_ij] = tmp_[["T_long", longi_feat[k]]].values
-#
-#                paths[i, j, k, n_ij :] = paths[i, j, k, n_ij]
-
-#    asso_features = iisignature.sig(paths, 2).reshape((n_samples, J, -1))
     longi_feat = Y.columns[1:]
     paths = np.zeros((n_samples, J, 30, len(longi_feat)))
     for i in range(n_samples):

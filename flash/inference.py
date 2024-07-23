@@ -13,7 +13,7 @@ from flash.model.m_step_functions import MstepFunctions
 from flash.model.regularizations import ElasticNet, SparseGroupL1
 from scipy.stats import multivariate_normal
 from numpy.linalg import multi_dot
-from flash.base.base import feat_representation_extraction
+from flash.base.base import feat_representation_extraction, feat_representation_extraction_sig
 
 class ext_EM(Learner):
     """Extension of EM Algorithm for the flash model inference
@@ -88,7 +88,7 @@ class ext_EM(Learner):
                  verbose=True, print_every=10, tol=1e-4,
                  warm_start=True, fixed_effect_time_order=1, initialize=True,
                  copt_accelerate=False, copt_solver_step='backtracking',
-                 fc_parameters=None):
+                 fc_parameters=None, sig_ext=False, sig_order=3):
         Learner.__init__(self, verbose=verbose, print_every=print_every)
         self.max_iter = max_iter
         self.max_iter_lbfgs = max_iter_lbfgs
@@ -101,7 +101,12 @@ class ext_EM(Learner):
         self.l_pen_EN = l_pen_EN
         self.l_pen_SGL = l_pen_SGL
         self.eta_elastic_net = eta_elastic_net
-        self.eta_sp_gp_l1 = eta_sp_gp_l1
+        self.sig_ext = sig_ext
+        if self.sig_ext:
+            self.eta_sp_gp_l1 = 0.
+            self.sig_order = sig_order
+        else:
+            self.eta_sp_gp_l1 = eta_sp_gp_l1
         self.ENet = ElasticNet(l_pen_EN, eta_elastic_net)
         self._fitted = False
 
@@ -184,7 +189,10 @@ class ext_EM(Learner):
         # xi elastic net penalty
         xi = theta["xi"]
         gamma = theta["gamma"]
-        groups = np.arange(0, len(gamma[0])).reshape(L, -1).tolist()
+        if self.sig_ext:
+            groups = np.arange(0, len(gamma[0])).reshape(1, -1).tolist()
+        else:
+            groups = np.arange(0, len(gamma[0])).reshape(L, -1).tolist()
         SGL1 = SparseGroupL1(l_pen_SGL, eta_sp_gp_l1, groups)
         K = xi.shape[1]
         pen = 0
@@ -404,8 +412,11 @@ class ext_EM(Learner):
             id_list = list(np.unique(Y.id.values))
             n_samples = len(id_list)
             markers = []
-            asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
-                                                        self.T_u, self.fc_parameters)
+            if self.sig_ext:
+                asso_feats, _ = feat_representation_extraction_sig(Y, self.T_u, self.sig_order)
+            else:
+                asso_feats, _ = feat_representation_extraction(Y, self.n_long_features,
+                                                               self.T_u, self.fc_parameters)
             for i in range(n_samples):
                 # predictions for alive subjects only
                 T_u = self.T_u
@@ -495,12 +506,17 @@ class ext_EM(Learner):
         J, ind_1, ind_2 = get_times_infos(T, T_u)
         asso_feats = asso_feats
         if asso_feats is None:
-            asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u,
-                                                        self.fc_parameters)
+            if self.sig_ext:
+                asso_feats, nb_extracted_feat = feat_representation_extraction_sig(Y, T_u, self.sig_order)
+            else:
+                asso_feats, nb_extracted_feat = feat_representation_extraction(Y, L, T_u, self.fc_parameters)
         else:
             nb_extracted_feat = None
         self.asso_feats = asso_feats
-        nb_asso_param = asso_feats.shape[-1] // L
+        if self.sig_ext:
+            nb_asso_param = asso_feats.shape[-1]
+        else:
+            nb_asso_param = asso_feats.shape[-1] // L
         self.nb_extracted_feat = nb_extracted_feat
 
         # Initialization
@@ -531,9 +547,15 @@ class ext_EM(Learner):
         xi_ext_all = [np.zeros((2 * p, 1))]
         for k in range(K):
             beta_all.append(beta.reshape(-1, 1))
-            gamma_all.append(1e-4 * np.ones((L * nb_asso_param, 1)))
+            if self.sig_ext:
+                gamma_all.append(1e-4 * np.ones((nb_asso_param, 1)))
+            else:
+                gamma_all.append(1e-4 * np.ones((L * nb_asso_param, 1)))
         if gamma_supports is None:
-            gamma_supports = [np.ones(L * nb_asso_param)] * K
+            if self.sig_ext:
+                gamma_supports = [np.ones(nb_asso_param)] * K
+            else:
+                gamma_supports = [np.ones(L * nb_asso_param)] * K
 
         for k in range(1, K):
             xi_ext_all.append(xi_ext.reshape(-1, 1))
@@ -579,7 +601,10 @@ class ext_EM(Learner):
                     gamma_init = gamma_all
                 else:
                     xi_init = [np.zeros(2*p)] * K
-                    gamma_init = [np.zeros(L * nb_asso_param, 1)] * K
+                    if self.sig_ext:
+                        gamma_init = [np.zeros(nb_asso_param, 1)] * K
+                    else:
+                        gamma_init = [np.zeros(L * nb_asso_param, 1)] * K
 
                 # xi update
                 xi_ext_update = [np.zeros((2 * p, 1))]
