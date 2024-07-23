@@ -75,5 +75,3 @@ Figures 4 in the Supplementary Materials can be reproduced with
 Table 3 in the Supplementary Materials can be reproduced with
     
     python flash/exp_coef.py
-
-Note that the Sepsis data is not provided to protect the privacy.
